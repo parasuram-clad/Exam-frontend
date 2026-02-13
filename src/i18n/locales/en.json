@@ -1,0 +1,87 @@
+{
+  "header": {
+    "hello": "Hello",
+    "greeting": "Let's learn something new today!",
+    "notifications": "Notifications",
+    "markAllRead": "Mark all read",
+    "viewAllNotifications": "View All Notifications",
+    "viewProfile": "View Profile",
+    "logout": "Logout",
+    "loggedInSince": "Logged in since"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "studyPlan": "My Study Plan",
+    "testSeries": "Test Series",
+    "progress": "My Progress",
+    "leaderboard": "Leaderboard",
+    "schedule": "Upcoming Schedule",
+    "profile": "My Profile"
+  },
+  "pages": {
+    "studyPlan": {
+      "title": "My Study Plan",
+      "subtitle": "Keep track of your learning goals"
+    },
+    "testSeries": {
+      "title": "Test Series",
+      "subtitle": "Challenge yourself with mock exams"
+    },
+    "progress": {
+      "title": "My Progress",
+      "subtitle": "Track your growth and performance"
+    },
+    "leaderboard": {
+      "title": "Leaderboard",
+      "subtitle": "See how you rank against other aspirants"
+    },
+    "schedule": {
+      "title": "Upcoming Schedule",
+      "subtitle": "Don't miss your planned sessions"
+    },
+    "profile": {
+      "title": "My Profile",
+      "subtitle": "Manage your account and preferences"
+    }
+  },
+  "login": {
+    "title": "Welcome Back!",
+    "subtitle": "Please login to continue your preparation journey.",
+    "mobileLabel": "Mobile Number",
+    "mobilePlaceholder": "Enter your mobile number",
+    "sendOtp": "Get OTP",
+    "sendingOtp": "Sending OTP...",
+    "enterOtp": "Enter OTP",
+    "changeNumber": "Change Number",
+    "verifyLogin": "Verify & Login",
+    "verifying": "Verifying...",
+    "orContinueWith": "Or continue with",
+    "noAccount": "Don't have an account?",
+    "signUp": "Sign up",
+    "illustration": {
+      "title": "Continue Your Preparation",
+      "description": "Pick up right where you left off. Your personalized study plan awaits."
+    }
+  },
+  "signup": {
+    "title": "Create Account",
+    "subtitle": "Start your preparation journey today.",
+    "nameLabel": "Full Name",
+    "namePlaceholder": "Enter your full name",
+    "mobileLabel": "Mobile Number",
+    "mobilePlaceholder": "Enter your mobile number",
+    "createAccount": "Create Account",
+    "creating": "Creating...",
+    "orContinueWith": "Or continue with",
+    "hasAccount": "Already have an account?",
+    "login": "Login"
+  },
+  "notifications": {
+    "newTestSeries": "New Test Series",
+    "newTestSeriesDesc": "TNPSC Mock Test 2026 is now available.",
+    "scheduleUpdate": "Schedule Update",
+    "scheduleUpdateDesc": "Your History session has been moved to 4 PM.",
+    "achievementUnlocked": "Achievement Unlocked",
+    "achievementUnlockedDesc": "You've completed 7 days streak!"
+  }
+}
