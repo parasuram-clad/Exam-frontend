@@ -44,6 +44,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+const EXAM_SUB_DIVISIONS: Record<string, string[]> = {
+  "TNPSC": ["Group I", "Group II", "Group IIA", "Group IV"],
+  "TNTET": ["TET Paper I", "TET Paper II", "PG TET"],
+  "TNUSRB": ["SI/SO", "PC/Fireman"]
+};
+
 const Profile = () => {
   const [activeTab, setActiveTab] = useState('Personal Details');
   const [isEditing, setIsEditing] = useState(false);
@@ -79,6 +85,9 @@ const Profile = () => {
     fieldOfStudy: "",
     gender: "",
     targetExamYear: "",
+    examType: "",
+    subDivision: "",
+    learnerType: "",
     notifyTransactionEmail: true,
     notifyTransactionWhatsapp: false,
     notifyContentEmail: true,
@@ -120,6 +129,9 @@ const Profile = () => {
             fieldOfStudy: user.field_of_study || "",
             gender: user.gender || "Male",
             targetExamYear: user.target_exam_year || "2025",
+            examType: user.exam_type || "",
+            subDivision: user.sub_division || "",
+            learnerType: user.learner_type || "",
             notifyTransactionEmail: user.notify_transaction_email ?? true,
             notifyTransactionWhatsapp: user.notify_transaction_whatsapp ?? false,
             notifyContentEmail: user.notify_content_email ?? true,
@@ -286,6 +298,9 @@ const Profile = () => {
         gender: profileData.gender,
         field_of_study: profileData.fieldOfStudy,
         target_exam_year: profileData.targetExamYear,
+        exam_type: profileData.examType,
+        sub_division: profileData.subDivision,
+        learner_type: profileData.learnerType,
         notify_transaction_email: profileData.notifyTransactionEmail,
         notify_transaction_whatsapp: profileData.notifyTransactionWhatsapp,
         notify_content_email: profileData.notifyContentEmail,
@@ -995,6 +1010,85 @@ const Profile = () => {
                                 <SelectItem value="2025">2025</SelectItem>
                                 <SelectItem value="2026">2026</SelectItem>
                                 <SelectItem value="2027">2027</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* Exam Type */}
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Exam Type</Label>
+                          <div className="relative group">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                              <Target className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                            </div>
+                            <Select
+                              disabled={!isEditing}
+                              value={profileData.examType}
+                              onValueChange={(value) => {
+                                setProfileData({
+                                  ...profileData,
+                                  examType: value,
+                                  subDivision: "" // Reset sub division when exam type changes
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-full bg-muted/30 border-none h-12 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background text-foreground/80 shadow-none">
+                                <SelectValue placeholder="Select Exam Type" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-border/50">
+                                <SelectItem value="TNPSC">TNPSC</SelectItem>
+                                <SelectItem value="TNTET">TNTET</SelectItem>
+                                <SelectItem value="TNUSRB">TNUSRB</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* Sub Division */}
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Sub Division</Label>
+                          <div className="relative group">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                              <Globe className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                            </div>
+                            <Select
+                              disabled={!isEditing || !profileData.examType}
+                              value={profileData.subDivision}
+                              onValueChange={(value) => setProfileData({ ...profileData, subDivision: value })}
+                            >
+                              <SelectTrigger className="w-full bg-muted/30 border-none h-12 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background text-foreground/80 shadow-none">
+                                <SelectValue placeholder={profileData.examType ? "Select Sub Division" : "Select Exam Type First"} />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-border/50">
+                                {profileData.examType && EXAM_SUB_DIVISIONS[profileData.examType]?.map((sub) => (
+                                  <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* Learner Type */}
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Learner Type</Label>
+                          <div className="relative group">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                              <Zap className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                            </div>
+                            <Select
+                              disabled={!isEditing}
+                              value={profileData.learnerType}
+                              onValueChange={(value) => setProfileData({ ...profileData, learnerType: value })}
+                            >
+                              <SelectTrigger className="w-full bg-muted/30 border-none h-12 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background text-foreground/80 shadow-none">
+                                <SelectValue placeholder="Select Learner Type" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-border/50">
+                                <SelectItem value="Student">Student</SelectItem>
+                                <SelectItem value="Working Professional">Working Professional</SelectItem>
+                                <SelectItem value="Fresher">Fresher</SelectItem>
+                                <SelectItem value="Experienced">Experienced</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

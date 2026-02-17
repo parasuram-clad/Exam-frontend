@@ -12,7 +12,7 @@ export function LanguageToggle() {
 
   return (
     <div
-      className="hidden sm:flex items-center gap-2 text-sm bg-muted rounded-full px-3 py-1.5 border border-border/50 cursor-pointer"
+      className="hidden sm:flex items-center gap-2 text-sm   px-3 py-1.5  cursor-pointer"
       onClick={toggleLanguage}
     >
       <span className={cn(

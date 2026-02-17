@@ -1,4 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import authService, { UserMe } from "@/services/auth.service";
+import studyService, { StudyPlanResponse } from "@/services/study.service";
+import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { DashboardLayout } from "@/components/layout";
@@ -10,7 +13,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Check, Lock, BookOpen, ClipboardList, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, Lock, BookOpen, ClipboardList, ArrowLeft, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Import local assets
@@ -688,10 +691,99 @@ const CircularProgress = ({ progress, color = "stroke-primary" }: { progress: nu
 
 const StudyPlan = () => {
   const navigate = useNavigate();
+  const [user, setUser] = useState<UserMe | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [userPlans, setUserPlans] = useState<StudyPlanResponse[]>([]);
+  const [dynamicDayWisePlans, setDynamicDayWisePlans] = useState<Record<number, StudyTopicCard[]>>({});
   const [selectedTopic, setSelectedTopic] = useState<StudyTopicCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [activeDay, setActiveDay] = useState<number>(3); // Default to current day (Day 3)
+  const [activeDay, setActiveDay] = useState<number>(1);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const initData = async () => {
+      try {
+        setLoading(true);
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
+
+        if (userData?.id) {
+          const plans = await studyService.getUserStudyPlans(userData.id);
+          setUserPlans(plans);
+
+          if (plans.length > 0) {
+            const mapped = mapBackendPlanToFrontend(plans);
+            setDynamicDayWisePlans(mapped);
+
+            // Find the current day (first day with non-completed status)
+            const currentDay = plans.find(p => p.plan_status !== 'COMPLETED')?.day_no || 1;
+            setActiveDay(currentDay);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load study plan data", err);
+        toast.error("Failed to load study plan. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initData();
+  }, []);
+
+  const mapBackendPlanToFrontend = (backendPlans: StudyPlanResponse[]): Record<number, StudyTopicCard[]> => {
+    const groupedByDay: Record<number, StudyPlanResponse[]> = {};
+    backendPlans.forEach(plan => {
+      if (!groupedByDay[plan.day_no]) {
+        groupedByDay[plan.day_no] = [];
+      }
+      groupedByDay[plan.day_no].push(plan);
+    });
+
+    const result: Record<number, StudyTopicCard[]> = {};
+
+    Object.entries(groupedByDay).forEach(([day, plans]) => {
+      const dayNo = parseInt(day);
+      const groupedBySubject: Record<string, StudyPlanResponse[]> = {};
+      plans.forEach(plan => {
+        if (!groupedBySubject[plan.subject]) {
+          groupedBySubject[plan.subject] = [];
+        }
+        groupedBySubject[plan.subject].push(plan);
+      });
+
+      result[dayNo] = Object.entries(groupedBySubject).map(([subject, items]) => {
+        const completedCount = items.filter(i => i.plan_status === 'COMPLETED').length;
+        const totalCount = items.length || 1;
+        const progress = Math.round((completedCount / totalCount) * 100);
+
+        return {
+          id: `${subject.toLowerCase().replace(/\s+/g, '-')}-${dayNo}`,
+          image: subject.toLowerCase().includes('history') ? studyPlan1 :
+            subject.toLowerCase().includes('geography') ? studyPlan2 :
+              subject.toLowerCase().includes('science') ? studyPlan3 : studyPlan4,
+          title: subject,
+          topicCount: items.length,
+          progress: progress,
+          topics: Array.from(new Set(items.map(i => i.chapter))).map(chapter => ({
+            name: chapter,
+            color: 'bg-[#7C79EC]'
+          })),
+          subtopics: items.map(i => ({
+            id: i.id.toString(),
+            name: i.topic,
+            description: `Chapter: ${i.chapter}`,
+            timeSpent: i.plan_status === 'COMPLETED' ? i.minutes : 0,
+            totalTime: i.minutes,
+            status: i.plan_status === 'COMPLETED' ? 'completed' :
+              (i.plan_status === 'IN_PROGRESS' ? 'continue' : 'start')
+          }))
+        };
+      });
+    });
+
+    return result;
+  };
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -704,7 +796,32 @@ const StudyPlan = () => {
   };
 
   // Get study topics for the active day
-  const currentStudyTopics = dayWiseStudyPlans[activeDay] || [];
+  const currentStudyTopics = userPlans.length > 0
+    ? (dynamicDayWisePlans[activeDay] || [])
+    : (dayWiseStudyPlans[activeDay] || []);
+
+  // Generate dynamic day cycle based on available plans
+  const dynamicDayCycle: DayCycleItem[] = userPlans.length > 0
+    ? Array.from(new Set(userPlans.map(p => p.day_no))).sort((a, b) => a - b).map(day => {
+      const dayPlans = userPlans.filter(p => p.day_no === day);
+      const allCompleted = dayPlans.every(p => p.plan_status === 'COMPLETED');
+      const anyInProgress = dayPlans.some(p => p.plan_status === 'IN_PROGRESS');
+
+      let status: DayCycleItem['status'] = 'locked';
+      if (allCompleted) status = 'completed';
+      else if (day === activeDay || anyInProgress) status = 'current';
+
+      // Special case for assessments
+      const isAssessment = day % 7 === 0;
+      if (isAssessment) status = 'assessment';
+
+      return {
+        day,
+        status,
+        label: isAssessment ? `Week ${day / 7} Assessment` : `Day ${day}`
+      };
+    })
+    : dayCycle;
 
   const handleDayClick = (day: DayCycleItem) => {
     if (day.status !== "locked") {
@@ -722,6 +839,56 @@ const StudyPlan = () => {
     navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}`);
   };
 
+  const handleGeneratePlan = async () => {
+    if (!user) {
+      toast.error("Please log in to generate a study plan.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await studyService.generateStudyPlan({
+        user_id: user.id,
+        exam_type: user.exam_type || 'TNPSC',
+        sub_division: user.sub_division || 'Group I',
+        year: parseInt(user.target_exam_year || new Date().getFullYear().toString()),
+        learner_type: user.learner_type || 'Student',
+        daily_study_hours: 4
+      });
+
+      const plans = await studyService.getUserStudyPlans(user.id);
+      setUserPlans(plans);
+      const mapped = mapBackendPlanToFrontend(plans);
+      setDynamicDayWisePlans(mapped);
+      setActiveDay(1);
+      toast.success("Study plan generated successfully!");
+    } catch (err) {
+      console.error("Failed to generate study plan", err);
+      toast.error("Failed to generate study plan. Please check if your profile is complete.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Calculations for overview card
+  const totalStudyDays = userPlans.length > 0 ? Math.max(...userPlans.map(p => p.day_no)) : 180;
+  const currentWeekDay = ((activeDay - 1) % 7) + 1;
+  const subjectsTodayCount = currentStudyTopics.length;
+  const nextAssessmentDay = Math.ceil(activeDay / 7) * 7;
+  const overallProgress = userPlans.length > 0
+    ? Math.round((userPlans.filter(p => p.plan_status === 'COMPLETED').length / userPlans.length) * 100)
+    : 30;
+
   return (
     <DashboardLayout>
       <motion.div
@@ -738,127 +905,154 @@ const StudyPlan = () => {
           <div className="flex flex-wrap items-start justify-between gap-6 md:gap-4 mb-4">
             <div className="space-y-1.5 min-w-[120px]">
               <p className="text-[13px] text-[#8E8E93] font-medium">Day</p>
-              <p className="text-[22px] font-bold text-[#1C1C1E]">3 of 180</p>
+              <p className="text-[22px] font-bold text-[#1C1C1E]">{activeDay} of {totalStudyDays}</p>
             </div>
             <div className="space-y-1.5 min-w-[120px]">
               <p className="text-[13px] text-[#8E8E93] font-medium">Current Week</p>
-              <p className="text-[22px] font-bold text-[#1C1C1E]">Day 3 of 7</p>
+              <p className="text-[22px] font-bold text-[#1C1C1E]">Day {currentWeekDay} of 7</p>
             </div>
             <div className="space-y-1.5 min-w-[120px]">
               <p className="text-[13px] text-[#8E8E93] font-medium">Subjects Today</p>
-              <p className="text-[22px] font-bold text-[#1C1C1E]">3</p>
+              <p className="text-[22px] font-bold text-[#1C1C1E]">{subjectsTodayCount}</p>
             </div>
             <div className="space-y-1.5 min-w-[120px]">
               <p className="text-[13px] text-[#8E8E93] font-medium">Assessment</p>
-              <p className="text-[22px] font-bold text-[#1C1C1E]">Day 7</p>
+              <p className="text-[22px] font-bold text-[#1C1C1E]">Day {nextAssessmentDay}</p>
             </div>
           </div>
 
           <div className="mt-6">
             <div className="flex justify-between items-center mb-2.5">
               <span className="text-[13px] text-[#8E8E93] font-semibold">Overall Progress</span>
-              <span className="text-[14px] text-[#1C1C1E]">30%</span>
+              <span className="text-[14px] text-[#1C1C1E]">{overallProgress}%</span>
             </div>
             <div className="h-[7px] w-full bg-[#E5E5EA] rounded-full overflow-hidden">
               <motion.div
                 className="h-full bg-[#1D1E2C] rounded-full"
                 initial={{ width: 0 }}
-                animate={{ width: '30%' }}
+                animate={{ width: `${overallProgress}%` }}
                 transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
               />
             </div>
           </div>
         </motion.div>
 
-        {/* 14-Day Cycle Schedule */}
-        <motion.section variants={itemVariants} className="relative group">
-          <div className="flex items-center justify-between mb-4 px-2">
-            <h2 className="text-[18px] md:text-xl font-bold text-slate-800">Study Schedule</h2>
-            <div className="hidden md:flex gap-1">
-              <span className="text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter font-bold">Scroll for More</span>
+        {/* Empty State / Generate Plan */}
+        {userPlans.length === 0 && (
+          <motion.div
+            variants={itemVariants}
+            className="bg-white rounded-[24px] p-12 border border-[#F2F2F7] shadow-sm text-center space-y-6"
+          >
+            <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto">
+              <BookOpen className="w-8 h-8 text-accent" />
             </div>
-          </div>
-
-          <div className="relative px-2">
-            {/* Desktop Navigation Arrows - Centered vertially with icons */}
-            <div className="hidden sm:block absolute left-0 top-9 -translate-y-1/2 -ml-3 z-30">
-              <button
-                onClick={() => scroll('left')}
-                className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-primary/10 transition-all duration-300"
-                aria-label="Scroll Left"
-              >
-                <ChevronLeft className="h-8 w-8" strokeWidth={2.5} />
-              </button>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-slate-800">No Study Plan Found</h2>
+              <p className="text-slate-500 max-w-md mx-auto">
+                Ready to start your preparation? We'll generate a personalized study plan based on your target exam and schedule.
+              </p>
             </div>
-
-            <div className="hidden sm:block absolute right-0 top-9 -translate-y-1/2 -mr-3 z-30">
-              <button
-                onClick={() => scroll('right')}
-                className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-primary/10 transition-all duration-300"
-                aria-label="Scroll Right"
-              >
-                <ChevronRight className="h-8 w-8" strokeWidth={2.5} />
-              </button>
-            </div>
-
-            <div
-              ref={scrollContainerRef}
-              className="flex items-start gap-0 overflow-x-auto pb-6 pt-2 no-scrollbar scroll-smooth px-4 md:px-10"
+            <Button
+              onClick={handleGeneratePlan}
+              className="bg-[#1c1c1e] text-white hover:bg-black px-10 py-6 text-lg rounded-xl transition-all shadow-md group"
             >
-              {dayCycle.map((item, index) => (
-                <div key={index} className="flex items-start shrink-0">
-                  <div className="flex flex-col items-center w-14 shrink-0">
-                    <motion.div
-                      whileHover={item.status !== "locked" ? { scale: 1.1, y: -2 } : {}}
-                      whileTap={item.status !== "locked" ? { scale: 0.95 } : {}}
-                      onClick={() => item.status !== "locked" && handleDayClick(item)}
-                      className={cn(
-                        "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm relative z-10 cursor-pointer ",
-                        item.status === "completed" && "bg-[#1D1E2C] text-white",
-                        item.status === "current" && "bg-accent text-accent-foreground shadow-md ring-2 ring-accent/20",
-                        item.status === "locked" && "bg-[#F2F2F7] text-slate-300 cursor-not-allowed",
-                        item.status === "assessment" && "bg-white border-2 border-slate-200 text-slate-400 font-bold",
-                        activeDay === item.day && item.status !== "locked" && "ring-4 ring-accent/30 scale-105 shadow-xl border-accent"
-                      )}
-                    >
-                      {item.status === "completed" && <Check className="w-6 h-6" strokeWidth={3} />}
-                      {item.status === "current" && <BookOpen className="w-6 h-6" />}
-                      {item.status === "locked" && <Lock className="w-5 h-5" />}
-                      {item.status === "assessment" && <ClipboardList className="w-6 h-6" />}
-                    </motion.div>
-                    <div className="w-[100px] mt-3 flex justify-center">
-                      <span className={cn(
-                        "text-[10px] md:text-[11px] uppercase tracking-wider font-semibold text-center leading-tight",
-                        item.status === "locked" ? "text-slate-300" : "text-slate-600",
-                        activeDay === item.day && "text-blue-600 font-bold"
-                      )}>
-                        {item.label}
-                      </span>
-                    </div>
-                  </div>
+              <Sparkles className="w-5 h-5 mr-3 text-yellow-400 group-hover:rotate-12 transition-transform" />
+              Generate My Study Plan
+            </Button>
+          </motion.div>
+        )}
 
-                  {index < dayCycle.length - 1 && (
-                    <div className="w-12 md:w-16 h-14 flex items-center justify-center shrink-0 -mx-[1px]">
-                      <div className="w-full h-[2px] border-t-2 border-dashed border-slate-200" />
-                    </div>
-                  )}
-                </div>
-              ))}
+        {/* 14-Day Cycle Schedule */}
+        {userPlans.length > 0 && (
+          <motion.section variants={itemVariants} className="relative group">
+            <div className="flex items-center justify-between mb-4 px-2">
+              <h2 className="text-[18px] md:text-xl font-bold text-slate-800">Study Schedule</h2>
+              <div className="hidden md:flex gap-1">
+                <span className="text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter font-bold">Scroll for More</span>
+              </div>
             </div>
-          </div>
-        </motion.section>
+
+            <div className="relative px-2">
+              {/* Desktop Navigation Arrows - Centered vertially with icons */}
+              <div className="hidden sm:block absolute left-0 top-9 -translate-y-1/2 -ml-3 z-30">
+                <button
+                  onClick={() => scroll('left')}
+                  className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-primary/10 transition-all duration-300"
+                  aria-label="Scroll Left"
+                >
+                  <ChevronLeft className="h-8 w-8" strokeWidth={2.5} />
+                </button>
+              </div>
+
+              <div className="hidden sm:block absolute right-0 top-9 -translate-y-1/2 -mr-3 z-30">
+                <button
+                  onClick={() => scroll('right')}
+                  className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-primary/10 transition-all duration-300"
+                  aria-label="Scroll Right"
+                >
+                  <ChevronRight className="h-8 w-8" strokeWidth={2.5} />
+                </button>
+              </div>
+
+              <div
+                ref={scrollContainerRef}
+                className="flex items-start gap-0 overflow-x-auto pb-6 pt-2 no-scrollbar scroll-smooth px-4 md:px-10"
+              >
+                {dynamicDayCycle.map((item, index) => (
+                  <div key={index} className="flex items-start shrink-0">
+                    <div className="flex flex-col items-center w-14 shrink-0">
+                      <motion.div
+                        whileHover={item.status !== "locked" ? { scale: 1.1, y: -2 } : {}}
+                        whileTap={item.status !== "locked" ? { scale: 0.95 } : {}}
+                        onClick={() => item.status !== "locked" && handleDayClick(item)}
+                        className={cn(
+                          "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm relative z-10 cursor-pointer ",
+                          item.status === "completed" && "bg-[#1D1E2C] text-white",
+                          item.status === "current" && "bg-accent text-accent-foreground shadow-md ring-2 ring-accent/20",
+                          item.status === "locked" && "bg-[#F2F2F7] text-slate-300 cursor-not-allowed",
+                          item.status === "assessment" && "bg-white border-2 border-slate-200 text-slate-400 font-bold",
+                          activeDay === item.day && item.status !== "locked" && "ring-4 ring-accent/30 scale-105 shadow-xl border-accent"
+                        )}
+                      >
+                        {item.status === "completed" && <Check className="w-6 h-6" strokeWidth={3} />}
+                        {item.status === "current" && <BookOpen className="w-6 h-6" />}
+                        {item.status === "locked" && <Lock className="w-5 h-5" />}
+                        {item.status === "assessment" && <ClipboardList className="w-6 h-6" />}
+                      </motion.div>
+                      <div className="w-[100px] mt-3 flex justify-center">
+                        <span className={cn(
+                          "text-[10px] md:text-[11px] uppercase tracking-wider font-semibold text-center leading-tight",
+                          item.status === "locked" ? "text-slate-300" : "text-slate-600",
+                          activeDay === item.day && "text-blue-600 font-bold"
+                        )}>
+                          {item.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {index < dynamicDayCycle.length - 1 && (
+                      <div className="w-12 md:w-16 h-14 flex items-center justify-center shrink-0 -mx-[1px]">
+                        <div className="w-full h-[2px] border-t-2 border-dashed border-slate-200" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.section>
+        )}
 
         {/* Today's Study Plan */}
         <motion.section variants={itemVariants}>
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <h2 className="text-[18px] font-bold text-[#1C1C1E]">
-                {activeDay === 3 ? "Today's Study Plan" : `Day ${activeDay} Study Plan`}
+                {userPlans.length > 0 ? (activeDay === (userPlans.find(p => p.plan_status !== 'COMPLETED')?.day_no || 1) ? "Today's Study Plan" : `Day ${activeDay} Study Plan`) : "Today's Study Plan"}
               </h2>
               <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider">
-                {dayCycle.find(d => d.day === activeDay)?.status === "completed" ? "✓ Completed" :
-                  dayCycle.find(d => d.day === activeDay)?.status === "current" ? "Active" :
-                    dayCycle.find(d => d.day === activeDay)?.status === "assessment" ? "Assessment" : "Upcoming"}
+                {dynamicDayCycle.find(d => d.day === activeDay)?.status === "completed" ? "✓ Completed" :
+                  dynamicDayCycle.find(d => d.day === activeDay)?.status === "current" ? "Active" :
+                    dynamicDayCycle.find(d => d.day === activeDay)?.status === "assessment" ? "Assessment" : "Upcoming"}
               </span>
             </div>
             <span className="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">

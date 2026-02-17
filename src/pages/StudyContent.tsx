@@ -1,4 +1,7 @@
 import { useState, useRef, useEffect } from "react";
+import authService, { UserMe } from "@/services/auth.service";
+import studyService from "@/services/study.service";
+import { toast } from "sonner";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -513,12 +516,14 @@ const StudyContent = () => {
   const { topicId, subtopicId } = useParams();
   const navigate = useNavigate();
 
+  const [sections, setSections] = useState<ContentSection[]>(contentSections);
+  const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>("reading");
   const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset>("light");
   const [showTopBar, setShowTopBar] = useState(false);
   const [openPyqAccordion, setOpenPyqAccordion] = useState<string | null>(null); // Format: "sectionId-paragraphIndex"
   const [openAnswers, setOpenAnswers] = useState<Set<string>>(new Set());
-  const [visibleKeywords, setVisibleKeywords] = useState<string[]>(contentSections[0].keywords);
+  const [visibleKeywords, setVisibleKeywords] = useState<string[]>([]);
 
   const [isAssessmentStarted, setIsAssessmentStarted] = useState(false);
   const [isAssessmentFinished, setIsAssessmentFinished] = useState(false);
@@ -532,6 +537,71 @@ const StudyContent = () => {
   const [tempNoteText, setTempNoteText] = useState("");
 
   const readingPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      // If we don't have a backend subtopicId (numeric), we might be using mock routes
+      if (!subtopicId || isNaN(parseInt(subtopicId))) {
+        setLoading(false);
+        setVisibleKeywords(contentSections[0].keywords);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const user = await authService.getCurrentUser();
+
+        // Get the specific plan item to know the topic and subject
+        const planItem = await studyService.getStudyPlan(parseInt(subtopicId));
+
+        if (planItem) {
+          const response = await studyService.getTopicContent({
+            user_id: user.id,
+            exam_type: user.exam_type || 'TNPSC',
+            sub_division: user.sub_division || 'Group I',
+            subject: planItem.subject,
+            topic: planItem.topic,
+            learner_type: user.learner_type === 'Experienced' || user.learner_type === 'Working Professional',
+            language: user.preferred_language || 'English'
+          });
+
+          // Simple parser: split by double newlines
+          const paragraphs = response.content.split('\n\n').filter(p => p.trim());
+
+          const newSections: ContentSection[] = [{
+            id: 'generated',
+            title: planItem.topic,
+            paragraphs: paragraphs,
+            keywords: []
+          }];
+
+          setSections(newSections);
+
+          // Fetch existing notes for this topic
+          try {
+            const notes = await studyService.getUserNotes(user.id);
+            const topicNotes = notes.filter(n => n.topic_id === parseInt(subtopicId));
+            const notesMap: Record<string, string> = {};
+            topicNotes.forEach(n => {
+              notesMap[n.title] = n.content;
+            });
+            setKeywordNotes(notesMap);
+          } catch (nErr) {
+            console.error("Failed to fetch notes", nErr);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch study content", err);
+        // Fallback to mock content if backend fails
+        setSections(contentSections);
+        toast.error("Using backup study material.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContent();
+  }, [subtopicId]);
 
   // When keyword changes, reset editing state
   useEffect(() => {
@@ -558,8 +628,8 @@ const StudyContent = () => {
       const clientHeight = readingPanelRef.current.clientHeight;
 
       const scrollPercent = scrollTop / (scrollHeight - clientHeight || 1);
-      const sectionIndex = Math.floor(scrollPercent * contentSections.length);
-      const currentSection = contentSections[Math.min(sectionIndex, contentSections.length - 1)];
+      const sectionIndex = Math.floor(scrollPercent * sections.length);
+      const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];
 
       setVisibleKeywords(currentSection.keywords);
     };
@@ -614,11 +684,36 @@ const StudyContent = () => {
 
   const handleNoteContentChange = (keyword: string, content: string) => {
     setKeywordNotes(prev => ({ ...prev, [keyword]: content }));
+    // Auto-save logic can be added here if desired
+  };
+
+  const handleSaveNote = async (keyword: string, content: string) => {
+    if (!subtopicId || isNaN(parseInt(subtopicId))) {
+      // For mock data, just update local state
+      setKeywordNotes(prev => ({ ...prev, [keyword]: content }));
+      return;
+    }
+
+    try {
+      const user = await authService.getCurrentUser();
+      await studyService.createNote({
+        user_id: user.id,
+        topic_id: parseInt(subtopicId),
+        title: keyword,
+        content: content,
+        status: 'private'
+      });
+      setKeywordNotes(prev => ({ ...prev, [keyword]: content }));
+      toast.success("Note saved successfully!");
+    } catch (err) {
+      console.error("Failed to save note", err);
+      toast.error("Failed to save note to server.");
+    }
   };
 
   const renderReadingContent = () => (
     <div className="flex flex-col gap-10 py-12 px-8 md:px-16 max-w-[800px] mx-auto">
-      {contentSections.map((section, idx) => (
+      {sections.map((section, idx) => (
         <div key={section.id} id={`section-${section.id}`} className="space-y-8 scroll-mt-24">
           {/* <div className="flex items-center justify-between pb-3 border-b border-gray-200/10">
             <span className={cn("text-[12px] uppercase tracking-[0.1em] font-medium opacity-40", getTextColor())}>
@@ -780,288 +875,300 @@ const StudyContent = () => {
 
   return (
     <div className={cn("fixed inset-0 z-50 overflow-hidden", getBackgroundStyle())}>
-      {/* Top Control Bar from StudyInterface */}
-      <div
-        className="fixed top-0 left-0 right-0 h-16 z-[100]"
-        onMouseEnter={() => setShowTopBar(true)}
-        onMouseLeave={() => setShowTopBar(false)}
-      >
-        <div className={cn(
-          "absolute inset-0 transition-opacity duration-200",
-          showTopBar ? "opacity-100" : "opacity-0 pointer-events-none",
-          backgroundPreset === 'dark' ? "bg-[#1a1a1a] border-b border-gray-800" : "bg-white border-b border-gray-200 shadow-sm"
-        )}>
-          <div className="max-w-[1400px] mx-auto h-full px-4 sm:px-8 flex items-center justify-between gap-4">
-            <div className="flex-1 flex items-center">
-              <button
-                onClick={() => navigate('/study-plan')}
-                className={cn("flex items-center gap-1.5 font-['Inter:Regular',sans-serif] text-[13px] sm:text-[14px] opacity-70 hover:opacity-100 transition-opacity", getTextColor())}
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span className="hidden xs:inline">Back</span>
-              </button>
-            </div>
-
-            <div className="flex-shrink-0 flex items-center gap-1 sm:gap-2 bg-gray-100/10 p-1 rounded-xl">
-              {[
-                { id: 'reading', icon: Book, label: 'Reading' },
-                { id: 'study', icon: PenTool, label: 'Study' },
-                { id: 'revision', icon: History, label: 'Revision' }
-              ].map(m => (
-                <button
-                  key={m.id}
-                  onClick={() => setMode(m.id as Mode)}
-                  className={cn(
-                    "px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-all flex items-center gap-1.5 sm:gap-2",
-                    mode === m.id
-                      ? "bg-[#1f2937] text-white shadow-sm"
-                      : cn("text-[13px] sm:text-[14px] opacity-40 hover:opacity-100", getTextColor())
-                  )}
-                  title={`${m.label} Mode`}
-                >
-                  <m.icon className="w-4 h-4" />
-                  <span className="text-[13px] sm:text-[14px] font-medium hidden sm:inline">{m.label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex-1 flex items-center justify-end gap-2 sm:gap-4">
-              <span className={cn("text-[13px] sm:text-[14px] opacity-60 hidden lg:inline", getTextColor())}>Display:</span>
-              <div className="flex items-center gap-1 sm:gap-1.5">
-                {(['light', 'warm', 'dark'] as BackgroundPreset[]).map(p => (
-                  <button
-                    key={p}
-                    onClick={() => setBackgroundPreset(p)}
-                    className={cn(
-                      "px-2 sm:px-3 py-1 rounded-lg text-[11px] sm:text-[12px] font-medium transition-all border",
-                      backgroundPreset === p
-                        ? "bg-[#1f2937] text-white border-[#1f2937]"
-                        : cn("bg-transparent border-gray-200/20", getTextColor())
-                    )}
-                  >
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
+      {loading ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className={cn("text-sm", getTextColor())}>Generating your study material...</p>
           </div>
         </div>
-      </div>
-
-      <div className="w-full h-full overflow-hidden">
-        {mode === 'reading' && (
-          <div className="w-full h-full overflow-y-auto bg-[#f5f5f5]">
-            <div className={cn("h-full overflow-y-auto pt-20", getBackgroundStyle())} style={{ maxWidth: '800px', margin: '0 auto' }} ref={readingPanelRef}>
-              {renderReadingContent()}
-            </div>
-          </div>
-        )}
-
-        {mode === 'study' && (
-          <div className="flex flex-col lg:flex-row h-full w-full overflow-hidden">
-            {/* Reading Panel */}
+      ) : (
+        <>
+          {/* Top Control Bar from StudyInterface */}
+          <div
+            className="fixed top-0 left-0 right-0 h-16 z-[100]"
+            onMouseEnter={() => setShowTopBar(true)}
+            onMouseLeave={() => setShowTopBar(false)}
+          >
             <div className={cn(
-              "w-full lg:w-[60%] h-[35%] lg:h-full overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200/10 transition-all duration-300 pt-20 lg:pt-24",
-              focusedNoteKeyword ? "h-0 opacity-0 invisible lg:h-full lg:opacity-100 lg:visible" : "h-[35%]",
-              getBackgroundStyle()
-            )} ref={readingPanelRef}>
-              {renderReadingContent()}
-            </div>
-
-            {/* Right Side Panels (Keywords + Notes) */}
-            <div className="w-full lg:w-[40%] flex-1 lg:h-full bg-[#fafaf9] flex flex-col overflow-hidden pb-20 lg:pb-0">
-              {/* Keywords Bar */}
-              <div className={cn(
-                "flex-shrink-0 lg:h-[30%] lg:overflow-y-auto border-b border-gray-200/60 p-4 sm:p-6 bg-white/50 backdrop-blur-sm transition-all duration-300",
-                focusedNoteKeyword ? "h-0 p-0 opacity-0 overflow-hidden border-none lg:h-[30%] lg:p-6 lg:opacity-100 lg:overflow-y-auto lg:border-b" : "h-auto"
-              )}><div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-semibold">Keywords</h3>
-
+              "absolute inset-0 transition-opacity duration-200",
+              showTopBar ? "opacity-100" : "opacity-0 pointer-events-none",
+              backgroundPreset === 'dark' ? "bg-[#1a1a1a] border-b border-gray-800" : "bg-white border-b border-gray-200 shadow-sm"
+            )}>
+              <div className="max-w-[1400px] mx-auto h-full px-4 sm:px-8 flex items-center justify-between gap-4">
+                <div className="flex-1 flex items-center">
+                  <button
+                    onClick={() => navigate('/study-plan')}
+                    className={cn("flex items-center gap-1.5 font-['Inter:Regular',sans-serif] text-[13px] sm:text-[14px] opacity-70 hover:opacity-100 transition-opacity", getTextColor())}
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span className="hidden xs:inline">Back</span>
+                  </button>
                 </div>
 
-                <div className="flex flex-wrap gap-2 transition-all duration-300">
-                  {visibleKeywords.map(kw => (
+                <div className="flex-shrink-0 flex items-center gap-1 sm:gap-2 bg-gray-100/10 p-1 rounded-xl">
+                  {[
+                    { id: 'reading', icon: Book, label: 'Reading' },
+                    { id: 'study', icon: PenTool, label: 'Study' },
+                    { id: 'revision', icon: History, label: 'Revision' }
+                  ].map(m => (
                     <button
-                      key={kw}
-                      onClick={() => {
-                        setSelectedKeyword(kw);
-                        if (keywordNotes[kw] === undefined) {
-                          setKeywordNotes(prev => ({ ...prev, [kw]: "" }));
-                        }
-                      }}
+                      key={m.id}
+                      onClick={() => setMode(m.id as Mode)}
                       className={cn(
-                        "px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[12px] sm:text-[14px] transition-all border font-medium",
-                        selectedKeyword === kw
-                          ? "bg-[#1f2937] border-[#1f2937] text-white shadow-md font-semibold"
-                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
+                        "px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-all flex items-center gap-1.5 sm:gap-2",
+                        mode === m.id
+                          ? "bg-[#1f2937] text-white shadow-sm"
+                          : cn("text-[13px] sm:text-[14px] opacity-40 hover:opacity-100", getTextColor())
                       )}
+                      title={`${m.label} Mode`}
                     >
-                      {kw}
+                      <m.icon className="w-4 h-4" />
+                      <span className="text-[13px] sm:text-[14px] font-medium hidden sm:inline">{m.label}</span>
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* Notes List Section */}
-              <div className="flex-1 p-4 sm:p-8 flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-semibold">
-                    {focusedNoteKeyword ? `Editing: ${focusedNoteKeyword}` : 'Notes'}
-                  </h3>
-                  {focusedNoteKeyword && (
-                    <button
-                      onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                      className="text-[12px] font-bold text-blue-500 uppercase tracking-wider py-1 px-3 bg-blue-50 rounded-lg"
-                    >
-                      Done
-                    </button>
-                  )}
+                <div className="flex-1 flex items-center justify-end gap-2 sm:gap-4">
+                  <span className={cn("text-[13px] sm:text-[14px] opacity-60 hidden lg:inline", getTextColor())}>Display:</span>
+                  <div className="flex items-center gap-1 sm:gap-1.5">
+                    {(['light', 'warm', 'dark'] as BackgroundPreset[]).map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setBackgroundPreset(p)}
+                        className={cn(
+                          "px-2 sm:px-3 py-1 rounded-lg text-[11px] sm:text-[12px] font-medium transition-all border",
+                          backgroundPreset === p
+                            ? "bg-[#1f2937] text-white border-[#1f2937]"
+                            : cn("bg-transparent border-gray-200/20", getTextColor())
+                        )}
+                      >
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto space-y-4 pr-1 no-scrollbar">
-                  {Object.keys(keywordNotes).length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center py-12 sm:py-20">
-                      <div className="w-12 h-12 rounded-2xl bg-gray-200/50 flex items-center justify-center mb-4">
-                        <PenTool className="w-6 h-6" />
-                      </div>
-                      <p className="font-['Inter:Regular',sans-serif] text-[13px] sm:text-[14px] text-gray-700 italic">
-                        Select a keyword to start taking notes
-                      </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full h-full overflow-hidden">
+            {mode === 'reading' && (
+              <div className="w-full h-full overflow-y-auto bg-[#f5f5f5]">
+                <div className={cn("h-full overflow-y-auto pt-20", getBackgroundStyle())} style={{ maxWidth: '800px', margin: '0 auto' }} ref={readingPanelRef}>
+                  {renderReadingContent()}
+                </div>
+              </div>
+            )}
+
+            {mode === 'study' && (
+              <div className="flex flex-col lg:flex-row h-full w-full overflow-hidden">
+                {/* Reading Panel */}
+                <div className={cn(
+                  "w-full lg:w-[60%] h-[35%] lg:h-full overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200/10 transition-all duration-300 pt-20 lg:pt-24",
+                  focusedNoteKeyword ? "h-0 opacity-0 invisible lg:h-full lg:opacity-100 lg:visible" : "h-[35%]",
+                  getBackgroundStyle()
+                )} ref={readingPanelRef}>
+                  {renderReadingContent()}
+                </div>
+
+                {/* Right Side Panels (Keywords + Notes) */}
+                <div className="w-full lg:w-[40%] flex-1 lg:h-full bg-[#fafaf9] flex flex-col overflow-hidden pb-20 lg:pb-0">
+                  {/* Keywords Bar */}
+                  <div className={cn(
+                    "flex-shrink-0 lg:h-[30%] lg:overflow-y-auto border-b border-gray-200/60 p-4 sm:p-6 bg-white/50 backdrop-blur-sm transition-all duration-300",
+                    focusedNoteKeyword ? "h-0 p-0 opacity-0 overflow-hidden border-none lg:h-[30%] lg:p-6 lg:opacity-100 lg:overflow-y-auto lg:border-b" : "h-auto"
+                  )}><div className="flex items-center justify-between mb-3 sm:mb-4">
+                      <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-semibold">Keywords</h3>
+
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 transition-all duration-300">
+                      {visibleKeywords.map(kw => (
+                        <button
+                          key={kw}
+                          onClick={() => {
+                            setSelectedKeyword(kw);
+                            if (keywordNotes[kw] === undefined) {
+                              setKeywordNotes(prev => ({ ...prev, [kw]: "" }));
+                            }
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[12px] sm:text-[14px] transition-all border font-medium",
+                            selectedKeyword === kw
+                              ? "bg-[#1f2937] border-[#1f2937] text-white shadow-md font-semibold"
+                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
+                          )}
+                        >
+                          {kw}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Notes List Section */}
+                  <div className="flex-1 p-4 sm:p-8 flex flex-col overflow-hidden">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-semibold">
+                        {focusedNoteKeyword ? `Editing: ${focusedNoteKeyword}` : 'Notes'}
+                      </h3>
+                      {focusedNoteKeyword && (
+                        <button
+                          onClick={() => (document.activeElement as HTMLElement)?.blur()}
+                          className="text-[12px] font-bold text-blue-500 uppercase tracking-wider py-1 px-3 bg-blue-50 rounded-lg"
+                        >
+                          Done
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-1 no-scrollbar">
+                      {Object.keys(keywordNotes).length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center py-12 sm:py-20">
+                          <div className="w-12 h-12 rounded-2xl bg-gray-200/50 flex items-center justify-center mb-4">
+                            <PenTool className="w-6 h-6" />
+                          </div>
+                          <p className="font-['Inter:Regular',sans-serif] text-[13px] sm:text-[14px] text-gray-700 italic">
+                            Select a keyword to start taking notes
+                          </p>
+                        </div>
+                      ) : (
+                        Object.entries(keywordNotes).map(([keyword, content]) => (
+                          <div
+                            key={keyword}
+                            className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
+                            onMouseEnter={() => setHoveredNoteId(keyword)}
+                            onMouseLeave={() => setHoveredNoteId(null)}
+                          >
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <h4 className="font-['Inter:SemiBold',sans-serif] text-[14px] sm:text-[15px] font-bold text-gray-900 leading-tight">{keyword}</h4>
+                                <p className="font-['Inter:Regular',sans-serif] text-[10px] text-gray-400 mt-1">Ref: Tamil Nadu History</p>
+                              </div>
+                              {hoveredNoteId === keyword && (
+                                <button
+                                  onClick={() => handleDeleteNote(keyword)}
+                                  className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                                >
+                                  <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                                    <path d="M4 6V13C4 13.5523 4.44772 14 5 14H11C11.5523 14 12 13.5523 12 13V6M2 4H14M6 4V2.5C6 2.22386 6.22386 2 6.5 2H9.5C9.77614 2 10 2.22386 10 2.5V4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                            <textarea
+                              value={content}
+                              onFocus={() => setFocusedNoteKeyword(keyword)}
+                              onBlur={() => {
+                                setFocusedNoteKeyword(null);
+                                handleSaveNote(keyword, content);
+                              }}
+                              onChange={(e) => handleNoteContentChange(keyword, e.target.value)}
+                              placeholder="Synthesize your understanding..."
+                              className={cn(
+                                "w-full p-4 bg-white border-2 transition-all duration-300 rounded-2xl resize-none font-['Inter:Regular',sans-serif] text-[14px] leading-relaxed shadow-sm",
+                                focusedNoteKeyword === keyword
+                                  ? "min-h-[400px] border-blue-500/30 ring-4 ring-blue-500/5 text-gray-900"
+                                  : "min-h-[120px] border-gray-100 text-gray-600 bg-gray-50/30"
+                              )}
+                            />
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {mode === 'revision' && (
+              <div className="w-full h-full overflow-y-auto bg-[#fdfcfa] px-6 sm:px-10 md:px-24 py-16">
+                <div className="max-w-[850px] mx-auto space-y-8 sm:space-y-10">
+                  <div className="text-center sm:text-left">
+                    <h2 className="text-[24px] sm:text-[28px] font-medium text-gray-900 font-['Inter:Medium',sans-serif]">Revision Notes</h2>
+                  </div>
+
+                  {Object.keys(keywordNotes).length > 0 ? (
+                    <div className="grid gap-8">
+                      {Object.entries(keywordNotes).map(([k, n]) => (
+                        <div key={k} className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm transition-all hover:shadow-md">
+                          <div className="mb-6">
+                            <h4 className="text-md font-bold text-gray-900 leading-tight font-['Inter:Medium',sans-serif]">
+                              {k}
+                            </h4>
+                            <p className="text-sm text-gray-500 mt-1 font-['Inter:Regular',sans-serif]">
+                              History of Tamil Nadu: Ancient Kingdoms and Cultural Heritage
+                            </p>
+                          </div>
+
+                          <div className="relative group/rev-note">
+                            <textarea
+                              value={n}
+                              onChange={(e) => handleNoteContentChange(k, e.target.value)}
+                              placeholder="Your captured analysis will appear here..."
+                              className="w-full min-h-[150px] p-6 bg-[#fcfcfc] border border-gray-100 rounded-lg resize-none font-['Inter:Regular',sans-serif] text-[16px] leading-[26px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
-                    Object.entries(keywordNotes).map(([keyword, content]) => (
-                      <div
-                        key={keyword}
-                        className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
-                        onMouseEnter={() => setHoveredNoteId(keyword)}
-                        onMouseLeave={() => setHoveredNoteId(null)}
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h4 className="font-['Inter:SemiBold',sans-serif] text-[14px] sm:text-[15px] font-bold text-gray-900 leading-tight">{keyword}</h4>
-                            <p className="font-['Inter:Regular',sans-serif] text-[10px] text-gray-400 mt-1">Ref: Tamil Nadu History</p>
-                          </div>
-                          {hoveredNoteId === keyword && (
-                            <button
-                              onClick={() => handleDeleteNote(keyword)}
-                              className="text-gray-400 hover:text-red-600 transition-colors p-1"
-                            >
-                              <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-                                <path d="M4 6V13C4 13.5523 4.44772 14 5 14H11C11.5523 14 12 13.5523 12 13V6M2 4H14M6 4V2.5C6 2.22386 6.22386 2 6.5 2H9.5C9.77614 2 10 2.22386 10 2.5V4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-                        <textarea
-                          value={content}
-                          onFocus={() => setFocusedNoteKeyword(keyword)}
-                          onBlur={() => setFocusedNoteKeyword(null)}
-                          onChange={(e) => handleNoteContentChange(keyword, e.target.value)}
-                          placeholder="Synthesize your understanding..."
-                          className={cn(
-                            "w-full p-4 bg-white border-2 transition-all duration-300 rounded-2xl resize-none font-['Inter:Regular',sans-serif] text-[14px] leading-relaxed shadow-sm",
-                            focusedNoteKeyword === keyword
-                              ? "min-h-[400px] border-blue-500/30 ring-4 ring-blue-500/5 text-gray-900"
-                              : "min-h-[120px] border-gray-100 text-gray-600 bg-gray-50/30"
-                          )}
-                        />
+                    <div className="py-24 text-center">
+                      <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-100">
+                        <History className="w-10 h-10 text-gray-200" />
                       </div>
-                    ))
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">Synthesis Required</h3>
+                      <p className="text-gray-400 max-w-sm mx-auto">
+                        Toggle to Study Mode and capture your analysis across key concepts to populate your revision profile.
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
+            )}
           </div>
-        )}
 
-        {mode === 'revision' && (
-          <div className="w-full h-full overflow-y-auto bg-[#fdfcfa] px-6 sm:px-10 md:px-24 py-16">
-            <div className="max-w-[850px] mx-auto space-y-8 sm:space-y-10">
-              <div className="text-center sm:text-left">
-                <h2 className="text-[24px] sm:text-[28px] font-medium text-gray-900 font-['Inter:Medium',sans-serif]">Revision Notes</h2>
-              </div>
+          <DailyQuizModal
+            isOpen={isInQuizMode}
+            onClose={() => setIsAssessmentStarted(false)}
+            onComplete={() => {
+              setIsAssessmentFinished(true);
+              // Do NOT close the modal here to allow users to see the result
+              // setIsAssessmentStarted(false); 
+            }}
+            title="Tamil Nadu History Assessment"
+            subtitle="Quick Evaluation • 10 Minutes"
+            questions={[
+              {
+                id: 1,
+                question: "Which of the following dynasties is NOT considered one of the 'Three Great Tamil Kingdoms'?",
+                subject: "History",
+                difficulty: "Easy",
+                options: ["Chera", "Chola", "Pandya", "Pallava"],
+                correctAnswer: 3,
+                explanation: "The Three Great Tamil Kingdoms were the Cheras, Cholas, and Pandyas. The Pallavas came later and were a distinct dynasty."
+              },
+              {
+                id: 2,
+                question: "The term 'Sangam' in ancient Tamil history literally refers to:",
+                subject: "History",
+                difficulty: "Medium",
+                options: ["A battlefield", "An assembly of poets", "A naval port", "A royal palace"],
+                correctAnswer: 1,
+                explanation: "The term 'Sangam' refers to an assembly or academy of poets and scholars who gathered under royal patronage."
+              },
+              {
+                id: 3,
+                question: "Which ancient Tamil port was famously known for its extensive trade with the Roman Empire?",
+                subject: "History",
+                difficulty: "Hard",
+                options: ["Madurai", "Kancheepuram", "Arikamedu", "Kaveripattinam"],
+                correctAnswer: 2,
+                explanation: "Arikamedu (near Pondicherry) was a major port known for its trade with the Roman Empire, evidenced by Roman pottery and coins found there."
+              }
+            ]}
+          />
 
-              {Object.keys(keywordNotes).length > 0 ? (
-                <div className="grid gap-8">
-                  {Object.entries(keywordNotes).map(([k, n]) => (
-                    <div key={k} className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm transition-all hover:shadow-md">
-                      <div className="mb-6">
-                        <h4 className="text-md font-bold text-gray-900 leading-tight font-['Inter:Medium',sans-serif]">
-                          {k}
-                        </h4>
-                        <p className="text-sm text-gray-500 mt-1 font-['Inter:Regular',sans-serif]">
-                          History of Tamil Nadu: Ancient Kingdoms and Cultural Heritage
-                        </p>
-                      </div>
-
-                      <div className="relative group/rev-note">
-                        <textarea
-                          value={n}
-                          onChange={(e) => handleNoteContentChange(k, e.target.value)}
-                          placeholder="Your captured analysis will appear here..."
-                          className="w-full min-h-[150px] p-6 bg-[#fcfcfc] border border-gray-100 rounded-lg resize-none font-['Inter:Regular',sans-serif] text-[16px] leading-[26px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-24 text-center">
-                  <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-100">
-                    <History className="w-10 h-10 text-gray-200" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Synthesis Required</h3>
-                  <p className="text-gray-400 max-w-sm mx-auto">
-                    Toggle to Study Mode and capture your analysis across key concepts to populate your revision profile.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <DailyQuizModal
-        isOpen={isInQuizMode}
-        onClose={() => setIsAssessmentStarted(false)}
-        onComplete={() => {
-          setIsAssessmentFinished(true);
-          // Do NOT close the modal here to allow users to see the result
-          // setIsAssessmentStarted(false); 
-        }}
-        title="Tamil Nadu History Assessment"
-        subtitle="Quick Evaluation • 10 Minutes"
-        questions={[
-          {
-            id: 1,
-            question: "Which of the following dynasties is NOT considered one of the 'Three Great Tamil Kingdoms'?",
-            subject: "History",
-            difficulty: "Easy",
-            options: ["Chera", "Chola", "Pandya", "Pallava"],
-            correctAnswer: 3,
-            explanation: "The Three Great Tamil Kingdoms were the Cheras, Cholas, and Pandyas. The Pallavas came later and were a distinct dynasty."
-          },
-          {
-            id: 2,
-            question: "The term 'Sangam' in ancient Tamil history literally refers to:",
-            subject: "History",
-            difficulty: "Medium",
-            options: ["A battlefield", "An assembly of poets", "A naval port", "A royal palace"],
-            correctAnswer: 1,
-            explanation: "The term 'Sangam' refers to an assembly or academy of poets and scholars who gathered under royal patronage."
-          },
-          {
-            id: 3,
-            question: "Which ancient Tamil port was famously known for its extensive trade with the Roman Empire?",
-            subject: "History",
-            difficulty: "Hard",
-            options: ["Madurai", "Kancheepuram", "Arikamedu", "Kaveripattinam"],
-            correctAnswer: 2,
-            explanation: "Arikamedu (near Pondicherry) was a major port known for its trade with the Roman Empire, evidenced by Roman pottery and coins found there."
-          }
-        ]}
-      />
-
-      <style>{`
+          <style>{`
         @keyframes bulbOnOffLoop {
           0%, 40% { transform: scale(1); opacity: 0.8; }
           45%, 95% { transform: scale(1.1) rotate(6deg); opacity: 1; filter: drop-shadow(0 0 12px rgba(251,191,36,0.4)); }
@@ -1090,6 +1197,8 @@ const StudyContent = () => {
           scrollbar-width: none;
         }
       `}</style>
+        </>
+      )}
     </div>
   );
 };

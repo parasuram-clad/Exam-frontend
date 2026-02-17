@@ -29,6 +29,9 @@ export interface UserMe {
     gender: string | null;
     field_of_study: string | null;
     target_exam_year: string | null;
+    exam_type: string | null;
+    sub_division: string | null;
+    learner_type: string | null;
     notify_transaction_email: boolean;
     notify_transaction_whatsapp: boolean;
     notify_content_email: boolean;

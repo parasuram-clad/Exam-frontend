@@ -7,3 +7,4 @@ export { LeaderboardWidget } from "./LeaderboardWidget";
 export { ScheduleWidget } from "./ScheduleWidget";
 export { ProfileWidget } from "./ProfileWidget";
 export { DailyQuizModal } from "./DailyQuizModal";
+export { CalendarWidget } from "./CalendarWidget";

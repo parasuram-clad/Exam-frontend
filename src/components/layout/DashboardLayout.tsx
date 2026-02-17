@@ -7,9 +7,10 @@ import authService, { UserMe } from "@/services/auth.service";
 interface DashboardLayoutProps {
     children: React.ReactNode;
     rightSidebar?: React.ReactNode;
+    hideHeader?: boolean;
 }
 
-export function DashboardLayout({ children, rightSidebar }: DashboardLayoutProps) {
+export function DashboardLayout({ children, rightSidebar, hideHeader = false }: DashboardLayoutProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [user, setUser] = useState<UserMe | null>(null);
 
@@ -44,12 +45,14 @@ export function DashboardLayout({ children, rightSidebar }: DashboardLayoutProps
 
                 {/* Center Column (Header + Main Content) */}
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden ">
-                    <Header
-                        userName={userName}
-                        userTitle={userTitle}
-                        avatarUrl={avatarUrl}
-                        onMenuToggle={() => setSidebarOpen(true)}
-                    />
+                    {!hideHeader && (
+                        <Header
+                            userName={userName}
+                            userTitle={userTitle}
+                            avatarUrl={avatarUrl}
+                            onMenuToggle={() => setSidebarOpen(true)}
+                        />
+                    )}
 
                     <main className="flex-1 overflow-y-auto p-4 lg:p-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
                         <div className="w-full">
