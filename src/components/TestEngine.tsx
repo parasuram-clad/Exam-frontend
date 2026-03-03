@@ -3,6 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 export interface Question {
     id: number;
@@ -45,9 +50,9 @@ const TestEngine = ({
     const [answers, setAnswers] = useState<Record<number, Answer>>({});
     const [visitedQuestions, setVisitedQuestions] = useState<Set<number>>(new Set([0]));
     const [timeLeft, setTimeLeft] = useState(initialTime);
+    const [showSubmitModal, setShowSubmitModal] = useState(false);
 
     useEffect(() => {
-        // Mark current question as visited
         setVisitedQuestions(prev => new Set([...prev, currentQuestion]));
     }, [currentQuestion]);
 
@@ -56,7 +61,7 @@ const TestEngine = ({
             setTimeLeft((prev) => {
                 if (prev <= 0) {
                     clearInterval(timer);
-                    handleSubmit();
+                    onComplete(answers);
                     return 0;
                 }
                 return prev - 1;
@@ -109,49 +114,37 @@ const TestEngine = ({
     };
 
     const handleSubmit = () => {
+        setShowSubmitModal(true);
+    };
+
+    const handleConfirmSubmit = () => {
+        setShowSubmitModal(false);
         onComplete(answers);
     };
 
     const getQuestionStatus = (index: number) => {
-        if (!visitedQuestions.has(index)) {
-            return "not-visited";
-        }
-
+        if (!visitedQuestions.has(index)) return "not-visited";
         const answer = answers[index];
-        if (!answer) {
-            return "not-answered";
-        }
-
-        if (answer.markedForReview && answer.selectedOption !== null) {
-            return "answered-marked";
-        }
-        if (answer.markedForReview) {
-            return "marked";
-        }
-        if (answer.selectedOption !== null) {
-            return "answered";
-        }
+        if (!answer) return "not-answered";
+        if (answer.markedForReview && answer.selectedOption !== null) return "answered-marked";
+        if (answer.markedForReview) return "marked";
+        if (answer.selectedOption !== null) return "answered";
         return "not-answered";
     };
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case "not-visited":
-                return "bg-gray-200 text-gray-600";
-            case "not-answered":
-                return "bg-red-500 text-white";
-            case "answered":
-                return "bg-green-500 text-white";
-            case "marked":
-                return "bg-purple-500 text-white";
-            case "answered-marked":
-                return "bg-purple-700 text-white";
-            default:
-                return "bg-gray-200 text-gray-600";
+            case "not-visited": return "bg-gray-200 text-gray-600";
+            case "not-answered": return "bg-red-500 text-white";
+            case "answered": return "bg-green-500 text-white";
+            case "marked": return "bg-purple-500 text-white";
+            case "answered-marked": return "bg-purple-700 text-white";
+            default: return "bg-gray-200 text-gray-600";
         }
     };
 
     const answeredCount = Object.values(answers).filter((a) => a.selectedOption !== null).length;
+    const unattemptedCount = questions.length - answeredCount;
     const question = questions[currentQuestion];
 
     return (
@@ -168,10 +161,10 @@ const TestEngine = ({
                                 {onExit && (
                                     <button
                                         onClick={onExit}
-                                        className="p-1 hover:bg-gray-100 rounded-full transition-colors shrink-0"
+                                        className="flex items-center gap-1.5 p-1.5 rounded-lg transition-colors shrink-0 group"
                                         title="Exit Test"
                                     >
-                                        <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600" />
+                                        <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600 group-hover:text-primary transition-colors" />
                                     </button>
                                 )}
                                 <div className="min-w-0">
@@ -191,9 +184,9 @@ const TestEngine = ({
                 "container mx-auto px-4 py-6",
                 !showHeader && "pt-0"
             )}>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {/* Question Area */}
-                    <div className="lg:col-span-2 space-y-4">
+                    <div className="lg:col-span-3 space-y-4">
                         {/* Question Card */}
                         <div className="bg-white rounded-2xl p-4 sm:p-6 border border-border shadow-sm">
                             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
@@ -298,8 +291,8 @@ const TestEngine = ({
 
                     {/* Question Navigator */}
                     <div className="lg:col-span-1">
-                        <div className="bg-white rounded-2xl p-6 border border-border shadow-sm sticky top-24">
-                            <h3 className="text-lg font-bold text-foreground mb-4">Question Navigator</h3>
+                        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-border shadow-sm sticky top-24">
+                            <h3 className="text-base sm:text-lg font-bold text-foreground mb-4">Question Navigator</h3>
 
                             {/* Legend */}
                             <div className="space-y-2 mb-6 text-[10px]">
@@ -328,7 +321,7 @@ const TestEngine = ({
                             </div>
 
                             {/* Question Grid */}
-                            <div className="grid grid-cols-8 sm:grid-cols-10 gap-2 mb-6">
+                            <div className="grid grid-cols-5 sm:grid-cols-10 lg:grid-cols-6 xl:grid-cols-8 gap-2 mb-6">
                                 {questions.map((_, index) => (
                                     <button
                                         key={index}
@@ -359,6 +352,63 @@ const TestEngine = ({
                     </div>
                 </div>
             </div>
+
+            {/* Submit Confirmation Modal */}
+            <Dialog open={showSubmitModal} onOpenChange={setShowSubmitModal}>
+                <DialogContent className="sm:max-w-md rounded-3xl p-6 sm:p-8 border-none shadow-2xl">
+                    <DialogTitle className="sr-only">Submit Test Confirmation</DialogTitle>
+                    <div className="text-center space-y-6">
+                        {/* Warning Text */}
+                        <div>
+                            <p className="text-lg sm:text-xl text-foreground">
+                                You still have{" "}
+                                <span className="font-bold text-green-600">
+                                    {unattemptedCount} unattempted questions
+                                </span>.
+                            </p>
+                            <p className="text-base sm:text-lg text-muted-foreground mt-1">
+                                Are you sure you want to submit the test?
+                            </p>
+                        </div>
+
+                        {/* Summary Card */}
+                        <div className="rounded-2xl border border-green-200 overflow-hidden">
+                            <div className="bg-green-50 border-b bg-green-50/50  border-green-200 px-4 py-3">
+                                <p className="font-semibold text-foreground text-base">
+                                    Total Questions: {questions.length}
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-2 divide-x">
+                                <div className="p-5 text-center">
+                                    <p className="text-3xl sm:text-4xl font-bold text-foreground">{answeredCount}</p>
+                                    <p className="text-sm text-muted-foreground mt-1">Answered</p>
+                                </div>
+                                <div className="p-5 text-center">
+                                    <p className="text-3xl sm:text-4xl font-bold text-foreground">{unattemptedCount}</p>
+                                    <p className="text-sm text-muted-foreground mt-1">Unattempted</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center justify-center gap-3 pt-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowSubmitModal(false)}
+                                className="flex-1 h-12 rounded-xl text-sm font-semibold border-2"
+                            >
+                                Back to Test
+                            </Button>
+                            <Button
+                                onClick={handleConfirmSubmit}
+                                className="flex-1 h-12 rounded-xl text-sm font-semibold bg-[#0F172A] hover:bg-[#1E293B] text-white"
+                            >
+                                Submit Test
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

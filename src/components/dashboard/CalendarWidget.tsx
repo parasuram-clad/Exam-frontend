@@ -17,7 +17,13 @@ import {
     startOfDay
 } from "date-fns";
 
-export function CalendarWidget() {
+interface CalendarWidgetProps {
+    onDateClick?: (date: Date) => void;
+    selectedDate?: Date;
+    variant?: "streak" | "studyPlan";
+}
+
+export function CalendarWidget({ onDateClick, selectedDate, variant = "streak" }: CalendarWidgetProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const today = startOfDay(new Date());
 
@@ -51,7 +57,7 @@ export function CalendarWidget() {
     };
 
     return (
-        <div className="bg-white rounded-xl p-6 border border-border/50 shadow-sm w-full">
+        <div className="bg-white rounded-2xl p-6 border border-border/50 shadow-sm w-full">
             {/* Calendar Header */}
             <div className="flex items-center justify-between mb-8">
                 <h3 className="text-lg font-semibold text-[#1a2b4b]">
@@ -88,47 +94,62 @@ export function CalendarWidget() {
                     const status = getStatus(day);
                     const isSelectedMonth = isSameMonth(day, monthStart);
                     const isUpcoming = isAfter(startOfDay(day), today);
+                    const isSelected = selectedDate && isSameDay(day, selectedDate);
+                    const isToday = isSameDay(day, today);
 
                     return (
                         <div key={index} className="flex items-center justify-center relative h-8 w-full">
-                            <div
+                            <button
+                                onClick={() => isSelectedMonth && onDateClick?.(day)}
+                                disabled={!isSelectedMonth || (variant === "streak" && !isToday && isUpcoming)}
                                 className={cn(
-                                    "w-7 h-7 flex items-center justify-center rounded-full text-xs font-semibold transition-all duration-200",
+                                    "w-8 h-8 flex items-center justify-center rounded-full text-xs font-semibold transition-all duration-200",
                                     !isSelectedMonth && "text-slate-200/50 pointer-events-none",
-                                    isSelectedMonth && isUpcoming && "text-slate-300",
+                                    isSelectedMonth && isUpcoming && !isToday && "text-slate-300",
                                     isSelectedMonth && !isUpcoming && !status && "text-[#1a2b4b]",
+                                    (variant === "studyPlan" && isSelected) && "ring-2 ring-primary ring-offset-2",
+                                    (variant === "studyPlan" && !isSelectedMonth) && "opacity-0",
 
-                                    // Status Overrides
-                                    status === "today" && "bg-[#72C146] text-white shadow-[0_4px_10px_rgba(114,193,70,0.3)]",
-                                    status === "skipped" && "bg-[#C4C8D0] text-white",
-                                    status === "completed" && "bg-[#1a2b4b] text-white"
+                                    // Status Colors for Streak variant
+                                    variant === "streak" && isSelectedMonth && (
+                                        status === "today" ? "bg-[#72C146] text-white shadow-[0_4px_10px_rgba(114,193,70,0.3)]" :
+                                            status === "skipped" ? "bg-[#C4C8D0] text-white" :
+                                                status === "completed" ? "bg-[#1a2b4b] text-white" : ""
+                                    ),
+
+                                    // Study Plan hover effect
+                                    variant === "studyPlan" && isSelectedMonth && "hover:bg-primary/10"
                                 )}
                             >
                                 {format(day, "d")}
-                            </div>
+                            </button>
                         </div>
                     );
                 })}
             </div>
 
-            {/* Divider */}
-            <div className="h-[1px] bg-slate-50 w-full mb-6" />
+            {variant === "streak" && (
+                <>
+                    {/* Divider */}
+                    <div className="h-[1px] bg-slate-50 w-full mb-6" />
 
-            {/* Legend */}
-            <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#1a2b4b]" />
-                    <span className="text-[11px] font-semibold text-slate-400">Completed</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#72C146]" />
-                    <span className="text-[11px] font-semibold text-slate-400">Today</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#C4C8D0]" />
-                    <span className="text-[11px] font-semibold text-slate-400">Skipped</span>
-                </div>
-            </div>
+                    {/* Legend */}
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#1a2b4b]" />
+                            <span className="text-[11px] font-semibold text-slate-400">Completed</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#72C146]" />
+                            <span className="text-[11px] font-semibold text-slate-400">Today</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#C4C8D0]" />
+                            <span className="text-[11px] font-semibold text-slate-400">Skipped</span>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }

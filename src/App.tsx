@@ -4,8 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
 import Index from "./pages/Index";
 import StudyPlan from "./pages/StudyPlan";
 import TestSeries from "./pages/TestSeries";
@@ -19,6 +17,8 @@ import Profile from "./pages/Profile";
 import Leaderboard from "./pages/Leaderboard";
 import Schedule from "./pages/Schedule";
 import MindMapView from "./pages/MindMapView";
+import AskYourDoubt from "./pages/AskYourDoubt";
+import CurrentAffairs from "./pages/CurrentAffairs";
 import NotFound from "./pages/NotFound";
 import { ChatbotWidget } from "./components/ChatbotWidget";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -35,11 +35,11 @@ const App = () => (
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
-          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-          <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
 
           {/* Protected Routes */}
           <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/ask-doubt" element={<ProtectedRoute><AskYourDoubt /></ProtectedRoute>} />
+          <Route path="/current-affairs" element={<ProtectedRoute><CurrentAffairs /></ProtectedRoute>} />
           <Route path="/study-plan" element={<ProtectedRoute><StudyPlan /></ProtectedRoute>} />
           <Route path="/study-plan/topic/:topicId" element={<ProtectedRoute><TopicStudy /></ProtectedRoute>} />
           <Route path="/study-plan/topic/:topicId/subtopic/:subtopicId" element={<ProtectedRoute><StudyContent /></ProtectedRoute>} />

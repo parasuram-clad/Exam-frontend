@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Send, X } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import chatbotService from "@/services/chatbot.service";
+import authService, { UserMe } from "@/services/auth.service";
 
 interface Message {
     id: string;
@@ -25,6 +27,21 @@ export function ChatbotWidget() {
     const location = useLocation();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
+    const [conversationId, setConversationId] = useState<number | undefined>(undefined);
+    const [user, setUser] = useState<UserMe | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                const u = await authService.getCurrentUser();
+                setUser(u);
+            } catch (err) {
+                console.error("Failed to fetch user", err);
+            }
+        };
+        fetchUser();
+    }, []);
 
     useEffect(() => {
         const path = location.pathname;
@@ -43,6 +60,8 @@ export function ChatbotWidget() {
                 timestamp: new Date(),
             },
         ]);
+        // Reset conversation on page change? Maybe not, but for now we follow old logic
+        // setConversationId(undefined); 
     }, [location.pathname]);
 
     const [inputValue, setInputValue] = useState("");
@@ -65,11 +84,11 @@ export function ChatbotWidget() {
     const nudgeIntervalRef = useRef<any>();
 
     // Panel dimensions
-    const PANEL_WIDTH = 380;
-    const PANEL_HEIGHT = 500;
+    const PANEL_WIDTH = window.innerWidth < 640 ? window.innerWidth - 32 : 380;
+    const PANEL_HEIGHT = window.innerHeight < 640 ? window.innerHeight - 100 : 500;
     const ICON_SIZE = 56;
     const MARGIN = 16;
-    const DRAG_THRESHOLD = 5; // pixels - minimum movement to be considered a drag
+    const DRAG_THRESHOLD = 10; // Increased threshold for better click reliability
 
     // Nudge timing constants
     const NUDGE_SHOW_DURATION = 4000; // Show for 4 seconds
@@ -171,29 +190,52 @@ export function ChatbotWidget() {
         };
     };
 
-    const handleSend = () => {
-        if (!inputValue.trim()) return;
+    const handleSend = async () => {
+        if (!inputValue.trim() || isLoading) return;
 
+        const userText = inputValue;
         const newMessage: Message = {
             id: Date.now().toString(),
-            text: inputValue,
+            text: userText,
             sender: "user",
             timestamp: new Date(),
         };
 
         setMessages([...messages, newMessage]);
         setInputValue("");
+        setIsLoading(true);
 
-        // Simulate bot response
-        setTimeout(() => {
+        try {
+            const response = await chatbotService.askChatbot({
+                user_id: user?.id,
+                syllabus_id: 1, // Default syllabus ID, should be dynamic if possible
+                question: userText,
+                conversation_id: conversationId,
+            });
+
+            if (response.conversation_id) {
+                setConversationId(response.conversation_id);
+            }
+
             const botResponse: Message = {
+                id: response.id.toString(),
+                text: response.answer || "I'm sorry, I couldn't process that.",
+                sender: "bot",
+                timestamp: new Date(response.created_at),
+            };
+            setMessages((prev) => [...prev, botResponse]);
+        } catch (error) {
+            console.error("Chatbot error:", error);
+            const errorResponse: Message = {
                 id: (Date.now() + 1).toString(),
-                text: "Thanks for your message! This is a demo chatbot interface.",
+                text: "Sorry, I'm having trouble connecting to the server. Please try again later.",
                 sender: "bot",
                 timestamp: new Date(),
             };
-            setMessages((prev) => [...prev, botResponse]);
-        }, 1000);
+            setMessages((prev) => [...prev, errorResponse]);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -300,6 +342,8 @@ export function ChatbotWidget() {
         };
     }, [isOpen, isHoveringIcon]);
 
+    const isTypingIndicator = isLoading;
+
     return (
         <>
             <AnimatePresence>
@@ -347,7 +391,7 @@ export function ChatbotWidget() {
                                             <MessageCircle className="size-5 text-primary dark:text-white" />
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-semibold text-foreground">Exam Assistant</h3>
+                                            <h3 className="text-sm font-medium text-foreground">Exam Assistant</h3>
                                             <p className="text-xs text-foreground/60">Online</p>
                                         </div>
                                     </div>
@@ -398,6 +442,17 @@ export function ChatbotWidget() {
                                                 </div>
                                             </div>
                                         ))}
+                                        {isTypingIndicator && (
+                                            <div className="flex justify-start mb-3">
+                                                <div className="relative rounded-2xl overflow-hidden bg-card border border-border">
+                                                    <div className="relative px-4 py-2.5 flex items-center gap-1">
+                                                        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-full animate-bounce" />
+                                                        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-full animate-bounce [animation-delay:0.2s]" />
+                                                        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-full animate-bounce [animation-delay:0.4s]" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div ref={messagesEndRef} />
                                 </div>
@@ -449,51 +504,52 @@ export function ChatbotWidget() {
                 whileTap={{ scale: 0.95 }}
                 onMouseEnter={() => setIsHoveringIcon(true)}
                 onMouseLeave={() => setIsHoveringIcon(false)}
-                className="chatbot-button group"
+                onMouseDown={handleDragStart}
+                onTouchStart={handleDragStart}
+                onClick={(e) => {
+                    // Prevent normal click if we were dragging
+                    if (hasDragged.current) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+
+                    if (!isOpen) {
+                        const direction = calculateExpansionDirection();
+                        setExpansionDir(direction);
+                        setIsOpen(true);
+                    } else {
+                        setIsOpen(false);
+                    }
+                }}
+                className="chatbot-button group touch-none"
             >
-                <button
-                    onClick={() => {
-                        if (!hasDragged.current) {
-                            if (!isOpen) {
-                                const direction = calculateExpansionDirection();
-                                setExpansionDir(direction);
-                                setIsOpen(true);
-                            } else {
-                                setIsOpen(false);
-                            }
-                        }
-                    }}
-                    onMouseDown={handleDragStart}
-                    onTouchStart={handleDragStart}
-                    className="size-full"
-                >
-                    {/* Liquid Glass Button Container */}
-                    <div className="relative size-full rounded-full overflow-visible">
-                        {/* Base glass layer - subtle in idle state */}
-                        <div className="absolute inset-0 bg-white/25 dark:bg-black/25 group-hover:bg-white/40 dark:group-hover:bg-black/40 rounded-full transition-colors duration-300" />
+                {/* Liquid Glass Button Container */}
+                <div className="relative size-full rounded-full overflow-visible">
+                    {/* Base glass layer - subtle in idle state */}
+                    <div className="absolute inset-0 bg-white/25 dark:bg-black/25 group-hover:bg-white/40 dark:group-hover:bg-black/40 rounded-full transition-colors duration-300" />
 
-                        {/* Gradient refraction - enhanced on hover */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-transparent dark:from-white/20 dark:via-white/10 dark:to-transparent group-hover:from-white/60 group-hover:via-white/30 dark:group-hover:from-white/30 dark:group-hover:via-white/15 rounded-full transition-all duration-300" />
+                    {/* Gradient refraction - enhanced on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-transparent dark:from-white/20 dark:via-white/10 dark:to-transparent group-hover:from-white/60 group-hover:via-white/30 dark:group-hover:from-white/30 dark:group-hover:via-white/15 rounded-full transition-all duration-300" />
 
-                        {/* Specular highlight - more pronounced on hover */}
-                        <div className="absolute top-1 left-2 right-6 h-6 bg-gradient-to-b from-white/50 to-transparent dark:from-white/30 dark:to-transparent group-hover:from-white/80 dark:group-hover:from-white/50 rounded-full blur-sm transition-all duration-300" />
+                    {/* Specular highlight - more pronounced on hover */}
+                    <div className="absolute top-1 left-2 right-6 h-6 bg-gradient-to-b from-white/50 to-transparent dark:from-white/30 dark:to-transparent group-hover:from-white/80 dark:group-hover:from-white/50 rounded-full blur-sm transition-all duration-300" />
 
-                        {/* Rim light - bright edge, enhanced on hover */}
-                        <div className="absolute inset-0 rounded-full border-2 border-white/50 dark:border-white/30 group-hover:border-white/80 dark:group-hover:border-white/50 transition-colors duration-300" />
-                        <div className="absolute inset-0 rounded-full shadow-[inset_0_2px_4px_rgba(255,255,255,0.6),inset_0_-2px_4px_rgba(0,0,0,0.08)] dark:shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2)] group-hover:shadow-[inset_0_2px_4px_rgba(255,255,255,0.9),inset_0_-2px_4px_rgba(0,0,0,0.1)] dark:group-hover:shadow-[inset_0_2px_4px_rgba(255,255,255,0.5),inset_0_-2px_4px_rgba(0,0,0,0.3)] transition-shadow duration-300" />
+                    {/* Rim light - bright edge, enhanced on hover */}
+                    <div className="absolute inset-0 rounded-full border-2 border-white/50 dark:border-white/30 group-hover:border-white/80 dark:group-hover:border-white/50 transition-colors duration-300" />
+                    <div className="absolute inset-0 rounded-full shadow-[inset_0_2px_4px_rgba(255,255,255,0.6),inset_0_-2px_4px_rgba(0,0,0,0.08)] dark:shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2)] group-hover:shadow-[inset_0_2px_4px_rgba(255,255,255,0.9),inset_0_-2px_4px_rgba(0,0,0,0.1)] dark:group-hover:shadow-[inset_0_2px_4px_rgba(255,255,255,0.5),inset_0_-2px_4px_rgba(0,0,0,0.3)] transition-shadow duration-300" />
 
-                        {/* Liquid reflection animation */}
-                        <div className="absolute inset-0 liquid-reflection-button rounded-full" />
+                    {/* Liquid reflection animation */}
+                    <div className="absolute inset-0 liquid-reflection-button rounded-full" />
 
-                        {/* Outer glow - subtle by default */}
-                        <div className="absolute inset-0 rounded-full shadow-md shadow-black/5 dark:shadow-black/30 group-hover:shadow-lg group-hover:shadow-black/10 dark:group-hover:shadow-black/40 transition-shadow duration-300" />
+                    {/* Outer glow - subtle by default */}
+                    <div className="absolute inset-0 rounded-full shadow-md shadow-black/5 dark:shadow-black/30 group-hover:shadow-lg group-hover:shadow-black/10 dark:group-hover:shadow-black/40 transition-shadow duration-300" />
 
-                        {/* Icon container */}
-                        <div className="relative size-full flex items-center justify-center">
-                            <MessageCircle className="size-6 text-primary dark:text-white group-hover:scale-110 transition-transform" strokeWidth={2.5} />
-                        </div>
+                    {/* Icon container */}
+                    <div className="relative size-full flex items-center justify-center">
+                        <MessageCircle className="size-6 text-primary dark:text-white group-hover:scale-110 transition-transform" strokeWidth={2.5} />
                     </div>
-                </button>
+                </div>
             </motion.div>
 
             {/* Nudge message */}

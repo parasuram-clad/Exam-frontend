@@ -4,7 +4,11 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Home, CreditCard, BookOpen, LogIn } from "lucide-react";
 
-const Navbar = () => {
+interface NavbarProps {
+    onLoginClick: () => void;
+}
+
+const Navbar = ({ onLoginClick }: NavbarProps) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
     const [isAtTop, setIsAtTop] = useState(true);
@@ -93,7 +97,7 @@ const Navbar = () => {
                         minWidth: isScrolled ? (windowWidth < 640 ? "100%" : "320px") : "100%",
                         maxWidth: isScrolled ? (windowWidth < 640 ? "100%" : "1200px") : "1280px",
                     }}
-                    className={`relative flex items-center justify-between pointer-events-auto gap-4 sm:gap-12 ${isScrolled && windowWidth < 640 ? 'mx-0' : 'mx-4'}`}
+                    className={`relative flex items-center ${isScrolled ? 'justify-center' : 'justify-between'} pointer-events-auto gap-4 sm:gap-12 ${isScrolled && windowWidth < 640 ? 'mx-0' : 'mx-4'}`}
                 >
                     {/* Logo Section */}
                     <motion.div layout className="flex items-center">
@@ -153,11 +157,12 @@ const Navbar = () => {
 
                     {/* Right Side Actions */}
                     <motion.div layout className="flex items-center gap-3">
-                        <Link to="/login" className="hidden sm:block">
-                            <Button className={`bg-[#52a662] hover:bg-[#439652] text-white font-medium rounded-full transition-all active:scale-95 whitespace-nowrap ${isScrolled ? 'px-5 py-2 h-10 text-sm' : 'px-8 py-3 h-auto text-[15px]'}`}>
-                                Sign In
-                            </Button>
-                        </Link>
+                        <Button
+                            onClick={onLoginClick}
+                            className={`bg-[#52a662] hover:bg-[#439652] text-white font-medium rounded-full transition-all active:scale-[0.98] whitespace-nowrap ${isScrolled ? 'px-5 py-2 h-10 text-sm' : 'px-8 py-3 h-auto text-[15px]'}`}
+                        >
+                            Sign In
+                        </Button>
 
                         {/* Hamburger Button - Hidden on Desktop/Tablet */}
                         <Button
@@ -231,12 +236,16 @@ const Navbar = () => {
 
                                 {/* Bottom CTA */}
                                 <div className="mt-auto pt-6 border-t border-gray-100">
-                                    <Link to="/login" onClick={() => setIsMenuOpen(false)}>
-                                        <Button className="w-full bg-[#4FAA60] hover:bg-[#439652] text-white rounded-lg h-auto text-lg flex items-center justify-center gap-3 font-medium">
-                                            <LogIn className="w-5 h-5" />
-                                            Sign In
-                                        </Button>
-                                    </Link>
+                                    <Button
+                                        onClick={() => {
+                                            setIsMenuOpen(false);
+                                            onLoginClick();
+                                        }}
+                                        className="w-full bg-[#4FAA60] hover:bg-[#439652] text-white rounded-lg h-auto py-4 text-lg flex items-center justify-center gap-3 font-medium transition-all active:scale-[0.98]"
+                                    >
+                                        <LogIn className="w-5 h-5" />
+                                        Sign In
+                                    </Button>
                                     <p className="text-center text-gray-400 text-sm mt-4 font-medium">© 2026 Thani Oruvan</p>
                                 </div>
                             </motion.div>

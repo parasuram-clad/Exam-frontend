@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import trophyHero from "@/assets/results/trophy-hero.png";
 
 export interface QuizQuestion {
     id: number;
@@ -13,7 +14,7 @@ export interface QuizQuestion {
     explanation: string;
 }
 
-const QUIZ_QUESTIONS: QuizQuestion[] = [
+export const QUIZ_QUESTIONS: QuizQuestion[] = [
     {
         id: 1,
         question: 'The Sangam Age in Tamil Nadu history is primarily known for which of the following?',
@@ -95,83 +96,84 @@ interface DailyQuizModalProps {
     subtitle?: string;
 }
 
-// Confetti illustration component
-function ConfettiIllustration() {
+// Pre-computed confetti positions for result screen
+const CONFETTI = [
+    { color: "#4FAA60", left: "8%", w: 8, h: 10, delay: 0, dur: 3.2 },
+    { color: "#FFD700", left: "20%", w: 10, h: 7, delay: 0.4, dur: 3.8 },
+    { color: "#FF4B4B", left: "32%", w: 7, h: 9, delay: 0.8, dur: 3.5 },
+    { color: "#4D96FF", left: "44%", w: 9, h: 7, delay: 0.2, dur: 4.0 },
+    { color: "#A78BFA", left: "56%", w: 8, h: 11, delay: 1.0, dur: 3.3 },
+    { color: "#FFD700", left: "66%", w: 11, h: 8, delay: 0.6, dur: 3.7 },
+    { color: "#4FAA60", left: "76%", w: 7, h: 9, delay: 0.3, dur: 4.1 },
+    { color: "#FF4B4B", left: "86%", w: 9, h: 7, delay: 0.9, dur: 3.4 },
+    { color: "#4D96FF", left: "14%", w: 8, h: 10, delay: 0.5, dur: 3.6 },
+    { color: "#A78BFA", left: "50%", w: 10, h: 8, delay: 1.2, dur: 3.9 },
+];
+
+
+function TrophyIllustration() {
     return (
-        <div className="relative w-full h-[200px]">
-            {/* Confetti pieces - scattered around */}
-            <div className="absolute inset-0">
-                <svg className="absolute" style={{ left: '10%', top: '10%', width: '10px', height: '10px' }} viewBox="0 0 10 10">
-                    <rect fill="#FBC343" opacity="0.6" width="10" height="10" />
-                </svg>
-                <svg className="absolute" style={{ left: '85%', top: '15%', width: '8px', height: '12px' }} viewBox="0 0 8 12">
-                    <rect fill="#9490E6" opacity="0.6" width="8" height="12" />
-                </svg>
-                <svg className="absolute" style={{ left: '15%', top: '60%', width: '12px', height: '8px' }} viewBox="0 0 12 8">
-                    <rect fill="#8CBFBE" opacity="0.6" width="12" height="8" />
-                </svg>
-                <svg className="absolute" style={{ left: '90%', top: '65%', width: '10px', height: '10px' }} viewBox="0 0 10 10">
-                    <rect fill="#EE6F57" opacity="0.6" width="10" height="10" />
-                </svg>
-                <svg className="absolute" style={{ left: '20%', top: '85%', width: '9px', height: '9px' }} viewBox="0 0 9 9">
-                    <rect fill="#708CD5" opacity="0.6" width="9" height="9" />
-                </svg>
-                <svg className="absolute" style={{ left: '75%', top: '80%', width: '10px', height: '10px' }} viewBox="0 0 10 10">
-                    <rect fill="#FBC343" opacity="0.6" width="10" height="10" />
-                </svg>
-                <svg className="absolute" style={{ left: '50%', top: '5%', width: '11px', height: '7px' }} viewBox="0 0 11 7">
-                    <rect fill="#EE6F57" opacity="0.6" width="11" height="7" />
-                </svg>
-                <svg className="absolute" style={{ left: '82%', top: '90%', width: '8px', height: '10px' }} viewBox="0 0 8 10">
-                    <rect fill="#FBC343" opacity="0.6" width="8" height="10" />
-                </svg>
+        <div className="relative w-full flex items-center justify-center" style={{ height: 220 }}>
+            {/* Confetti scattered around */}
+            <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
+                {CONFETTI.map((c, i) => (
+                    <motion.div
+                        key={i}
+                        className="absolute"
+                        style={{ width: c.w, height: c.h, backgroundColor: c.color, left: c.left, top: -14 }}
+                        animate={{ y: [0, 460], opacity: [0, 0.6, 0.6, 0], rotate: [0, 360] }}
+                        transition={{ duration: c.dur, delay: c.delay, repeat: Infinity, ease: "linear" }}
+                    />
+                ))}
             </div>
-
-            {/* Person with trophy on podium illustration */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[180px] h-[150px]">
-                <svg viewBox="0 0 180 150" fill="none" className="w-full h-full">
-                    {/* Podium steps */}
-                    <path d="M40 100 L60 100 L60 140 L40 140 Z" fill="#D33327" />
-                    <path d="M60 85 L90 85 L90 140 L60 140 Z" fill="#D33327" />
-                    <path d="M90 95 L110 95 L110 140 L90 140 Z" fill="#B22724" />
-
-                    {/* Person body */}
-                    <ellipse cx="75" cy="70" rx="8" ry="10" fill="#F28A5C" />
-                    <path d="M75 80 L75 105" stroke="#D15828" strokeWidth="6" strokeLinecap="round" />
-                    <path d="M75 90 L65 100" stroke="#D15828" strokeWidth="5" strokeLinecap="round" />
-                    <path d="M75 90 L85 100" stroke="#B74821" strokeWidth="5" strokeLinecap="round" />
-                    <path d="M75 105 L65 125" stroke="#1C3E60" strokeWidth="6" strokeLinecap="round" />
-                    <path d="M75 105 L85 125" stroke="#0D2B4D" strokeWidth="6" strokeLinecap="round" />
-
-                    {/* Cape */}
-                    <path d="M72 82 Q65 95 62 110 Q70 105 75 100" fill="#E84A46" />
-
-                    {/* Trophy */}
-                    <g transform="translate(80, 62)">
-                        <rect x="0" y="0" width="12" height="16" fill="#EDB73E" rx="2" />
-                        <ellipse cx="6" cy="2" rx="5" ry="3" fill="#F2C56D" />
-                        <rect x="4" y="16" width="4" height="3" fill="#D39735" />
-                    </g>
-
-                    {/* Trophy sparkles */}
-                    <circle cx="95" cy="65" r="2" fill="#FBC343" opacity="0.8" />
-                    <circle cx="102" cy="72" r="1.5" fill="#FBC343" opacity="0.6" />
-                </svg>
-            </div>
+            {/* Trophy hero image — centered */}
+            <motion.img
+                src={trophyHero}
+                alt="Trophy"
+                className="relative z-10 object-contain"
+                style={{ height: 180 }}
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 180, damping: 14 }}
+            />
         </div>
     );
 }
 
 export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, subtitle }: DailyQuizModalProps) {
-    const activeQuestions = questions || QUIZ_QUESTIONS;
+    console.log("DailyQuizModal Props - questions:", questions);
+    const activeQuestions = questions && questions.length > 0 ? questions : QUIZ_QUESTIONS;
+    console.log("DailyQuizModal activeQuestions:", activeQuestions);
+
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(Array(activeQuestions.length).fill(null));
+    const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>([]);
     const [showEvaluation, setShowEvaluation] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
 
+    // Sync state when activeQuestions change
+    useEffect(() => {
+        if (activeQuestions.length > 0) {
+            setSelectedAnswers(Array(activeQuestions.length).fill(null));
+            setCurrentQuestionIndex(0);
+        }
+    }, [activeQuestions]);
+
     if (!isOpen) return null;
 
+    if (isOpen && (!activeQuestions || activeQuestions.length === 0)) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-background rounded-2xl p-8 flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="text-sm text-muted-foreground">Preparing assessment...</p>
+                </div>
+            </div>
+        );
+    }
+
     const currentQuestion = activeQuestions[currentQuestionIndex];
+    if (!currentQuestion && !showEvaluation) return null;
+
     const currentAnswer = selectedAnswers[currentQuestionIndex];
 
     const handleOptionSelect = (optionIndex: number) => {
@@ -201,7 +203,7 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
     const handleClose = () => {
         // Reset state
         setCurrentQuestionIndex(0);
-        setSelectedAnswers(Array(activeQuestions.length).fill(null)); // Reset based on length
+        setSelectedAnswers(Array(activeQuestions.length).fill(null));
         setShowEvaluation(false);
         setShowDetails(false);
         onClose();
@@ -217,7 +219,8 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
         return correct;
     };
 
-    const getDifficultyColor = (difficulty: string) => {
+    const getDifficultyColor = (difficulty?: string) => {
+        if (!difficulty) return '#64748b';
         switch (difficulty) {
             case 'Easy':
                 return '#10b981';
@@ -236,55 +239,54 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={handleClose}>
             <div
-                className="bg-background rounded-[14px] shadow-2xl w-[680px] max-w-[90vw] max-h-[90vh] overflow-y-auto animate-fade-in scrollbar-hide"
+                className="bg-background rounded-[14px] shadow-2xl w-[600px] max-w-[90vw] max-h-[90vh] overflow-y-auto animate-fade-in scrollbar-hide"
                 onClick={(e) => e.stopPropagation()}
             >
                 {!showEvaluation ? (
                     // Question Screen
-                    <div className="relative p-6 sm:p-8">
+                    <div className="relative p-5 sm:p-7">
                         {/* Title Section */}
-                        <div className="flex flex-col gap-1 mb-6">
-                            <h2 className="font-sans font-medium leading-tight text-foreground text-xl">
+                        <div className="flex flex-col gap-0.5 mb-5">
+                            <h2 className="font-sans font-medium leading-tight text-foreground text-lg">
                                 {title || "Daily Quiz"}
                             </h2>
-                            <p className="font-sans font-normal text-muted-foreground text-sm">
+                            <p className="font-sans font-normal text-muted-foreground text-[13px]">
                                 {subtitle || `${activeQuestions.length} Questions • Mixed Subjects`}
                             </p>
                         </div>
 
                         {/* Question Header */}
-                        <div className="flex justify-between items-center mb-6">
-                            <p className="font-sans font-medium text-foreground text-base">
+                        <div className="flex justify-between items-center mb-5">
+                            <p className="font-sans font-medium text-foreground text-sm">
                                 Question {currentQuestionIndex + 1}
                             </p>
-                            <div className="flex gap-3 items-center">
-                                <span className="font-sans font-normal text-muted-foreground text-sm">
-                                    {currentQuestion.subject}
+                            <div className="flex gap-2 items-center">
+                                <span className="font-sans font-normal text-muted-foreground text-xs">
+                                    {currentQuestion?.subject}
                                 </span>
                                 <div className="size-1 bg-border rounded-full" />
                                 <span
-                                    className="font-sans font-semibold text-sm"
-                                    style={{ color: getDifficultyColor(currentQuestion.difficulty) }}
+                                    className="font-sans font-semibold text-xs"
+                                    style={{ color: getDifficultyColor(currentQuestion?.difficulty) }}
                                 >
-                                    {currentQuestion.difficulty}
+                                    {currentQuestion?.difficulty}
                                 </span>
                             </div>
                         </div>
 
                         {/* Question Content - Dark gradient box */}
-                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-6 mb-6 shadow-md">
-                            <p className="font-medium leading-relaxed text-white text-base">
-                                {currentQuestion.question}
+                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-5 mb-5 shadow-md">
+                            <p className="font-medium leading-relaxed text-white text-[15px]">
+                                {currentQuestion?.question}
                             </p>
                         </div>
 
-                        {/* MCQ Options */}
-                        <div className="flex flex-col gap-3 mb-6">
-                            {currentQuestion.options.map((option, index) => (
+                        <div className="flex flex-col gap-2.5 mb-5">
+                            {currentQuestion?.options?.map((option, index) => (
                                 <div
                                     key={index}
                                     className={cn(
-                                        "relative rounded-xl transition-all duration-200 cursor-pointer p-4 border",
+                                        "relative rounded-xl transition-all duration-200 cursor-pointer p-3.5 border",
                                         currentAnswer === index
                                             ? "bg-accent/10 border-accent border-l-4 shadow-sm"
                                             : "bg-card border-border hover:border-foreground/20 hover:bg-muted/50"
@@ -310,8 +312,9 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                             ))}
                         </div>
 
+
                         {/* Progress Indicator - centered */}
-                        <div className="flex gap-3 items-center justify-center mb-6">
+                        <div className="flex gap-3 items-center justify-center mb-5">
                             <div className="flex gap-2 items-center">
                                 {[...Array(activeQuestions.length).keys()].map((i) => (
                                     <div
@@ -332,7 +335,7 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                         <div className="flex justify-between items-center">
                             <Button
                                 variant="outline"
-                                className="h-11 px-6 rounded-xl border-border text-foreground hover:bg-muted"
+                                className="h-10 px-5 rounded-xl border-border text-foreground hover:bg-muted text-sm"
                                 onClick={handlePrevious}
                                 disabled={currentQuestionIndex === 0}
                             >
@@ -355,7 +358,7 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                             ) : (
                                 <Button
                                     className={cn(
-                                        "h-11 px-8 rounded-xl font-medium text-primary-foreground transition-all duration-200",
+                                        "h-10 px-7 rounded-xl font-medium text-primary-foreground transition-all duration-200 text-sm",
                                         currentAnswer !== null
                                             ? "bg-primary hover:bg-primary/90"
                                             : "opacity-50 cursor-not-allowed"
@@ -369,166 +372,122 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                         </div>
                     </div>
                 ) : (
-                    // Evaluation/Reward Screen
-                    <div className="relative bg-gradient-to-b from-green-50/50 to-white rounded-[14px] overflow-hidden">
-                        {/* Main reward summary - always visible */}
-                        <div className="p-8 pb-6">
-                            {/* Title */}
-                            <div className="mb-6 text-center">
-                                <h2 className="font-medium text-foreground text-xl mb-1">
+                    // ── Result / Reward Screen ──
+                    <div className="relative bg-[#F7FAF8] rounded-[14px] overflow-hidden">
+
+                        <div className="p-6 pb-4">
+                            {/* Header */}
+                            <div className="mb-4">
+                                <h2 className="font-semibold text-foreground text-lg leading-tight">
                                     Great Effort!
                                 </h2>
-                                <p className="font-sans text-muted-foreground text-base">
+                                <p className="text-muted-foreground text-sm mt-0.5">
                                     Here's your performance summary
                                 </p>
                             </div>
 
-                            {/* Illustration with confetti */}
-                            <ConfettiIllustration />
+                            {/* Trophy illustration + confetti */}
+                            <TrophyIllustration />
 
-                            {/* Score Display */}
-                            <div className="flex flex-col items-center gap-2 mt-6 mb-8">
-                                <div className="flex flex-col items-center">
-                                    <p className="font-sans font-medium text-foreground text-lg">
-                                        Your Score
-                                    </p>
-                                    <p className="font-bold text-5xl tracking-tight my-2">
-                                        <span className="text-success">{score}</span>
-                                        <span className="text-muted-foreground text-3xl font-medium">/{activeQuestions.length}</span>
-                                    </p>
-                                </div>
-                                <p className="font-sans font-medium text-foreground text-lg">
-                                    {accuracy}% Accuracy
+                            {/* Score */}
+                            <div className="flex flex-col items-center mt-2 mb-5">
+                                <p className="text-foreground text-sm font-medium">Your Score</p>
+                                <p className="text-4xl tracking-tight my-1.5">
+                                    <span className="text-green-500 font-semibold">{score}</span>
+                                    <span className="text-muted-foreground text-2xl font-medium"> / {activeQuestions.length}</span>
                                 </p>
+                                <p className="text-foreground text-base font-medium">{accuracy}% Accuracy</p>
                             </div>
 
-                            {/* Motivational message */}
-                            <div className="text-center mb-6">
-                                <p className="font-medium text-foreground text-sm">
-                                    Good start!
-                                </p>
-                                <p className="text-muted-foreground text-sm">
-                                    Review your mistakes to improve.
-                                </p>
+                            {/* Motivational note */}
+                            <div className="text-center mb-5">
+                                <p className="font-semibold text-foreground text-sm">Good start!</p>
+                                <p className="text-muted-foreground text-sm">Review your mistakes to improve.</p>
                             </div>
 
-                            {/* View Details Button */}
+                            {/* View Details */}
                             <div className="flex justify-center">
                                 <Button
                                     variant="outline"
                                     onClick={() => setShowDetails(!showDetails)}
-                                    className="h-11 rounded-full px-6 flex items-center gap-2 border-border hover:bg-muted"
+                                    className="h-10 rounded-full px-6 flex items-center gap-2 border-border text-sm"
                                 >
                                     {showDetails ? 'Hide Details' : 'View Details'}
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={cn("transition-transform duration-200", showDetails && "rotate-90")}>
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+                                        className={cn('transition-transform duration-200', showDetails && 'rotate-180')}>
                                         <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
                                 </Button>
                             </div>
                         </div>
 
-                        {/* Detailed Review - Expandable */}
-                        {showDetails && (
-                            <div className="px-8 pb-8 border-t border-border pt-6 animate-in slide-in-from-top-4 duration-300">
-                                <div className="flex flex-col gap-4">
-                                    <p className="font-medium text-foreground text-base">
-                                        Detailed Review
-                                    </p>
-
-                                    {activeQuestions.map((question, index) => {
-                                        const isCorrect = selectedAnswers[index] === question.correctAnswer;
-                                        const userAnswer = selectedAnswers[index];
-
-                                        return (
-                                            <div key={question.id} className="bg-card border border-border rounded-xl p-5 flex flex-col gap-3 shadow-sm">
-                                                {/* Question Header */}
-                                                <div className="flex justify-between items-start">
-                                                    <div className="flex gap-2 items-center">
-                                                        <p className="font-medium text-foreground text-sm">
-                                                            Question {index + 1}
-                                                        </p>
-                                                        <span className="text-muted-foreground text-xs">
-                                                            • {question.subject}
-                                                        </span>
-                                                    </div>
-                                                    <div className={cn(
-                                                        "px-3 py-1 rounded-md text-xs font-medium",
-                                                        isCorrect
-                                                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                                                    )}>
-                                                        {isCorrect ? '✅ Correct' : '❌ Wrong'}
-                                                    </div>
-                                                </div>
-
-                                                {/* Question Text */}
-                                                <p className="text-foreground text-sm leading-relaxed">
-                                                    {question.question}
-                                                </p>
-
-                                                {/* Answers */}
-                                                <div className="flex flex-col gap-2 mt-1">
-                                                    {userAnswer !== null && (
-                                                        <div className="flex gap-2 items-start">
-                                                            <p className="text-muted-foreground text-sm shrink-0 w-24">
-                                                                Your answer:
-                                                            </p>
-                                                            <p className={cn(
-                                                                "text-sm font-medium",
-                                                                isCorrect ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                                                            )}>
-                                                                {question.options[userAnswer]}
-                                                            </p>
-                                                        </div>
-                                                    )}
-
-                                                    {!isCorrect && (
-                                                        <div className="flex gap-2 items-start">
-                                                            <p className="text-muted-foreground text-sm shrink-0 w-24">
-                                                                Correct answer:
-                                                            </p>
-                                                            <p className="text-green-600 dark:text-green-400 text-sm font-medium">
-                                                                {question.options[question.correctAnswer]}
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Explanation */}
-                                                <div className="bg-muted/50 border border-border rounded-lg p-3 mt-2">
-                                                    <p className="text-muted-foreground text-xs font-semibold mb-1">
-                                                        Explanation:
-                                                    </p>
-                                                    <p className="text-foreground text-sm leading-relaxed">
-                                                        {question.explanation}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Close Button */}
-                                <div className="flex justify-center mt-6">
-                                    <Button
-                                        className="h-11 px-12 rounded-xl font-medium"
-                                        onClick={handleClose}
-                                    >
-                                        Close
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Close button when details are hidden */}
-                        {!showDetails && (
-                            <div className="px-8 pb-8 flex justify-center">
-                                <Button
-                                    className="h-11 px-12 rounded-xl font-medium"
-                                    onClick={handleClose}
+                        {/* Detailed Review */}
+                        <AnimatePresence>
+                            {showDetails && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="overflow-hidden"
                                 >
-                                    Close
-                                </Button>
+                                    <div className="px-6 pb-8 border-t border-border pt-5">
+                                        <p className="font-semibold text-foreground text-base mb-4">Detailed Review</p>
+                                        <div className="flex flex-col gap-4">
+                                            {activeQuestions.map((question, index) => {
+                                                const isCorrect = selectedAnswers[index] === (question?.correctAnswer ?? -1);
+                                                const userAnswer = selectedAnswers[index];
+                                                return (
+                                                    <div key={question?.id || index} className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+                                                        <div className="flex justify-between items-start">
+                                                            <div className="flex gap-2 items-center">
+                                                                <p className="font-medium text-foreground text-sm">Question {index + 1}</p>
+                                                                <span className="text-muted-foreground text-xs">• {question?.subject}</span>
+                                                            </div>
+
+                                                            <div className={cn(
+                                                                'px-2.5 py-0.5 rounded-md text-xs font-medium',
+                                                                isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                            )}>
+                                                                {isCorrect ? '✅ Correct' : '❌ Wrong'}
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-foreground text-sm leading-relaxed">{question.question}</p>
+                                                        <div className="flex flex-col gap-2 mt-1">
+                                                            {userAnswer !== null && (
+                                                                <div className="flex gap-2 items-start">
+                                                                    <p className="text-muted-foreground text-sm shrink-0 w-24">Your answer:</p>
+                                                                    <p className={cn('text-sm font-medium', isCorrect ? 'text-green-600' : 'text-red-600')}>
+                                                                        {question.options[userAnswer]}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                            {!isCorrect && (
+                                                                <div className="flex gap-2 items-start">
+                                                                    <p className="text-muted-foreground text-sm shrink-0 w-24">Correct answer:</p>
+                                                                    <p className="text-green-600 text-sm font-medium">{question.options[question.correctAnswer]}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="bg-muted/50 border border-border rounded-lg p-3 mt-1">
+                                                            <p className="text-muted-foreground text-xs font-medium mb-1">Explanation:</p>
+                                                            <p className="text-foreground text-sm leading-relaxed">{question?.explanation}</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className="px-2 mt-5">
+                                            <Button className="w-full h-10 rounded-xl font-medium text-sm" onClick={handleClose}>Close</Button>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {!showDetails && (
+                            <div className="px-6 pb-7">
+                                <Button className="w-full h-10 rounded-xl font-medium text-sm" onClick={handleClose}>Close</Button>
                             </div>
                         )}
                     </div>

@@ -10,17 +10,19 @@
     "loggedInSince": "Logged in since"
   },
   "nav": {
-    "dashboard": "Dashboard",
-    "studyPlan": "My Study Plan",
+    "home": "Home",
+    "studyPlan": "Study Plan",
     "testSeries": "Test Series",
     "progress": "My Progress",
     "leaderboard": "Leaderboard",
     "schedule": "Upcoming Schedule",
-    "profile": "My Profile"
+    "profile": "My Profile",
+    "askDoubt": "Ask Your Doubt",
+    "currentAffairs": "Current Affairs"
   },
   "pages": {
     "studyPlan": {
-      "title": "My Study Plan",
+      "title": "Study Plan",
       "subtitle": "Keep track of your learning goals"
     },
     "testSeries": {
@@ -42,6 +44,14 @@
     "profile": {
       "title": "My Profile",
       "subtitle": "Manage your account and preferences"
+    },
+    "askDoubt": {
+      "title": "Ask Your Doubt",
+      "subtitle": "AI Tutor for TNPSC Group 4 Preparation"
+    },
+    "currentAffairs": {
+      "title": "Current Affairs",
+      "subtitle": "Stay updated with daily news for TNPSC preparation"
     }
   },
   "login": {

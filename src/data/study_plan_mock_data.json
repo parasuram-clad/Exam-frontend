@@ -1,0 +1,1090 @@
+[
+    {
+        "day_metadata": {
+            "day_no": 1,
+            "total_tasks": 3,
+            "completed_tasks": 0,
+            "overall_plan_progress": 0,
+            "exam_type": "TNPSC Group 4"
+        },
+        "tasks": [
+            {
+                "id": 1001,
+                "subject": "General Tamil (Podhu Tamil)",
+                "chapter": "Tamil Literature (Part-B)",
+                "topic": "Thirukkural - The Universal Veda",
+                "short_description": "Exhaustive study of Thirukkural's structure, history, and the 19 essential chapters for Group 4.",
+                "status": "START",
+                "duration_minutes": 180,
+                "image_url": "/assets/thirukkural-master.png",
+                "learning_content": {
+                    "introduction": "Thirukkural is the crown jewel of Tamil literature. Composed by the divine poet Thiruvalluvar, it transcends time, religion, and geography. It is the most translated non-religious work in the world after the Bible and the Quran.",
+                    "sections": [
+                        {
+                            "section_id": "tk-s1",
+                            "title": "Historical Foundation & Genesis",
+                            "type": "reading",
+                            "content_blocks": [
+                                {
+                                    "block_id": "tk-b1",
+                                    "type": "paragraph",
+                                    "sub_heading": "The Identity of the Author",
+                                    "text": "While little is historically verified about Thiruvalluvar's life, tradition places him in Mylapore, Chennai. He is revered by many names: Deiva Pulavar, Naanmuganaar, Madhaanubangi, and Poyyamozhi Pulavar. The era of the Kural is generally accepted as the 2nd century BCE to 2nd century CE, belonging to the Pathinenkilkanakku collection of the post-Sangam age. His work is so universal that he never mentions 'Tamil', 'Tamil Nadu', or any specific deity, earning it the title 'Ulaga Podhumarai' (The Universal Veda).",
+                                    "keywords": [
+                                        "Thiruvalluvar",
+                                        "Mylapore",
+                                        "Deiva Pulavar",
+                                        "Pathinenkilkanakku",
+                                        "Ulaga Podhumarai"
+                                    ],
+                                    "image": {
+                                        "url": "/assets/valluvar-mural.jpg",
+                                        "caption": "Traditional depiction of Thiruvalluvar in deep meditation."
+                                    },
+                                    "pyqs": [
+                                        {
+                                            "id": "p701_1",
+                                            "exam_name": "Group 4",
+                                            "year": 2022,
+                                            "question": "Which collection does Thirukkural belong to?",
+                                            "answer": "Pathinenkilkanakku"
+                                        },
+                                        {
+                                            "id": "p701_2",
+                                            "exam_name": "Group 2",
+                                            "year": 2018,
+                                            "question": "Another name for Thiruvalluvar?",
+                                            "answer": "Deiva Pulavar"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "block_id": "tk-b2",
+                                    "type": "paragraph",
+                                    "sub_heading": "The Three-Fold Division (Muppal)",
+                                    "text": "The Kural is uniquely structured into 'Muppal'—three major sections. Aram (Virtue) sets the moral foundation, Porul (Wealth/Statecraft) provides practical guidance for social and political life, and Inbam (Love) explores the psychological depths of human relationships. This structure reflects the Purusharthas of Indian philosophy but remains strictly secular. It contains 133 chapters (Adhikarams), each containing exactly 10 couplets.",
+                                    "keywords": [
+                                        "Muppal",
+                                        "Aram",
+                                        "Porul",
+                                        "Inbam",
+                                        "Secular",
+                                        "133 Chapters"
+                                    ],
+                                    "pyqs": []
+                                },
+                                {
+                                    "block_id": "tk-b3",
+                                    "type": "bullet_points",
+                                    "sub_heading": "Numerical Statistics (Exam Pointers)",
+                                    "list_items": [
+                                        "Total Couplets: 1,330 Kurals.",
+                                        "Total Chapters: 133 Adhikarams (10 Kurals each).",
+                                        "Aram (Virtue): 38 Chapters - focusing on domestic and ascetic life.",
+                                        "Porul (Wealth/Politics): 70 Chapters - the largest section, dealing with kings and society.",
+                                        "Inbam (Love): 25 Chapters - focusing on the inner life (Agam).",
+                                        "Words: Exactly 7 words per Kural (4 in the first line, 3 in the second)."
+                                    ],
+                                    "keywords": [
+                                        "1330 Kurals",
+                                        "38 Chapters",
+                                        "70 Chapters",
+                                        "25 Chapters",
+                                        "7 Words"
+                                    ],
+                                    "pyqs": [
+                                        {
+                                            "id": "p701_3",
+                                            "exam_name": "VAO",
+                                            "year": 2016,
+                                            "question": "How many chapters in Porul?",
+                                            "answer": "70"
+                                        },
+                                        {
+                                            "id": "p701_4",
+                                            "exam_name": "Group 4",
+                                            "year": 2021,
+                                            "question": "Total chapters in Thirukkural?",
+                                            "answer": "133Adhikarams"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "mindmap_structure": {
+                                "id": "mm-tk-deep",
+                                "title": "Thirukkural Hierarchy",
+                                "children": [
+                                    {
+                                        "title": "Aram (Virtue/38)",
+                                        "children": [
+                                            {
+                                                "title": "Payiraviyal (Intro)",
+                                                "children": [
+                                                    {
+                                                        "title": "Kadavul Vazhthu",
+                                                        "children": [
+                                                            {
+                                                                "title": "Aadhi Bagavan",
+                                                                "children": [
+                                                                    {
+                                                                        "title": "Attributes",
+                                                                        "children": [
+                                                                            {
+                                                                                "title": "Omnipresence",
+                                                                                "children": [
+                                                                                    {
+                                                                                        "title": "First Letter 'A'",
+                                                                                        "details": [
+                                                                                            "Alphabet starts with A",
+                                                                                            "World starts with God"
+                                                                                        ]
+                                                                                    }
+                                                                                ]
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "title": "Illaraviyal",
+                                                "children": [
+                                                    "Anbu",
+                                                    "Virundhu",
+                                                    "Iniyavai"
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "title": "Porul (Wealth/70)",
+                                        "children": [
+                                            {
+                                                "title": "Arasiyal",
+                                                "children": [
+                                                    "King's Duty",
+                                                    "Justice"
+                                                ]
+                                            },
+                                            {
+                                                "title": "Amaichiyal",
+                                                "children": [
+                                                    "Ministers",
+                                                    "Diplomacy"
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "section_id": "tk-s2",
+                            "title": "Philosophical Depth & Translations",
+                            "type": "reading",
+                            "content_blocks": [
+                                {
+                                    "block_id": "tk-b4",
+                                    "type": "paragraph",
+                                    "sub_heading": "Thirukkural Translations",
+                                    "text": "The Kural's wisdom has crossed all borders. The Latin translation by Veeramamunivar (Beschi) was the first major European translation. G.U. Pope's English translation brought it to the global stage. It has also been translated into German, French, and Russian. Many world leaders, including Mahatma Gandhi and Leo Tolstoy, have praised the Kural for its simplicity and profound truth.",
+                                    "keywords": [
+                                        "Veeramamunivar",
+                                        "Latin",
+                                        "G.U. Pope",
+                                        "English",
+                                        "Leo Tolstoy"
+                                    ],
+                                    "pyqs": [
+                                        {
+                                            "id": "p701_5",
+                                            "exam_name": "Group 4",
+                                            "year": 2019,
+                                            "question": "Who translated Kural to Latin?",
+                                            "answer": "Veeramamunivar"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "block_id": "tk-b5",
+                                    "type": "bullet_points",
+                                    "sub_heading": "Selected Chapters for Group 4",
+                                    "list_items": [
+                                        "Anbuudaimai: Defines love as the life-giving force.",
+                                        "Ozhukkamudaimai: States that discipline is more precious than life.",
+                                        "Panbudaimai: Importance of good social qualities.",
+                                        "Iniyavai Koorald: The merit of speaking pleasant words."
+                                    ],
+                                    "keywords": [
+                                        "Anbuudaimai",
+                                        "Ozhukkamudaimai",
+                                        "Panbudaimai"
+                                    ],
+                                    "pyqs": []
+                                }
+                            ]
+                        }
+                    ],
+                    "assessment": {
+                        "quiz_id": "qz1",
+                        "title": "Thirukkural Finale Assessment",
+                        "total_questions": 15,
+                        "questions": [
+                            {
+                                "id": "q1",
+                                "question": "Total words in Thirukkural?",
+                                "options": [
+                                    "9310",
+                                    "1330",
+                                    "7000",
+                                    "10000"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "1330 Kurals * 7 words each = 9310 words."
+                            },
+                            {
+                                "id": "q2",
+                                "question": "Who translated Kural into English?",
+                                "options": [
+                                    "G.U. Pope",
+                                    "Veeramamunivar",
+                                    "Beschi",
+                                    "Ellis"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "G.U. Pope translated it into English."
+                            },
+                            {
+                                "id": "q3",
+                                "question": "Total chapters in Aram?",
+                                "options": [
+                                    "38",
+                                    "70",
+                                    "25",
+                                    "133"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Aram has 38 chapters."
+                            },
+                            {
+                                "id": "q4",
+                                "question": "Kural belongs to which collection?",
+                                "options": [
+                                    "Ettuthogai",
+                                    "Pattupattu",
+                                    "Pathinenkilkanakku",
+                                    "Epics"
+                                ],
+                                "correct_answer_index": 2,
+                                "explanation": "Pathinenkilkanakku."
+                            },
+                            {
+                                "id": "q5",
+                                "question": "Number of words in the second line of a Kural?",
+                                "options": [
+                                    "3",
+                                    "4",
+                                    "7",
+                                    "10"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Exactly three words."
+                            },
+                            {
+                                "id": "q6",
+                                "question": "Who translated Kural to Latin?",
+                                "options": [
+                                    "G.U. Pope",
+                                    "Veeramamunivar",
+                                    "Ellis",
+                                    "Beschi"
+                                ],
+                                "correct_answer_index": 1,
+                                "explanation": "Veeramamunivar (Beschi)."
+                            },
+                            {
+                                "id": "q7",
+                                "question": "How many chapters in Porul?",
+                                "options": [
+                                    "38",
+                                    "70",
+                                    "25",
+                                    "133"
+                                ],
+                                "correct_answer_index": 1,
+                                "explanation": "70 chapters."
+                            },
+                            {
+                                "id": "q8",
+                                "question": "How many chapters in Inbam?",
+                                "options": [
+                                    "38",
+                                    "70",
+                                    "25",
+                                    "133"
+                                ],
+                                "correct_answer_index": 2,
+                                "explanation": "25 chapters."
+                            },
+                            {
+                                "id": "q9",
+                                "question": "Thiruvalluvar is also called?",
+                                "options": [
+                                    "Deiva Pulavar",
+                                    "Naanmuganaar",
+                                    "Both",
+                                    "None"
+                                ],
+                                "correct_answer_index": 2,
+                                "explanation": "Both are his names."
+                            },
+                            {
+                                "id": "q10",
+                                "question": "The word 'Tamil' appears how many times in Kural?",
+                                "options": [
+                                    "0",
+                                    "1",
+                                    "10",
+                                    "133"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Zero times."
+                            },
+                            {
+                                "id": "q11",
+                                "question": "Poetic meter of Thirukkural?",
+                                "options": [
+                                    "Venba",
+                                    "Kural Venba",
+                                    "Kali",
+                                    "Ahaval"
+                                ],
+                                "correct_answer_index": 1,
+                                "explanation": "Kural Venba."
+                            },
+                            {
+                                "id": "q12",
+                                "question": "One Kural has how many words?",
+                                "options": [
+                                    "4",
+                                    "7",
+                                    "10",
+                                    "14"
+                                ],
+                                "correct_answer_index": 1,
+                                "explanation": "Seven words."
+                            },
+                            {
+                                "id": "q13",
+                                "question": "Which king supported Valluvar?",
+                                "options": [
+                                    "Elela Singan",
+                                    "Pandyan",
+                                    "Karikalan",
+                                    "Cheran"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Elela Singan."
+                            },
+                            {
+                                "id": "q14",
+                                "question": "Translator G.U. Pope belongs to?",
+                                "options": [
+                                    "Germany",
+                                    "UK",
+                                    "Italy",
+                                    "France"
+                                ],
+                                "correct_answer_index": 1,
+                                "explanation": "English translator."
+                            },
+                            {
+                                "id": "q15",
+                                "question": "Valluvar's birthplace tradition?",
+                                "options": [
+                                    "Mylapore",
+                                    "Madurai",
+                                    "Kanchi",
+                                    "Puhar"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Mylapore."
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "id": 1002,
+                "subject": "General Science",
+                "chapter": "Physics",
+                "topic": "Universe & Scientific Laws",
+                "short_description": "Nature of Universe, General scientific laws, and Force/Motion.",
+                "status": "START",
+                "duration_minutes": 60,
+                "learning_content": {
+                    "introduction": "The study of Physics begins with understanding the vast Universe and the fundamental laws that govern force and motion.",
+                    "sections": [
+                        {
+                            "section_id": "phy-s1",
+                            "title": "The Nature of Universe",
+                            "type": "reading",
+                            "content_blocks": [
+                                {
+                                    "block_id": "phy-b1",
+                                    "type": "paragraph",
+                                    "text": "The Universe consists of billions of galaxies, each containing billions of stars. The Big Bang theory is the leading explanation for its origin about 13.8 billion years ago. Our Solar System is located in the Orion Arm of the Milky Way galaxy.",
+                                    "keywords": [
+                                        "Universe",
+                                        "Big Bang",
+                                        "Galaxies",
+                                        "Milky Way"
+                                    ],
+                                    "pyqs": [
+                                        {
+                                            "id": "p-phy-1",
+                                            "exam_name": "Group 4",
+                                            "year": 2021,
+                                            "question": "Age of the Universe?",
+                                            "answer": "13.8 Billion Years"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "mindmap_structure": {
+                                "id": "mm-phy-1",
+                                "title": "Physics Root",
+                                "children": [
+                                    "Universe",
+                                    "Mechanics",
+                                    "Energy",
+                                    "Light"
+                                ]
+                            }
+                        }
+                    ],
+                    "assessment": {
+                        "quiz_id": "qz-phy",
+                        "total_questions": 10,
+                        "questions": []
+                    }
+                }
+            },
+            {
+                "id": 1003,
+                "subject": "Aptitude & Mental Ability",
+                "chapter": "Arithmetic",
+                "topic": "Simplification, HCF & LCM",
+                "short_description": "Core mental ability concepts for speed and accuracy.",
+                "status": "START",
+                "duration_minutes": 60,
+                "learning_content": {
+                    "introduction": "Simplification and Number systems are the foundation of all aptitude problems in TNPSC exams.",
+                    "sections": [
+                        {
+                            "section_id": "apt-s1",
+                            "title": "HCF and LCM Concepts",
+                            "type": "reading",
+                            "content_blocks": [
+                                {
+                                    "block_id": "apt-b1",
+                                    "type": "bullet_points",
+                                    "sub_heading": "Key Formulae",
+                                    "list_items": [
+                                        "Product of two numbers = HCF × LCM.",
+                                        "HCF is the highest common factor.",
+                                        "LCM is the least common multiple.",
+                                        "Use Prime Factorization method for large numbers."
+                                    ],
+                                    "keywords": [
+                                        "HCF",
+                                        "LCM",
+                                        "Prime Factorization"
+                                    ],
+                                    "pyqs": [
+                                        {
+                                            "id": "p-apt-1",
+                                            "exam_name": "Group 4",
+                                            "year": 2022,
+                                            "question": "HCF of 12 and 18?",
+                                            "answer": "6"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "assessment": {
+                        "quiz_id": "qz-apt",
+                        "total_questions": 10,
+                        "questions": []
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "day_metadata": {
+            "day_no": 2,
+            "total_tasks": 6,
+            "completed_tasks": 0,
+            "overall_plan_progress": 15,
+            "exam_type": "TNPSC Group 4"
+        },
+        "tasks": [
+            {
+                "id": 2001,
+                "subject": "General Tamil (Podhu Tamil)",
+                "chapter": "Tamil Literature (Part-B)",
+                "topic": "Eight Anthologies (Ettuthogai)",
+                "short_description": "Deep analysis of the secondary Sangam collection focusing on Purananuru.",
+                "status": "START",
+                "duration_minutes": 150,
+                "learning_content": {
+                    "introduction": "Ettuthogai represents the sociological records of the ancient Tamils, divided into Agam (Inner/Love) and Puram (Outer/War).",
+                    "sections": [
+                        {
+                            "section_id": "et-s1",
+                            "title": "The Eight Pillars of Sangam",
+                            "type": "reading",
+                            "content_blocks": [
+                                {
+                                    "block_id": "et-b1",
+                                    "type": "paragraph",
+                                    "sub_heading": "The Purananuru Legacy",
+                                    "text": "Purananuru, consisting of 400 songs by various poets, is the 'Encyclopedia of Tamil Culture'. It captures the heroism of the Muvendar, the generosity of the Seven Great Patrons (Kadaiyezhu Vallalgal), and the philosophical outlook of the common people. It famously contains the verse 'Yaadhum Oore Yaavarum Kelir' (Every place is my home, every human is my kin) by Kaniyan Pungundranar. The poems were mostly composed by assembly poets known as 'Panars' and 'Viraliars'.",
+                                    "keywords": [
+                                        "Purananuru",
+                                        "Yaadhum Oore",
+                                        "Vallalgal",
+                                        "Encyclopedia"
+                                    ],
+                                    "image": {
+                                        "url": "/assets/sangam-script.jpg",
+                                        "caption": "Replica of ancient palm leaf manuscripts."
+                                    },
+                                    "pyqs": [
+                                        {
+                                            "id": "p801_1",
+                                            "exam_name": "Group 4",
+                                            "year": 2022,
+                                            "question": "Who said 'Yaadhum Oore Yaavarum Kelir'?",
+                                            "answer": "Kaniyan Pungundranar"
+                                        },
+                                        {
+                                            "id": "p801_3",
+                                            "exam_name": "Group 4",
+                                            "year": 2021,
+                                            "question": "Which work is called 'Purappattu'?",
+                                            "answer": "Purananuru"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "block_id": "et-b2",
+                                    "type": "bullet_points",
+                                    "sub_heading": "Detailed Anthology Metrics",
+                                    "list_items": [
+                                        "Natrinai: 400 poems on love, 9-12 lines each.",
+                                        "Kurunthogai: 401 poems, 4-8 lines each (The most edited work).",
+                                        "Aingurunuru: 500 poems (Shortest, 3-6 lines).",
+                                        "Pathitrupathu: 80 available poems, exclusively on Chera Kings.",
+                                        "Paripadal: Musical poems on Gods like Murugan and rivers like Vaigai.",
+                                        "Kalithogai: set in Kali meter with dramatic dialogue.",
+                                        "Agananuru: 400 long poems (13-31 lines), divided into 3 parts."
+                                    ],
+                                    "keywords": [
+                                        "Natrinai",
+                                        "Kurunthogai",
+                                        "Pathitrupathu",
+                                        "Paripadal",
+                                        "Agananuru"
+                                    ],
+                                    "pyqs": [
+                                        {
+                                            "id": "p801_2",
+                                            "exam_name": "VAO",
+                                            "year": 2017,
+                                            "question": "Which work is exclusively on Chera kings?",
+                                            "answer": "Pathitrupathu"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "mindmap_structure": {
+                                "id": "mm-et-deep",
+                                "title": "Ettuthogai Root",
+                                "children": [
+                                    {
+                                        "title": "Category: Agam (Internal)",
+                                        "children": [
+                                            "Natrinai",
+                                            "Kurunthogai",
+                                            "Aingurunuru",
+                                            "Kalithogai",
+                                            "Agananuru"
+                                        ]
+                                    },
+                                    {
+                                        "title": "Category: Puram (Outer)",
+                                        "children": [
+                                            {
+                                                "title": "Purananuru",
+                                                "children": [
+                                                    {
+                                                        "title": "Poets",
+                                                        "children": [
+                                                            {
+                                                                "title": "Avvaiyar",
+                                                                "children": [
+                                                                    {
+                                                                        "title": "Patronage",
+                                                                        "children": [
+                                                                            {
+                                                                                "title": "Adhiyaman",
+                                                                                "children": [
+                                                                                    {
+                                                                                        "title": "Gift",
+                                                                                        "details": [
+                                                                                            "Nellikaai (Gooseberry)",
+                                                                                            "Immortality Grant"
+                                                                                        ]
+                                                                                    }
+                                                                                ]
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "title": "Pathitrupathu",
+                                                "children": [
+                                                    "Chera Dynasties",
+                                                    "Iron Age Records"
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    "assessment": {
+                        "quiz_id": "qz2",
+                        "title": "Ettuthogai Finale Assessment",
+                        "total_questions": 15,
+                        "questions": [
+                            {
+                                "id": "q1",
+                                "question": "Purananuru has how many poems?",
+                                "options": [
+                                    "100",
+                                    "200",
+                                    "400",
+                                    "500"
+                                ],
+                                "correct_answer_index": 2,
+                                "explanation": "400 poems."
+                            },
+                            {
+                                "id": "q2",
+                                "question": "Which work is a mixed category (Agam/Puram)?",
+                                "options": [
+                                    "Paripadal",
+                                    "Natrinai",
+                                    "Kalithogai",
+                                    "Aingurunuru"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Paripadal."
+                            },
+                            {
+                                "id": "q3",
+                                "question": "Shortest poems in Ettuthogai?",
+                                "options": [
+                                    "Aingurunuru",
+                                    "Kurunthogai",
+                                    "Natrinai",
+                                    "Kalithogai"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Aingurunuru (3-6 lines)."
+                            },
+                            {
+                                "id": "q4",
+                                "question": "Who said 'Yaadhum Oore'?",
+                                "options": [
+                                    "Kapilar",
+                                    "Avvaiyar",
+                                    "Pungundranar",
+                                    "Sathanar"
+                                ],
+                                "correct_answer_index": 2,
+                                "explanation": "Kaniyan Pungundranar."
+                            },
+                            {
+                                "id": "q5",
+                                "question": "Poems on Chera kings?",
+                                "options": [
+                                    "Pathitrupathu",
+                                    "Purananuru",
+                                    "Natrinai",
+                                    "Agananuru"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Pathitrupathu."
+                            },
+                            {
+                                "id": "q6",
+                                "question": "Agananuru is also called?",
+                                "options": [
+                                    "Purappattu",
+                                    "Nedunthogai",
+                                    "Muppal",
+                                    "Parani"
+                                ],
+                                "correct_answer_index": 1,
+                                "explanation": "Nedunthogai."
+                            },
+                            {
+                                "id": "q7",
+                                "question": "Collection with dramatic dialogue?",
+                                "options": [
+                                    "Kalithogai",
+                                    "Natrinai",
+                                    "Paripadal",
+                                    "Purananuru"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Kalithogai."
+                            },
+                            {
+                                "id": "q8",
+                                "question": "Who edited Purananuru?",
+                                "options": [
+                                    "U.V.S. Iyer",
+                                    "S.P. Bharathi",
+                                    "Sivagyana Munivar",
+                                    "Ellis"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Dr. U.V. Swaminatha Iyer (Tamil Thatha)."
+                            },
+                            {
+                                "id": "q9",
+                                "question": "Number of works in Ettuthogai?",
+                                "options": [
+                                    "5",
+                                    "8",
+                                    "10",
+                                    "18"
+                                ],
+                                "correct_answer_index": 1,
+                                "explanation": "Eight works."
+                            },
+                            {
+                                "id": "q10",
+                                "question": "Work with 500 poems?",
+                                "options": [
+                                    "Aingurunuru",
+                                    "Kurunthogai",
+                                    "Natrinai",
+                                    "Purananuru"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Aingurunuru."
+                            },
+                            {
+                                "id": "q11",
+                                "question": "Purananuru belongs to?",
+                                "options": [
+                                    "Agam",
+                                    "Puram",
+                                    "Both",
+                                    "None"
+                                ],
+                                "correct_answer_index": 1,
+                                "explanation": "Puram (Outer life)."
+                            },
+                            {
+                                "id": "q12",
+                                "question": "First anthology in the list?",
+                                "options": [
+                                    "Natrinai",
+                                    "Kurunthogai",
+                                    "Agananuru",
+                                    "Aingurunuru"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Natrinai."
+                            },
+                            {
+                                "id": "q13",
+                                "question": "Work focused on Vaigai river?",
+                                "options": [
+                                    "Paripadal",
+                                    "Kalithogai",
+                                    "Natrinai",
+                                    "Purananuru"
+                                ],
+                                "correct_answer_index": 0,
+                                "explanation": "Paripadal."
+                            },
+                            {
+                                "id": "q14",
+                                "question": "Poems in Kurunthogai?",
+                                "options": [
+                                    "400",
+                                    "401",
+                                    "500",
+                                    "1330"
+                                ],
+                                "correct_answer_index": 1,
+                                "explanation": "401 poems."
+                            },
+                            {
+                                "id": "q15",
+                                "question": "Anthology dedicated only to war?",
+                                "options": [
+                                    "Pathitrupathu",
+                                    "Purananuru",
+                                    "Both",
+                                    "None"
+                                ],
+                                "correct_answer_index": 2,
+                                "explanation": "Both are Puram works."
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "id": 2002,
+                "subject": "Indian Polity",
+                "chapter": "Constitutional Framework",
+                "topic": "Fundamental Rights",
+                "short_description": "Detailed study of Articles 12-35 (Part III) of the Constitution.",
+                "status": "START",
+                "duration_minutes": 60,
+                "learning_content": {
+                    "introduction": "Fundamental Rights are the heart and soul of the Indian Constitution, ensuring liberty and equality.",
+                    "sections": [
+                        {
+                            "section_id": "pol-s1",
+                            "title": "Classification of Rights",
+                            "type": "reading",
+                            "content_blocks": [
+                                {
+                                    "block_id": "pol-b1",
+                                    "type": "bullet_points",
+                                    "list_items": [
+                                        "Right to Equality (Articles 14-18)",
+                                        "Right to Freedom (Articles 19-22)",
+                                        "Right against Exploitation (Articles 23-24)",
+                                        "Right to Constitutional Remedies (Article 32)"
+                                    ],
+                                    "keywords": [
+                                        "Equality",
+                                        "Freedom",
+                                        "Article 32"
+                                    ],
+                                    "pyqs": [
+                                        {
+                                            "id": "p-pol-1",
+                                            "exam_name": "Group 4",
+                                            "year": 2022,
+                                            "question": "Heart and soul of constitution?",
+                                            "answer": "Article 32"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "mindmap_structure": {
+                                "id": "mm-pol-1",
+                                "title": "Polity Root",
+                                "children": [
+                                    "Preamble",
+                                    "Rights",
+                                    "Duties",
+                                    "State Polcy"
+                                ]
+                            }
+                        }
+                    ],
+                    "assessment": {
+                        "quiz_id": "qz-pol",
+                        "total_questions": 10,
+                        "questions": []
+                    }
+                }
+            },
+            {
+                "id": 2003,
+                "subject": "Geography",
+                "chapter": "Atmosphere & Climate",
+                "topic": "Monsoon & Rainfall Patterns",
+                "short_description": "Southwest and Northeast Monsoons in India and Tamil Nadu.",
+                "status": "START",
+                "duration_minutes": 50,
+                "learning_content": {
+                    "introduction": "Climate is the long-term weather pattern of a region.",
+                    "sections": [
+                        {
+                            "section_id": "geo-s1",
+                            "title": "Indian Monsoon",
+                            "type": "reading",
+                            "content_blocks": [
+                                {
+                                    "block_id": "geo-b1",
+                                    "type": "paragraph",
+                                    "text": "India primarily receives rainfall from the Southwest Monsoon (June-Sept). Tamil Nadu, however, is a rain-shadow region for SW monsoon and receives its major rainfall from the Northeast Monsoon (Oct-Dec).",
+                                    "keywords": [
+                                        "SW Monsoon",
+                                        "NE Monsoon",
+                                        "Rain Shadow"
+                                    ],
+                                    "pyqs": [
+                                        {
+                                            "id": "p-geo-1",
+                                            "exam_name": "Group 4",
+                                            "year": 2021,
+                                            "question": "Major rainfall source for TN?",
+                                            "answer": "NE Monsoon"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "assessment": {
+                        "quiz_id": "qz-geo",
+                        "total_questions": 10,
+                        "questions": []
+                    }
+                }
+            },
+            {
+                "id": 2004,
+                "subject": "History & Culture",
+                "chapter": "Medieval India",
+                "topic": "Vijayanagara Empire",
+                "short_description": "Founding of Vijayanagara and the reign of Krishnadevaraya.",
+                "status": "START",
+                "duration_minutes": 60,
+                "learning_content": {
+                    "introduction": "The Vijayanagara Empire (1336-1646) was founded by Harihara and Bukka.",
+                    "sections": [
+                        {
+                            "section_id": "his-s1",
+                            "title": "Krishnadevaraya",
+                            "type": "reading",
+                            "content_blocks": [
+                                {
+                                    "block_id": "his-b1",
+                                    "type": "paragraph",
+                                    "text": "Krishnadevaraya was the greatest ruler. He wrote 'Amuktamalyada' and built the Vitthala temple. His court was graced by the 'Ashtadiggajas'.",
+                                    "keywords": [
+                                        "Krishnadevaraya",
+                                        "Amuktamalyada",
+                                        "Ashtadiggajas"
+                                    ],
+                                    "pyqs": [
+                                        {
+                                            "id": "p-his-1",
+                                            "exam_name": "Group 4",
+                                            "year": 2022,
+                                            "question": "Who founded Vijayanagara?",
+                                            "answer": "Harihara and Bukka"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "assessment": {
+                        "quiz_id": "qz-his",
+                        "total_questions": 10,
+                        "questions": []
+                    }
+                }
+            },
+            {
+                "id": 2005,
+                "subject": "Indian Economy",
+                "chapter": "Planning",
+                "topic": "Five Year Plans & NITI Aayog",
+                "short_description": "Growth strategies from 1951 to present.",
+                "status": "START",
+                "duration_minutes": 50,
+                "learning_content": {
+                    "introduction": "Economic planning in India was initially guided by Five Year Plans.",
+                    "sections": [
+                        {
+                            "section_id": "eco-s1",
+                            "title": "Planning Era",
+                            "type": "bullet_points",
+                            "list_items": [
+                                "1st Plan: Focus on Agriculture (1951-56).",
+                                "2nd Plan: Focus on Heavy Industry (Mahalanobis Model).",
+                                "NITI Aayog replaced Planning Commission in 2015."
+                            ],
+                            "keywords": [
+                                "Mahalanobis",
+                                "NITI Aayog",
+                                "Agriculture"
+                            ],
+                            "pyqs": []
+                        }
+                    ],
+                    "assessment": {
+                        "quiz_id": "qz-eco",
+                        "total_questions": 10,
+                        "questions": []
+                    }
+                }
+            },
+            {
+                "id": 2006,
+                "subject": "Current Affairs",
+                "chapter": "Tamil Nadu",
+                "topic": "State Welfare Schemes",
+                "short_description": "Recent social welfare and educational initiatives.",
+                "status": "START",
+                "duration_minutes": 40,
+                "learning_content": {
+                    "introduction": "Tamil Nadu is a leader in social welfare schemes in India.",
+                    "sections": [
+                        {
+                            "section_id": "ca-s1",
+                            "title": "Recent Initiatives",
+                            "type": "bullet_points",
+                            "list_items": [
+                                "Pudhumai Penn: Financial aid for women's higher education.",
+                                "Illam Thedi Kalvi: Post-pandemic bridge education.",
+                                "早餐计划: Breakfast scheme for primary students."
+                            ],
+                            "keywords": [
+                                "Pudhumai Penn",
+                                "Illam Thedi Kalvi",
+                                "Breakfast Scheme"
+                            ],
+                            "pyqs": []
+                        }
+                    ],
+                    "assessment": {
+                        "quiz_id": "qz-ca",
+                        "total_questions": 10,
+                        "questions": []
+                    }
+                }
+            }
+        ]
+    }
+]

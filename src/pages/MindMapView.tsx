@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
     ArrowLeft,
     X,
@@ -18,6 +18,8 @@ import MindMap, { MindMapNode } from "@/components/MindMap";
 const MindMapViewPage = () => {
     const { topicId, subtopicId, sectionId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    const stateData = location.state as { mindmapData: any; sectionTitle: string } | null;
 
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 120, y: 80 });
@@ -58,6 +60,14 @@ const MindMapViewPage = () => {
 
     // Get content data and build tree
     useEffect(() => {
+        // If we have data passed from navigation state, use it
+        if (stateData?.mindmapData) {
+            const children = stateData.mindmapData.children || [];
+            const root = buildTree(stateData.mindmapData.id || "root", stateData.mindmapData.title || stateData.sectionTitle, 0, children);
+            setRootNode(root);
+            return;
+        }
+
         const topic = topicContent[topicId as keyof typeof topicContent];
         if (!topic) return;
 
@@ -120,7 +130,7 @@ const MindMapViewPage = () => {
         }
 
         setRootNode(initialRoot);
-    }, [topicId, subtopicId, sectionId]);
+    }, [topicId, subtopicId, sectionId, stateData]);
 
     // Calculate node height recursively
     const calculateNodeHeight = (node: MindMapNode): number => {
@@ -317,9 +327,9 @@ const MindMapViewPage = () => {
         document.body.removeChild(link);
     };
 
-    const mainContent = topicContent[topicId as keyof typeof topicContent]?.[(subtopicId as string) as any] as any;
+    const mainContentData = topicContent[topicId as keyof typeof topicContent]?.[(subtopicId as string) as any] as any;
 
-    if (!mainContent && !rootNode) return (
+    if (!mainContentData && !rootNode && !stateData) return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-white p-6 text-center">
             <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
                 <X className="w-8 h-8 text-red-500" />
@@ -334,9 +344,9 @@ const MindMapViewPage = () => {
 
     if (!rootNode) return <div className="p-10 text-center">Loading...</div>;
 
-    const pageTitle = sectionId
-        ? mainContent?.sections?.find((s: any) => s.id.toString() === sectionId)?.title
-        : mainContent?.title;
+    const pageTitle = stateData?.sectionTitle || (sectionId
+        ? mainContentData?.sections?.find((s: any) => s.id.toString() === sectionId)?.title
+        : mainContentData?.title);
 
     return (
         <div className="fixed inset-0 z-[70] flex flex-col bg-white overflow-hidden">
@@ -455,7 +465,7 @@ const MindMapViewPage = () => {
                         <ZoomOut className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-600" />
                     </Button>
 
-                    <div className="w-10 md:w-14 text-center text-[11px] md:text-[13px] text-gray-700 font-semibold">
+                    <div className="w-10 md:w-14 text-center text-[11px] md:text-[13px] text-gray-700 font-medium">
                         {Math.round(zoom * 100)}%
                     </div>
 

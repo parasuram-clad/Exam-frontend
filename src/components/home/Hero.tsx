@@ -1,9 +1,12 @@
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import pic from "@/assets/pic.png";
 
-const Hero = () => {
+interface HeroProps {
+    onGetStarted: () => void;
+}
+
+const Hero = ({ onGetStarted }: HeroProps) => {
     return (
         <section className="relative min-h-[85vh] sm:min-h-[90vh] flex items-center justify-center pt-24 sm:pt-32 pb-12 overflow-hidden bg-white">
             {/* Background Effects */}
@@ -36,9 +39,6 @@ const Hero = () => {
                         <img src={pic} alt="User" className="relative z-[3] w-10 h-10 rounded-full border-2 border-white ring-1 ring-gray-100 object-cover" />
                         <img src={pic} alt="User" className="relative z-[2] w-10 h-10 rounded-full border-2 border-white ring-1 ring-gray-100 object-cover" />
                         <img src={pic} alt="User" className="relative z-[1] w-10 h-10 rounded-full border-2 border-white ring-1 ring-gray-100 object-cover" />
-                        {/* <p className="relative z-0 flex items-center justify-center text-[10px] sm:text-xs font-medium text-[#4FAA60] ">
-                            100+
-                        </p> */}
                     </div>
                     <span className=" text-[12px] sm:text-sm font-medium">Trusted by +10000 Future Officers</span>
                 </div>
@@ -53,14 +53,15 @@ const Hero = () => {
                 </p>
 
                 <div className="flex flex-row items-center justify-center gap-2 sm:gap-5 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
-                    <Link to="/signup">
-                        <Button className="bg-[#1e1e2d] hover:bg-[#2d2d3d] text-white rounded-full px-4 py-5 sm:px-8 sm:py-7 text-xs sm:text-lg group transition-all hover:scale-105 active:scale-95 shadow-lg shadow-gray-200/50 font-medium whitespace-nowrap">
-                            Begin Today
-                            <div className="ml-1.5 sm:ml-3 bg-white rounded-full p-1 sm:p-1.5 transition-transform group-hover:translate-x-1">
-                                <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 text-[#1e1e2d]" />
-                            </div>
-                        </Button>
-                    </Link>
+                    <Button
+                        onClick={onGetStarted}
+                        className="bg-[#1e1e2d] hover:bg-[#2d2d3d] text-white rounded-full px-4 py-5 sm:px-8 sm:py-7 text-xs sm:text-lg group transition-all hover:scale-105 active:scale-95 shadow-lg shadow-gray-200/50 font-medium whitespace-nowrap"
+                    >
+                        Begin Today
+                        <div className="ml-1.5 sm:ml-3 bg-white rounded-full p-1 sm:p-1.5 transition-transform group-hover:translate-x-1">
+                            <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 text-[#1e1e2d]" />
+                        </div>
+                    </Button>
                     <Button
                         variant="ghost"
                         className="bg-transparent border border-gray-400 text-gray-800 rounded-full px-5 py-5 sm:px-10 sm:py-7 text-xs sm:text-lg hover:bg-gray-50 transition-all active:scale-95 font-medium whitespace-nowrap"

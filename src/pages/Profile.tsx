@@ -810,6 +810,29 @@ const Profile = () => {
                             </button>
                           </div>
                         </div>
+
+                        {/* Study Medium */}
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Study Medium</Label>
+                          <div className="relative group">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                              <Globe className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                            </div>
+                            <Select
+                              disabled={!isEditing}
+                              value={profileData.preferredLanguage}
+                              onValueChange={(value) => setProfileData({ ...profileData, preferredLanguage: value })}
+                            >
+                              <SelectTrigger className="w-full bg-muted/30 border-none h-12 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background text-foreground/80 shadow-none">
+                                <SelectValue placeholder="Select Medium" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-border/50 shadow-xl">
+                                <SelectItem value="en">English Medium</SelectItem>
+                                <SelectItem value="ta">Tamil Medium</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                       </div>
                     </section>
 
@@ -1007,9 +1030,9 @@ const Profile = () => {
                                 <SelectValue placeholder="Select Year" />
                               </SelectTrigger>
                               <SelectContent className="rounded-xl border-border/50">
-                                <SelectItem value="2025">2025</SelectItem>
                                 <SelectItem value="2026">2026</SelectItem>
                                 <SelectItem value="2027">2027</SelectItem>
+                                <SelectItem value="2028">2028</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

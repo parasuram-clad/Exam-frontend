@@ -23,7 +23,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DailyQuizModal } from "@/components/dashboard/DailyQuizModal";
+import { DailyQuizModal, QUIZ_QUESTIONS } from "@/components/dashboard/DailyQuizModal";
 
 // Types from StudyInterface
 type Mode = "reading" | "study" | "revision";
@@ -40,10 +40,21 @@ interface PYQ {
 interface ContentSection {
   id: string;
   title: string;
-  paragraphs: string[];
-  keywords: string[];
-  importantParagraphIndices?: number[]; // Indices of paragraphs that have PYQs
-  pyqData?: { [paragraphIndex: number]: PYQ[] }; // PYQ data for each important paragraph
+  type?: string;
+  content_blocks?: {
+    block_id: string;
+    type: string;
+    sub_heading?: string;
+    keywords: string[];
+    text: string;
+    image?: string | null;
+    pyqs: any[];
+  }[];
+  paragraphs?: string[];
+  keywords?: string[];
+  importantParagraphIndices?: number[];
+  pyqData?: any;
+  mindmap_structure?: any;
 }
 
 // Content sections for Tamil Nadu History provided by the USER
@@ -537,45 +548,75 @@ const StudyContent = () => {
   const [tempNoteText, setTempNoteText] = useState("");
 
   const readingPanelRef = useRef<HTMLDivElement>(null);
+  const [topicAssessment, setTopicAssessment] = useState<any>(null);
+  const [topicData, setTopicData] = useState<any>(null);
 
   useEffect(() => {
     const fetchContent = async () => {
-      // If we don't have a backend subtopicId (numeric), we might be using mock routes
       if (!subtopicId || isNaN(parseInt(subtopicId))) {
         setLoading(false);
-        setVisibleKeywords(contentSections[0].keywords);
+        // Map mock content for safety
+        const mappedMock = contentSections.map(s => ({
+          ...s,
+          type: 'reading',
+          content_blocks: s.paragraphs.map((p, i) => ({
+            block_id: `${s.id}-b${i}`,
+            type: 'paragraph',
+            text: p,
+            keywords: s.keywords,
+            pyqs: []
+          }))
+        }));
+        setSections(mappedMock as any);
+        setVisibleKeywords(mappedMock[0].keywords);
         return;
       }
 
       try {
         setLoading(true);
         const user = await authService.getCurrentUser();
+        const response = await studyService.getTopicContentBySyllabusId(parseInt(subtopicId), user.id);
 
-        // Get the specific plan item to know the topic and subject
-        const planItem = await studyService.getStudyPlan(parseInt(subtopicId));
+        if (response && response.task) {
+          setTopicData(response);
+          const learningContent = response.task.learning_content;
+          const mappedSections: ContentSection[] = learningContent.sections.map(s => ({
+            id: s.section_id,
+            title: s.title,
+            type: s.type,
+            content_blocks: s.content_blocks,
+            mindmap_structure: s.mindmap_structure
+          }));
 
-        if (planItem) {
-          const response = await studyService.getTopicContent({
-            user_id: user.id,
-            exam_type: user.exam_type || 'TNPSC',
-            sub_division: user.sub_division || 'Group I',
-            subject: planItem.subject,
-            topic: planItem.topic,
-            learner_type: user.learner_type === 'Experienced' || user.learner_type === 'Working Professional',
-            language: user.preferred_language || 'English'
-          });
+          setSections(mappedSections);
+          setVisibleKeywords(mappedSections[0]?.content_blocks[0]?.keywords || []);
 
-          // Simple parser: split by double newlines
-          const paragraphs = response.content.split('\n\n').filter(p => p.trim());
+          // Store assessment if needed
+          console.log("Full Topic Content Response:", response);
+          const assessmentSource = response.task?.assessment || response.task?.learning_content?.assessment;
 
-          const newSections: ContentSection[] = [{
-            id: 'generated',
-            title: planItem.topic,
-            paragraphs: paragraphs,
-            keywords: []
-          }];
-
-          setSections(newSections);
+          if (assessmentSource && assessmentSource.questions && assessmentSource.questions.length > 0) {
+            console.log("Backend Assessment Questions found:", assessmentSource.questions.length);
+            const mappedQuestions = assessmentSource.questions.map((q: any, idx: number) => ({
+              id: q.id || `q-${idx}`,
+              question: q.question,
+              subject: response.task.subject || "General Science",
+              difficulty: q.difficulty || "Medium",
+              options: q.options,
+              correctAnswer: q.correct_answer_index,
+              explanation: q.explanation
+            }));
+            const finalAssessment = {
+              ...assessmentSource,
+              questions: mappedQuestions
+            };
+            console.log("Successfully mapped assessment questions:", finalAssessment.questions);
+            setTopicAssessment(finalAssessment);
+          } else {
+            console.warn("No assessment found in backend response task or learning_content:", response.task);
+            // If No assessment from backend, we can decide if we want to show anything or keep it null
+            setTopicAssessment(null);
+          }
 
           // Fetch existing notes for this topic
           try {
@@ -589,12 +630,12 @@ const StudyContent = () => {
           } catch (nErr) {
             console.error("Failed to fetch notes", nErr);
           }
+        } else {
+          console.error("Response or task is missing:", response);
         }
       } catch (err) {
         console.error("Failed to fetch study content", err);
-        // Fallback to mock content if backend fails
-        setSections(contentSections);
-        toast.error("Using backup study material.");
+        toast.error("Failed to load study material.");
       } finally {
         setLoading(false);
       }
@@ -620,26 +661,79 @@ const StudyContent = () => {
 
   // Handle scroll to update visible keywords
   useEffect(() => {
-    const handleScroll = () => {
-      if (!readingPanelRef.current) return;
+    if (sections.length === 0 || !readingPanelRef.current) return;
 
-      const scrollTop = readingPanelRef.current.scrollTop;
-      const scrollHeight = readingPanelRef.current.scrollHeight;
-      const clientHeight = readingPanelRef.current.clientHeight;
-
-      const scrollPercent = scrollTop / (scrollHeight - clientHeight || 1);
-      const sectionIndex = Math.floor(scrollPercent * sections.length);
-      const currentSection = sections[Math.min(sectionIndex, sections.length - 1)];
-
-      setVisibleKeywords(currentSection.keywords);
+    const observerOption = {
+      root: readingPanelRef.current,
+      rootMargin: '-5% 0% -60% 0%',
+      threshold: [0, 0.5]
     };
 
-    const panel = readingPanelRef.current;
-    if (panel) {
-      panel.addEventListener('scroll', handleScroll);
-      return () => panel.removeEventListener('scroll', handleScroll);
+    const observer = new IntersectionObserver((entries) => {
+      // Find the entries that are intersecting and sort by top position
+      const intersecting = entries
+        .filter(e => e.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+      if (intersecting.length > 0) {
+        const targetId = intersecting[0].target.id;
+        console.log("IntersectionObserver: Active Section:", targetId);
+
+        if (targetId.startsWith('section-')) {
+          const sectionId = targetId.replace('section-', '');
+          const section = sections.find(s => s.id === sectionId);
+          if (section) {
+            const allKeywords = Array.from(new Set(section.content_blocks?.flatMap(b => b.keywords) || []));
+            console.log("Updating visible keywords for section:", sectionId, allKeywords);
+            if (allKeywords.length > 0) {
+              setVisibleKeywords(allKeywords);
+            }
+          }
+        }
+      }
+    }, observerOption);
+
+    sections.forEach(s => {
+      const el = document.getElementById(`section-${s.id}`);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [sections, mode]);
+
+  const handleMindMapClick = (sectionIndex: number) => {
+    const section = sections[sectionIndex];
+    if (section && section.mindmap_structure) {
+      navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}/mindmap`, {
+        state: {
+          mindmapData: section.mindmap_structure,
+          sectionTitle: section.title
+        }
+      });
+    } else {
+      // Fallback to full topic mindmap if possible
+      navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}/mindmap`);
     }
-  }, []);
+  };
+
+  const handleKeywordClick = (kw: string) => {
+    setSelectedKeyword(kw);
+    if (keywordNotes[kw] === undefined) {
+      setKeywordNotes(prev => ({ ...prev, [kw]: "" }));
+    }
+
+    // Find first block that contains this keyword and scroll to it
+    for (const section of sections) {
+      const blockWithKeyword = section.content_blocks?.find(b => b.keywords.includes(kw));
+      if (blockWithKeyword) {
+        const el = document.getElementById(`block-${blockWithKeyword.block_id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        break;
+      }
+    }
+  };
 
   const getBackgroundStyle = () => {
     switch (backgroundPreset) {
@@ -713,33 +807,40 @@ const StudyContent = () => {
 
   const renderReadingContent = () => (
     <div className="flex flex-col gap-10 py-12 px-8 md:px-16 max-w-[800px] mx-auto">
+      {/* Topic Header & Introduction */}
+      <div className="space-y-4">
+        <h1 className={cn(
+          "font-['Inter:Medium',sans-serif] font-medium leading-[32px] sm:leading-[36px] text-[24px] sm:text-[28px] tracking-[0.0703px]",
+          getTextColor()
+        )}>
+          {sections[0]?.title || "Study Topic"}
+        </h1>
+        {topicData?.task?.short_description && (
+          <p className={cn("text-[15px] opacity-60 italic", getTextColor())}>
+            {topicData.task.short_description}
+          </p>
+        )}
+        {topicData?.task?.learning_content?.introduction && (
+          <div className={cn("p-6 rounded-2xl border bg-accent/5", backgroundPreset === 'dark' ? "border-gray-800" : "border-gray-100")}>
+            <p className={cn("text-[16px] leading-relaxed", getTextColor())}>
+              {topicData.task.learning_content.introduction}
+            </p>
+          </div>
+        )}
+      </div>
+
       {sections.map((section, idx) => (
         <div key={section.id} id={`section-${section.id}`} className="space-y-8 scroll-mt-24">
-          {/* <div className="flex items-center justify-between pb-3 border-b border-gray-200/10">
-            <span className={cn("text-[12px] uppercase tracking-[0.1em] font-medium opacity-40", getTextColor())}>
-              Section {idx + 1}
-            </span>
-          </div> */}
-
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            {idx === 0 ? (
-              <h1 className={cn(
-                "font-['Inter:Medium',sans-serif] font-medium leading-[32px] sm:leading-[36px] text-[20px] sm:text-[24px] tracking-[0.0703px]",
-                getTextColor()
-              )}>
-                {section.title}
-              </h1>
-            ) : (
-              <h2 className={cn(
-                "font-['Inter:Medium',sans-serif] font-medium leading-[26px] sm:leading-[30px] text-[18px] sm:text-[20px] tracking-[-0.4492px]",
-                getTextColor()
-              )}>
-                {section.title}
-              </h2>
-            )}
-            {idx === 0 && (
+            <h2 className={cn(
+              "font-['Inter:Medium',sans-serif] font-medium leading-[26px] sm:leading-[30px] text-[18px] sm:text-[22px] tracking-[-0.4492px]",
+              getTextColor()
+            )}>
+              {section.title}
+            </h2>
+            {section.mindmap_structure && (
               <button
-                onClick={() => navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}/mindmap`)}
+                onClick={() => handleMindMapClick(idx)}
                 className={cn(
                   "flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg transition-all shadow-sm border",
                   backgroundPreset === 'dark' ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-white border-gray-200 text-gray-600"
@@ -752,20 +853,51 @@ const StudyContent = () => {
           </div>
 
           <div className={cn("space-y-6 text-[16px] leading-[26px] tracking-[-0.3125px] font-['Inter:Regular',sans-serif]", getTextColor())}>
-            {section.paragraphs.map((paragraph, pIdx) => {
-              const pyqKey = `${section.id}-${pIdx}`;
-              const hasPyqs = section.importantParagraphIndices?.includes(pIdx);
+            {section.content_blocks?.map((block, bIdx) => {
+              const pyqKey = `${section.id}-${bIdx}`;
+              const hasPyqs = block.pyqs && block.pyqs.length > 0;
               const isExpanded = openPyqAccordion === pyqKey;
 
               return (
-                <div key={pIdx} className="space-y-4">
+                <div key={block.block_id} id={`block-${block.block_id}`} className="space-y-4">
                   <div className="relative group">
-                    <p className="text-justify inline">
-                      {paragraph}
-                    </p>
+                    {block.sub_heading && (
+                      <h4 className="font-bold mb-2">{block.sub_heading}</h4>
+                    )}
+
+                    {block.type === 'paragraph' && (
+                      <p className="text-justify inline">
+                        {block.text}
+                      </p>
+                    )}
+
+                    {block.type === 'image' && block.image && (
+                      <div className="my-6">
+                        <img
+                          src={block.image}
+                          alt={block.sub_heading || "Topic Image"}
+                          className="rounded-2xl border shadow-lg max-w-full h-auto mx-auto"
+                          loading="eager"
+                          fetchPriority="high"
+                        />
+                        {block.text && (
+                          <p className="text-sm text-center mt-3 opacity-60">{block.text}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {block.type === 'video' && (
+                      <div className="my-6 aspect-video bg-gray-100 rounded-2xl flex items-center justify-center border border-dashed border-gray-300">
+                        <div className="text-center">
+                          <Play className="w-12 h-12 text-accent/40 mx-auto mb-3" />
+                          <p className="text-sm font-medium opacity-50">Video content available in full version</p>
+                        </div>
+                      </div>
+                    )}
+
                     {hasPyqs && (
                       <button
-                        onClick={() => handlePyqToggle(section.id, pIdx)}
+                        onClick={() => handlePyqToggle(section.id, bIdx)}
                         className="inline-block ml-2 align-middle"
                       >
                         <BulbIcon isActive={isExpanded} />
@@ -773,8 +905,7 @@ const StudyContent = () => {
                     )}
                   </div>
 
-                  {/* Inline PYQ Accordion from StudyInterface */}
-                  {isExpanded && hasPyqs && section.pyqData && section.pyqData[pIdx] && (
+                  {isExpanded && hasPyqs && (
                     <div className={cn(
                       "my-4 rounded-xl border p-4 transition-all duration-300",
                       backgroundPreset === 'dark' ? "bg-[#2a2a2a] border-gray-700" : "bg-gray-50 border-gray-200"
@@ -784,17 +915,17 @@ const StudyContent = () => {
                         <h4 className={cn("font-['Inter:Medium',sans-serif] text-[14px] font-medium opacity-70", getTextColor())}>Asked in Exams</h4>
                       </div>
                       <div className="space-y-3">
-                        {section.pyqData[pIdx].map((pyq) => (
-                          <div key={pyq.id} className={cn("p-4 rounded-lg", backgroundPreset === 'dark' ? "bg-[#1a1a1a]" : "bg-white shadow-sm")}>
-                            <p className="text-[12px] font-medium mb-1 opacity-50 uppercase tracking-wider">{pyq.examName} – {pyq.year}</p>
+                        {block.pyqs.map((pyq: any, i: number) => (
+                          <div key={i} className={cn("p-4 rounded-lg", backgroundPreset === 'dark' ? "bg-[#1a1a1a]" : "bg-white shadow-sm")}>
+                            <p className="text-[12px] font-medium mb-1 opacity-50 uppercase tracking-wider">{pyq.exam_name} – {pyq.year}</p>
                             <p className="text-[14px] leading-[20px] mb-3">{pyq.question}</p>
                             <button
-                              onClick={() => handleAnswerToggle(pyq.id)}
+                              onClick={() => handleAnswerToggle(`pyq-${pyqKey}-${i}`)}
                               className="text-[13px] font-medium text-blue-500 hover:text-blue-600 transition-colors"
                             >
-                              {openAnswers.has(pyq.id) ? "Hide Answer" : "View Answer"}
+                              {openAnswers.has(`pyq-${pyqKey}-${i}`) ? "Hide Answer" : "View Answer"}
                             </button>
-                            {openAnswers.has(pyq.id) && (
+                            {openAnswers.has(`pyq-${pyqKey}-${i}`) && (
                               <div className="mt-3 pt-3 border-t border-gray-100/10">
                                 <p className="text-[12px] font-medium text-green-500 mb-1">Answer:</p>
                                 <p className="text-[14px]">{pyq.answer}</p>
@@ -855,16 +986,20 @@ const StudyContent = () => {
             </Button>
 
             {isAssessmentFinished ? (
-              <div className="bg-emerald-500 text-white px-8 py-6 text-[15px] rounded-xl shadow-md font-bold flex items-center justify-center cursor-default animate-fade-in">
+              <div className="bg-emerald-500 text-white p-3 text-[15px] rounded-xl shadow-md font-medium flex items-center justify-center cursor-default animate-fade-in">
                 Assessment Completed ✅
               </div>
             ) : (
               <Button
                 onClick={startAssessment}
-                className="bg-[#1c1c1e] text-white hover:bg-black px-10 py-6 text-[15px] rounded-xl transition-all shadow-md font-medium"
+                disabled={!topicAssessment}
+                className={cn(
+                  "bg-[#1c1c1e] text-white hover:bg-black px-10 py-6 text-[15px] rounded-xl transition-all shadow-md font-medium",
+                  !topicAssessment && "opacity-50 cursor-not-allowed"
+                )}
               >
                 <Play className="w-5 h-5 mr-2.5 fill-current" />
-                Start Assessment
+                {!topicAssessment ? "Loading Assessment..." : "Start Assessment"}
               </Button>
             )}
           </div>
@@ -979,7 +1114,7 @@ const StudyContent = () => {
                     "flex-shrink-0 lg:h-[30%] lg:overflow-y-auto border-b border-gray-200/60 p-4 sm:p-6 bg-white/50 backdrop-blur-sm transition-all duration-300",
                     focusedNoteKeyword ? "h-0 p-0 opacity-0 overflow-hidden border-none lg:h-[30%] lg:p-6 lg:opacity-100 lg:overflow-y-auto lg:border-b" : "h-auto"
                   )}><div className="flex items-center justify-between mb-3 sm:mb-4">
-                      <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-semibold">Keywords</h3>
+                      <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-medium">Keywords</h3>
 
                     </div>
 
@@ -987,16 +1122,11 @@ const StudyContent = () => {
                       {visibleKeywords.map(kw => (
                         <button
                           key={kw}
-                          onClick={() => {
-                            setSelectedKeyword(kw);
-                            if (keywordNotes[kw] === undefined) {
-                              setKeywordNotes(prev => ({ ...prev, [kw]: "" }));
-                            }
-                          }}
+                          onClick={() => handleKeywordClick(kw)}
                           className={cn(
                             "px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[12px] sm:text-[14px] transition-all border font-medium",
                             selectedKeyword === kw
-                              ? "bg-[#1f2937] border-[#1f2937] text-white shadow-md font-semibold"
+                              ? "bg-[#1f2937] border-[#1f2937] text-white shadow-md font-medium"
                               : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
                           )}
                         >
@@ -1009,7 +1139,7 @@ const StudyContent = () => {
                   {/* Notes List Section */}
                   <div className="flex-1 p-4 sm:p-8 flex flex-col overflow-hidden">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-semibold">
+                      <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-medium">
                         {focusedNoteKeyword ? `Editing: ${focusedNoteKeyword}` : 'Notes'}
                       </h3>
                       {focusedNoteKeyword && (
@@ -1041,7 +1171,7 @@ const StudyContent = () => {
                           >
                             <div className="flex items-start justify-between mb-3">
                               <div>
-                                <h4 className="font-['Inter:SemiBold',sans-serif] text-[14px] sm:text-[15px] font-bold text-gray-900 leading-tight">{keyword}</h4>
+                                <h4 className="font-['Inter:Medium',sans-serif] text-[14px] sm:text-[15px] font-medium text-gray-900 leading-tight">{keyword}</h4>
                                 <p className="font-['Inter:Regular',sans-serif] text-[10px] text-gray-400 mt-1">Ref: Tamil Nadu History</p>
                               </div>
                               {hoveredNoteId === keyword && (
@@ -1092,7 +1222,7 @@ const StudyContent = () => {
                       {Object.entries(keywordNotes).map(([k, n]) => (
                         <div key={k} className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm transition-all hover:shadow-md">
                           <div className="mb-6">
-                            <h4 className="text-md font-bold text-gray-900 leading-tight font-['Inter:Medium',sans-serif]">
+                            <h4 className="text-md font-medium text-gray-900 leading-tight font-['Inter:Medium',sans-serif]">
                               {k}
                             </h4>
                             <p className="text-sm text-gray-500 mt-1 font-['Inter:Regular',sans-serif]">
@@ -1128,44 +1258,14 @@ const StudyContent = () => {
           </div>
 
           <DailyQuizModal
-            isOpen={isInQuizMode}
+            isOpen={isAssessmentStarted}
             onClose={() => setIsAssessmentStarted(false)}
             onComplete={() => {
               setIsAssessmentFinished(true);
-              // Do NOT close the modal here to allow users to see the result
-              // setIsAssessmentStarted(false); 
             }}
-            title="Tamil Nadu History Assessment"
-            subtitle="Quick Evaluation • 10 Minutes"
-            questions={[
-              {
-                id: 1,
-                question: "Which of the following dynasties is NOT considered one of the 'Three Great Tamil Kingdoms'?",
-                subject: "History",
-                difficulty: "Easy",
-                options: ["Chera", "Chola", "Pandya", "Pallava"],
-                correctAnswer: 3,
-                explanation: "The Three Great Tamil Kingdoms were the Cheras, Cholas, and Pandyas. The Pallavas came later and were a distinct dynasty."
-              },
-              {
-                id: 2,
-                question: "The term 'Sangam' in ancient Tamil history literally refers to:",
-                subject: "History",
-                difficulty: "Medium",
-                options: ["A battlefield", "An assembly of poets", "A naval port", "A royal palace"],
-                correctAnswer: 1,
-                explanation: "The term 'Sangam' refers to an assembly or academy of poets and scholars who gathered under royal patronage."
-              },
-              {
-                id: 3,
-                question: "Which ancient Tamil port was famously known for its extensive trade with the Roman Empire?",
-                subject: "History",
-                difficulty: "Hard",
-                options: ["Madurai", "Kancheepuram", "Arikamedu", "Kaveripattinam"],
-                correctAnswer: 2,
-                explanation: "Arikamedu (near Pondicherry) was a major port known for its trade with the Roman Empire, evidenced by Roman pottery and coins found there."
-              }
-            ]}
+            title={topicData?.task?.topic || "Study Assessment"}
+            subtitle={`${topicAssessment?.total_questions || topicAssessment?.questions?.length || 0} Questions • 10 Minutes`}
+            questions={topicAssessment?.questions || []}
           />
 
           <style>{`

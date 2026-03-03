@@ -1,8 +1,11 @@
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 
-const Pricing = () => {
+interface PricingProps {
+    onGetStarted: () => void;
+}
+
+const Pricing = ({ onGetStarted }: PricingProps) => {
     const plans = [
         {
             price: "₹2,199",
@@ -109,13 +112,12 @@ const Pricing = () => {
                             </ul>
 
                             <div className="mt-auto">
-                                <Link to="/signup w-full">
-                                    <Button
-                                        className="w-full h-12 sm:h-14 rounded-full bg-[#4FAA60] hover:bg-[#45964f] text-white text-base sm:text-lg font-medium shadow-lg shadow-[#4FAA60]/20 transition-all duration-300 hover:shadow-xl hover:shadow-[#4FAA60]/30 active:scale-[0.98]"
-                                    >
-                                        {plan.buttonText}
-                                    </Button>
-                                </Link>
+                                <Button
+                                    onClick={onGetStarted}
+                                    className="w-full h-12 sm:h-14 rounded-full bg-[#4FAA60] hover:bg-[#45964f] text-white text-base sm:text-lg font-medium shadow-lg shadow-[#4FAA60]/20 transition-all duration-300 hover:shadow-xl hover:shadow-[#4FAA60]/30 active:scale-[0.98]"
+                                >
+                                    {plan.buttonText}
+                                </Button>
                             </div>
                         </div>
                     ))}

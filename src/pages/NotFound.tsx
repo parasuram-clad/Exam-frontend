@@ -28,7 +28,7 @@ const NotFound = () => {
         <div className="flex flex-col sm:flex-row gap-4">
           <a href="/">
             <Button className="px-8 h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold">
-              Back to Dashboard
+              Back to Home
             </Button>
           </a>
           <Button variant="outline" onClick={() => window.history.back()} className="px-8 h-12 rounded-xl border-slate-200">

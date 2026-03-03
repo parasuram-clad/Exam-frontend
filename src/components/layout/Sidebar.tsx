@@ -9,27 +9,20 @@ import {
   HelpCircle,
   X,
   GraduationCap,
-  Trophy,
-  CalendarDays,
+  MessageSquare,
+  Newspaper,
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
+import authService from "@/services/auth.service";
+import { toast } from "sonner";
 
 interface NavItem {
   icon: React.ElementType;
   label: string;
   href: string;
 }
-
-const navItems: NavItem[] = [
-  { icon: Home, label: "Home", href: "/dashboard" },
-  { icon: Calendar, label: "Study Plan", href: "/study-plan" },
-  { icon: FileText, label: "Test Series", href: "/test-series" },
-  { icon: TrendingUp, label: "My Progress", href: "/progress" },
-  { icon: Trophy, label: "Leaderboard", href: "/leaderboard" },
-  { icon: CalendarDays, label: "Schedule", href: "/schedule" },
-  { icon: User, label: "Profile", href: "/profile" },
-];
 
 interface SidebarProps {
   isOpen: boolean;
@@ -38,9 +31,31 @@ interface SidebarProps {
 
 
 export function Sidebar({ isOpen, onToggle }: SidebarProps) {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
+
+  const navItems: NavItem[] = [
+    { icon: Home, label: t('nav.home', 'Home'), href: "/dashboard" },
+    { icon: MessageSquare, label: t('nav.askDoubt', 'Ask Your Doubt'), href: "/ask-doubt" },
+    { icon: Calendar, label: t('nav.studyPlan', 'Study Plan'), href: "/study-plan" },
+    { icon: FileText, label: t('nav.testSeries', 'Test Series'), href: "/test-series" },
+    { icon: Newspaper, label: t('nav.currentAffairs', 'Current Affairs'), href: "/current-affairs" },
+    { icon: TrendingUp, label: t('nav.progress', 'My Progress'), href: "/progress" },
+    { icon: User, label: t('nav.profile', 'Profile'), href: "/profile" },
+  ];
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      toast.success("Logged out successfully");
+      navigate("/");
+    } catch (err) {
+      console.error("Logout failed:", err);
+      toast.error("Logout failed");
+    }
+  };
 
   return (
     <>
@@ -87,7 +102,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
               (item.href !== "/dashboard" && currentPath.startsWith(item.href));
             return (
               <Link
-                key={item.label}
+                key={item.href}
                 to={item.href}
                 onClick={onToggle}
                 className={cn(
@@ -103,9 +118,6 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
             );
           })}
         </nav>
-
-        {/* Logout Button */}
-
 
         {/* Help Center */}
         <div className="p-4">
@@ -139,7 +151,7 @@ export function MobileMenuButton({ onClick }: { onClick: () => void }) {
     <Button
       variant="ghost"
       size="icon"
-      className="lg:hidden"
+      className="hidden"
       onClick={onClick}
     >
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

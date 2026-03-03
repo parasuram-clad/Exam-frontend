@@ -1,4 +1,7 @@
+import { useState, useEffect } from "react";
+import authService, { UserMe } from "@/services/auth.service";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { DashboardLayout } from "@/components/layout";
 import {
   StreakWidget,
@@ -7,247 +10,320 @@ import {
 } from "@/components/dashboard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, FileText, Trophy, Library, BookOpen } from "lucide-react";
+import { Clock, FileText, Trophy, Library, BookOpen, Landmark, Globe, Banknote, Microscope, Newspaper, Brain, Pencil, Timer, Layout, Bell, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
-import svgPaths from './svg-qnm9pk5qsq';
-import testImage from "../assets/test-image.png";
+import { LanguageToggle } from "@/components/layout/LanguageToggle";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { SubjectWiseView, TestSubject } from "@/components/test-series/SubjectWiseView";
+import { TestSetsView, TestSet } from "@/components/test-series/TestSetsView";
+import testImage from "../assets/test-1.png";
 import testHero from "../assets/test-hero.png";
+import test1Icon from "../assets/test-1.png";
+import test2Icon from "../assets/test-2.png";
+import test3Icon from "../assets/test-3.png";
+import test4Icon from "../assets/test-4.png";
+import test5Icon from "../assets/tes-5.png";
+import test6Icon from "../assets/test-6.png";
 
-interface TestSubject {
-  id: string;
-  icon: string;
-  name: string;
-  testsAvailable: number;
-  completed: number;
-  total: number;
-  difficulty: "Easy" | "Moderate" | "Hard";
-  tags: string[];
-}
+
 
 const testSubjects: TestSubject[] = [
   {
     id: "history",
-    icon: "📚",
+    icon: test1Icon,
     name: "History",
     testsAvailable: 25,
     completed: 6,
     total: 25,
     difficulty: "Moderate",
-    tags: ["25 Apt", "75 History + CA", "100 Lang"],
+    iconBg: "bg-amber-50",
+    items: [
+      { icon: <Brain className="w-3 h-3" />, text: "25 Apt", color: "text-pink-500", bg: "bg-pink-50" },
+      { icon: <BookOpen className="w-3 h-3" />, text: "75 History + CA", color: "text-blue-500", bg: "bg-blue-50" },
+      { icon: <Pencil className="w-3 h-3" />, text: "100 Lang", color: "text-amber-500", bg: "bg-amber-50" },
+    ],
   },
   {
     id: "polity",
-    icon: "⚖️",
+    icon: test2Icon,
     name: "Polity",
     testsAvailable: 25,
     completed: 0,
     total: 25,
     difficulty: "Hard",
-    tags: ["25 Apt", "75 Polity+ CA", "100 Lang"],
+    iconBg: "bg-orange-50",
+    items: [
+      { icon: <Brain className="w-3 h-3" />, text: "25 Apt", color: "text-pink-500", bg: "bg-pink-50" },
+      { icon: <BookOpen className="w-3 h-3" />, text: "75 Polity + CA", color: "text-blue-500", bg: "bg-blue-50" },
+      { icon: <Pencil className="w-3 h-3" />, text: "100 Lang", color: "text-amber-500", bg: "bg-amber-50" },
+    ],
   },
   {
     id: "geography",
-    icon: "🌍",
+    icon: test3Icon,
     name: "Geography",
     testsAvailable: 25,
     completed: 20,
     total: 25,
     difficulty: "Easy",
-    tags: ["25 Apt", "75 Geography+ CA", "100 Lang"],
+    iconBg: "bg-emerald-50",
+    items: [
+      { icon: <Brain className="w-3 h-3" />, text: "25 Apt", color: "text-pink-500", bg: "bg-pink-50" },
+      { icon: <BookOpen className="w-3 h-3" />, text: "75 Geography + CA", color: "text-blue-500", bg: "bg-blue-50" },
+      { icon: <Pencil className="w-3 h-3" />, text: "100 Lang", color: "text-amber-500", bg: "bg-amber-50" },
+    ],
   },
   {
     id: "economy",
-    icon: "💰",
+    icon: test4Icon,
     name: "Economy",
     testsAvailable: 25,
     completed: 23,
     total: 25,
     difficulty: "Easy",
-    tags: ["25 Apt", "75 Economy+ CA", "100 Lang"],
+    iconBg: "bg-sky-50",
+    items: [
+      { icon: <Brain className="w-3 h-3" />, text: "25 Apt", color: "text-pink-500", bg: "bg-pink-50" },
+      { icon: <BookOpen className="w-3 h-3" />, text: "75 Economy + CA", color: "text-blue-500", bg: "bg-blue-50" },
+      { icon: <Pencil className="w-3 h-3" />, text: "100 Lang", color: "text-amber-500", bg: "bg-amber-50" },
+    ],
   },
   {
     id: "science-tech",
-    icon: "🔬",
+    icon: test5Icon,
     name: "Science & Tech",
     testsAvailable: 25,
     completed: 10,
     total: 25,
     difficulty: "Moderate",
-    tags: ["25 Apt", "75 Science + Tech + CA", "100 Lang"],
+    iconBg: "bg-indigo-50",
+    items: [
+      { icon: <Brain className="w-3 h-3" />, text: "25 Apt", color: "text-pink-500", bg: "bg-pink-50" },
+      { icon: <BookOpen className="w-3 h-3" />, text: "75 Science + CA", color: "text-blue-500", bg: "bg-blue-50" },
+      { icon: <Pencil className="w-3 h-3" />, text: "100 Lang", color: "text-amber-500", bg: "bg-amber-50" },
+    ],
   },
   {
     id: "current-affairs",
-    icon: "📰",
+    icon: test6Icon,
     name: "Current Affairs",
     testsAvailable: 25,
     completed: 10,
     total: 25,
     difficulty: "Easy",
-    tags: ["25 Apt", "75 Current Affairs", "100 Lang"],
+    iconBg: "bg-slate-50",
+    items: [
+      { icon: <Brain className="w-3 h-3" />, text: "25 Apt", color: "text-pink-500", bg: "bg-pink-50" },
+      { icon: <BookOpen className="w-3 h-3" />, text: "75 Current Affairs", color: "text-blue-500", bg: "bg-blue-50" },
+      { icon: <Pencil className="w-3 h-3" />, text: "100 Lang", color: "text-amber-500", bg: "bg-amber-50" },
+    ],
   },
 ];
 
-const TestSeries = () => {
+const testSets: TestSet[] = [
+  {
+    id: "set-1",
+    name: "Test Set 1",
+    duration: "3 Hours",
+    questions: 200,
+    score: { obtained: 158, total: 300 },
+    difficulty: "Moderate",
+    syllabus: ["GS", "Tamil"],
+  },
+  {
+    id: "set-2",
+    name: "Test Set 2",
+    duration: "3 Hours",
+    questions: 200,
+    difficulty: "Moderate",
+    syllabus: ["GS", "Tamil"],
+  },
+  {
+    id: "set-3",
+    name: "Test Set 3",
+    duration: "3 Hours",
+    questions: 200,
+    difficulty: "Easy",
+    syllabus: ["GS", "English"],
+  },
+];
+
+const TestSeriesSidebar = ({ user }: { user: UserMe | null }) => {
   const navigate = useNavigate();
+  const attempts = [
+    { name: "Polity – Test 4", subject: "polity", testId: "4", score: "5/15" },
+    { name: "Geography – Test 6", subject: "geography", testId: "6", score: "12/15" },
+    { name: "Current Affairs – Test 6", subject: "current-affairs", testId: "6", score: "12/15" },
+  ];
+
+  // Helper for initials
+  const initials = user?.full_name
+    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
+    : user?.username?.substring(0, 2).toUpperCase() || "A";
+
+  // Handle relative avatar URL
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+  const avatarUrl = user?.photo_url
+    ? (user.photo_url.startsWith('http') ? user.photo_url : `${baseUrl}${user.photo_url}`)
+    : undefined;
 
   return (
-    <DashboardLayout>
-      {/* Subject-Wise Banner */}
-      <div className="bg-gradient-to-r from-[#D2EDDD] to-[#F1F7D8] rounded-2xl p-6 md:p-10 mb-8 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group border border-[#C7DD66]/20 shadow-sm">
-        {/* Content */}
-        <div className="flex-1 relative z-10">
-          <h2 className="text-2xl md:text-3xl font-bold text-[#0F172A] mb-6 tracking-tight">Subject-Wise Test Series</h2>
+    <div className="flex flex-col gap-6">
 
-          <div className="">
-            <div className="flex items-center gap-3 text-base md:text-lg text-slate-700/90 font-medium">
-              <div className="bg-white/60  rounded-lg">
-                <Library className="w-5 h-5 text-emerald-600" />
+
+      {/* Improve Last Attempts Card */}
+      <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm">
+        <h3 className="text-lg font-medium text-slate-900 mb-6 tracking-tight">
+          Improve Your Last Attempts
+        </h3>
+        <div className="space-y-4">
+          {attempts.map((attempt, index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between p-4 rounded-lg bg-white border border-slate-50 shadow-sm hover:shadow-md transition-all duration-300 group"
+            >
+              <div className="min-w-0 pr-2">
+                <p className="text-[12px] font-medium text-slate-800 mb-1 truncate">{attempt.name}</p>
+                <p className="text-[10px] text-slate-400 whitespace-nowrap">
+                  Score: <span className="text-slate-900">{attempt.score}</span>
+                </p>
               </div>
-              <span>25 test sets per subject</span>
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/test-series/${attempt.subject}/test/${attempt.testId}`)}
+                className="h-9 px-4 rounded-xl bg-sky-50 border-0 text-sky-600 hover:bg-sky-100  text-xs font-medium transition-all"
+              >
+                Start now
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TestSeries = () => {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<"subject" | "sets">("subject");
+  const [user, setUser] = useState<UserMe | null>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const u = await authService.getCurrentUser();
+        setUser(u);
+      } catch (err) {
+        console.error("Failed to fetch user", err);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const isDesktop = useMediaQuery("(min-width: 1280px)");
+  const userName = user?.full_name || user?.username || "Student";
+
+  return (
+    <DashboardLayout
+      hideHeader={isDesktop}
+      rightSidebar={<TestSeriesSidebar user={user} />}
+    >
+      <div className="px-1 mb-6">
+        <h1 className="text-xl sm:text-2xl font-medium text-slate-900">Test Series</h1>
+        <p className="text-[12px] sm:text-sm text-slate-500 mt-1 font-medium">
+          TNPSC – Group IV | 2026
+        </p>
+      </div>
+
+      {/* Hero Banner */}
+      {/* Compact Hero Banner */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative bg-gradient-to-r from-[#D2EDDD] to-[#F1F7D8] rounded-2xl p-4 md:px-8 md:py-6 mb-8 flex flex-col md:flex-row items-center justify-between gap-4 md:gap-8 overflow-hidden border border-[#C7DD66]/20 shadow-sm"
+      >
+        {/* Content */}
+        <div className="flex-1 relative z-10 text-center md:text-left order-2 md:order-1">
+          <h1 className="text-xl md:text-2xl font-semibold text-[#0F172A] mb-1 tracking-tight">
+            Hi, {userName} 👋
+          </h1>
+          <p className="text-[#0F172A]/70 text-sm md:text-base font-medium mb-3 md:mb-4">Ready to test your knowledge?</p>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-center md:justify-start gap-2.5 text-[12px] md:text-[14px] text-slate-700/80 font-medium">
+              <Library className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>25+ test sets per subject</span>
             </div>
 
-            <div className="flex items-center gap-3 text-base md:text-lg text-slate-700/90 font-medium">
-              <div className="bg-white/60 rounded-lg">
-                <BookOpen className="w-5 h-5 text-emerald-600" />
-              </div>
-              <span>Fixed syllabus + dynamic current affairs</span>
+            <div className="flex items-center justify-center md:justify-start gap-2.5 text-[12px] md:text-[14px] text-slate-700/80 font-medium">
+              <BookOpen className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Updated Syllabus & Current Affairs</span>
             </div>
           </div>
         </div>
 
-        {/* Hero Illustration */}
-        <div className="w-full md:w-1/3 max-w-[300px] relative z-10 transition-transform duration-500 group-hover:scale-105 select-none">
+        {/* Hero Illustration - Reduced Size */}
+        <motion.div
+          animate={{
+            y: [0, -6, 0],
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="w-20 sm:w-24 md:w-32 lg:w-40 shrink-0 relative z-10 select-none order-1 md:order-2"
+        >
           <img
             src={testHero}
             alt="Subject Wise Tests"
-            className="w-[150px] md:w-[250px] h-auto object-contain drop-shadow-xl"
+            className="w-full h-auto object-contain drop-shadow-xl"
           />
-        </div>
+        </motion.div>
 
         {/* Decorative corner accent */}
-        <div className="absolute top-0 left-0 w-2 h-2 bg-emerald-100/30 rounded-br-full" />
-        <div className="absolute bottom-4 left-1/4 w-32 h-32 bg-emerald-50/20 rounded-full blur-3xl opacity-60" />
+        <div className="absolute top-0 right-0 w-48 h-48 bg-white/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-100/30 rounded-full blur-2xl pointer-events-none" />
+      </motion.div>
+
+      {/* Selection Tabs */}
+      <div className="flex items-center gap-4 mb-8 bg-slate-100/50 p-1.5 rounded-2xl w-fit">
+        <button
+          onClick={() => setActiveTab("subject")}
+          className={cn(
+            "px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300",
+            activeTab === "subject"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          Subject-Wise
+        </button>
+        <button
+          onClick={() => setActiveTab("sets")}
+          className={cn(
+            "px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300",
+            activeTab === "sets"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          Test Sets
+        </button>
       </div>
 
-      {/* Test Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-        {testSubjects.map((subject, index) => (
-          <div
-            key={index}
-            className="bg-card rounded-xl p-4 border border-border shadow-card hover:shadow-card-hover transition-shadow flex flex-col h-full"
-          >
-            {/* Header */}
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">{subject.icon}</span>
-                <div>
-                  <h3 className="font-semibold">{subject.name}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {subject.testsAvailable} Tests Available
-                  </p>
-                </div>
-              </div>
-              <div className="text-sm font-bold bg-muted rounded-full px-2 py-1">
-                {subject.completed}/{subject.total}
-              </div>
-            </div>
-
-            {/* Difficulty Badge */}
-            <div>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "mb-3",
-                  subject.difficulty === "Easy" && "border-success text-success",
-                  subject.difficulty === "Moderate" && "border-warning text-warning",
-                  subject.difficulty === "Hard" && "border-destructive text-destructive"
-                )}
-              >
-                {subject.difficulty}
-              </Badge>
-            </div>
-
-            {/* Tags */}
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mb-4">
-              {subject.tags.map((tag, i) => (
-                <span key={i} className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-                  {tag}
-                </span>
-              ))}
-            </div>
-
-            {/* Action */}
-            <div className="mt-auto">
-              <Button
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={() => navigate(`/test-series/${subject.id}`)}
-              >
-                View Tests
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+      {
+        activeTab === "subject" ? (
+          <SubjectWiseView subjects={testSubjects} />
+        ) : (
+          <TestSetsView testSets={testSets} />
+        )
+      }
 
       {/* Special Full-Length Tests */}
-      <section>
-        <h2 className="text-lg font-semibold mb-6">Special Full-Length Tests</h2>
-        <div className="bg-[#C7DD66] rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 md:gap-12 relative overflow-hidden group mb-8 border border-[#B8CE55]/20">
-          {/* Subtle Square Patterns from Image */}
-          <div className="absolute top-4 left-4 w-32 h-32 bg-white/20 rounded-3xl rotate-12 -translate-x-12 -translate-y-8" />
-          <div className="absolute top-1/2 right-4 w-24 h-24 bg-white/10 rounded-2xl -rotate-12 translate-x-8" />
-          <div className="absolute bottom-4 right-20 w-16 h-16 bg-white/15 rounded-xl rotate-45" />
-          <div className="absolute top-1/4 left-1/2 w-40 h-40 bg-white/5 rounded-[40px] rotate-12" />
 
-          {/* Left Illustration */}
-          <div className="w-full md:w-auto flex justify-center relative z-10 transition-transform duration-500 group-hover:scale-105">
-            <img
-              src={testImage}
-              alt="Test Illustration"
-              className="w-[120px] md:w-[150px] h-auto object-contain"
-            />
-          </div>
-
-          <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left relative z-10">
-            <h3 className="text-2xl md:text-3xl font-bold text-[#1E293B] mb-1">TNPSC Mock – 2026</h3>
-            <p className="text-base md:text-lg text-[#1E293B]/70 font-medium mb-4">Full-Length Test</p>
-
-            <div className="space-y-3 mb-6">
-              <p className="text-sm md:text-base text-[#1E293B]/80">
-                Available from: <span className="font-bold">15 Jan 2026</span>
-              </p>
-
-              <div className="flex flex-wrap justify-center md:justify-start items-center gap-3 text-sm font-bold text-[#1E293B]">
-                <span className="flex items-center gap-1.5 whitespace-nowrap">
-                  <Clock className="w-4 h-4 opacity-70" /> 3 Hrs
-                </span>
-                <span className="opacity-30">•</span>
-                <span className="flex items-center gap-1.5 whitespace-nowrap">
-                  <FileText className="w-4 h-4 opacity-70" /> 200 Qs
-                </span>
-                <span className="opacity-30">•</span>
-                <span className="flex items-center gap-1.5 whitespace-nowrap">
-                  <Trophy className="w-4 h-4 opacity-70" /> 300 Marks
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-              <div className="bg-[#F1F7D8] text-[#7A8A3E] px-8 py-3 rounded-xl font-bold text-base shadow-sm min-w-[160px] text-center">
-                Coming Soon
-              </div>
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto px-10 py-6 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground hover:text-primary-foreground font-bold text-base transition-all duration-300 border-none"
-              >
-                View Details
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-    </DashboardLayout>
+    </DashboardLayout >
   );
 };
 

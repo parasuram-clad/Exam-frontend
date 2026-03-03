@@ -24,19 +24,20 @@ const generateQuestions = (): Question[] => {
 };
 
 const TestAttempt = () => {
-    const { subject } = useParams<{ subject: string }>();
+    const { subject, testId } = useParams<{ subject: string; testId: string }>();
     const navigate = useNavigate();
     const questions = generateQuestions();
 
     const handleComplete = (answers: Record<number, Answer>) => {
         // Calculate score (simplified as in original)
-        alert("Test submitted!");
-        navigate(`/test-series/${subject}`);
+        console.log("Answers submitted:", answers);
+        navigate(`/test-series/${subject}/test/${testId}/analytics`, { replace: true });
     };
 
     const handleExit = () => {
         if (window.confirm("Are you sure you want to exit? Your progress will not be saved.")) {
-            navigate(`/test-series/${subject}`);
+            // Navigate directly back to the main test series page
+            navigate("/test-series");
         }
     };
 
@@ -45,7 +46,7 @@ const TestAttempt = () => {
             questions={questions}
             onComplete={handleComplete}
             onExit={handleExit}
-            title={`${subject || "History"} – Test 03`}
+            title={`${subject ? subject.charAt(0).toUpperCase() + subject.slice(1) : "History"} – Test ${testId || "01"}`}
             subtitle="2 Hours • 100 Questions"
             initialTime={7200}
         />
