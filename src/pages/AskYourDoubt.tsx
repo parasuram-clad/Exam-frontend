@@ -7,12 +7,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import chatbotService from "@/services/chatbot.service";
 import authService, { UserMe } from "@/services/auth.service";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  isNew?: boolean; // New prop to track if it should animate
 }
 
 interface ChatSession {
@@ -139,39 +141,60 @@ const AskYourDoubt = () => {
   const [input, setInput] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [user, setUser] = useState<UserMe | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  const { data: user } = useQuery({
+    queryKey: ['user-me'],
+    queryFn: () => authService.getCurrentUser(),
+    staleTime: Infinity,
+  });
+
+  const { data: remoteSessions = [], isLoading: sessionsLoading } = useQuery({
+    queryKey: ['chatbot-conversations', user?.id],
+    queryFn: () => chatbotService.getConversations(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const loading = sessionsLoading;
 
   useEffect(() => {
-    const fetchUserAndSessions = async () => {
-      try {
-        setLoading(true);
-        const u = await authService.getCurrentUser();
-        setUser(u);
-        if (u) {
-          const remoteSessions = await chatbotService.getConversations(u.id);
-          if (remoteSessions.length > 0) {
-            const formattedSessions: ChatSession[] = remoteSessions.map(s => ({
-              id: s.conversation_id.toString(),
-              conversation_id: s.conversation_id,
-              title: s.title,
-              date: new Date(s.created_at).toLocaleDateString() === new Date().toLocaleDateString() ? "TODAY" : new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase(),
-              messages: [] // Will fetch on click
-            }));
-            setSessions(formattedSessions);
-            // Optionally select the most recent one
-            setActiveSessionId(formattedSessions[0].id);
-            await loadHistory(formattedSessions[0].id, formattedSessions[0].conversation_id!);
+    if (remoteSessions.length > 0) {
+      const formattedSessions: ChatSession[] = remoteSessions.map(s => ({
+        id: s.conversation_id.toString(),
+        conversation_id: s.conversation_id,
+        title: s.title,
+        date: new Date(s.created_at).toLocaleDateString() === new Date().toLocaleDateString() ? "TODAY" : new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase(),
+        messages: []
+      }));
+
+      setSessions(prev => {
+        // Keep any local sessions that don't have a conversation_id yet
+        const localOnly = prev.filter(p => !p.conversation_id);
+
+        // Create map of remote for easy merging
+        const remoteMap = new Map(formattedSessions.map(rs => [rs.id, rs]));
+
+        // Merge: local ones first, then remote ones
+        const merged = [...localOnly];
+        formattedSessions.forEach(rs => {
+          // Only add if not already in localOnly (shouldn't happen but for safety)
+          if (!localOnly.find(l => l.id === rs.id)) {
+            merged.push(rs);
           }
-        }
-      } catch (err) {
-        console.error("Failed to fetch initial data", err);
-      } finally {
-        setLoading(false);
+        });
+
+        // Sort by date/id descending could happen but simple append for now
+        return merged;
+      });
+
+      // If no session is active or the active one is very fresh, select the most recent remote one
+      if (activeSessionId === "1" && formattedSessions.length > 0) {
+        setActiveSessionId(formattedSessions[0].id);
+        loadHistory(formattedSessions[0].id, formattedSessions[0].conversation_id!);
       }
-    };
-    fetchUserAndSessions();
-  }, []);
+    }
+  }, [remoteSessions]);
 
   useEffect(() => {
     if (window.innerWidth >= 1024) {
@@ -189,7 +212,7 @@ const AskYourDoubt = () => {
     }
   };
 
-  const activeSession = sessions.find((s) => s.id === activeSessionId) || { id: "0", title: "New Chat", messages: defaultMessages };
+  const activeSession = (sessions.find((s) => s.id === activeSessionId) || { id: "0", title: "New Chat", messages: defaultMessages }) as ChatSession;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -286,6 +309,7 @@ const AskYourDoubt = () => {
           role: "assistant",
           content: response.answer || "I'm sorry, I couldn't process that.",
           timestamp: new Date(response.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          isNew: true, // Mark only this specific message for animation
         };
 
         setSessions((prev) =>
@@ -293,12 +317,17 @@ const AskYourDoubt = () => {
             s.id === activeSessionId
               ? {
                 ...s,
+                id: response.conversation_id.toString(), // Sync ID with remote
                 conversation_id: response.conversation_id,
-                messages: [...s.messages, aiMsg]
+                messages: [...s.messages.map(m => ({ ...m, isNew: false })), aiMsg],
               }
               : s
           )
         );
+        setActiveSessionId(response.conversation_id.toString());
+
+        // Invalidate conversations list to show updated title if needed
+        queryClient.invalidateQueries({ queryKey: ['chatbot-conversations', user?.id] });
       } catch (error) {
         console.error("Chatbot API error:", error);
         const errorMsg: Message = {
@@ -321,7 +350,14 @@ const AskYourDoubt = () => {
   };
 
   const newChat = () => {
-    const id = Date.now().toString();
+    // If the active session is already a "New Chat" and has no messages (except welcome), just focus it
+    const currentActive = sessions.find(s => s.id === activeSessionId);
+    if (currentActive && !currentActive.conversation_id && currentActive.messages.length <= 1) {
+      textAreaRef.current?.focus();
+      return;
+    }
+
+    const id = "local-" + Date.now().toString();
     const session: ChatSession = {
       id,
       title: "New Chat",
@@ -335,15 +371,18 @@ const AskYourDoubt = () => {
         },
       ],
     };
+
+    setIsTyping(false); // Stop any running typing if we switch to new chat
     setSessions((prev) => [session, ...prev]);
     setActiveSessionId(id);
     setInput("");
+
     setTimeout(() => {
       textAreaRef.current?.focus();
       if (textAreaRef.current) {
         textAreaRef.current.style.height = "auto";
       }
-    }, 0);
+    }, 10);
   };
 
   const clearChat = () => {
@@ -431,8 +470,8 @@ const AskYourDoubt = () => {
                   </Button>
                 </motion.div>
               </div>
-              <span className="text-sm font-medium text-[#1e1b4b] mx-auto truncate px-2 sm:px-4">
-                {activeSession.title === "New Chat" ? "Vanakkam" : activeSession.title}
+              <span className="text-[15px] font-bold text-[#1e1b4b] mx-auto truncate px-2 sm:px-4 tracking-tight">
+                {activeSession.title === "New Chat" || activeSession.title === "Vanakkam" ? "AI Tutor" : activeSession.title}
               </span>
               <div className="w-auto text-right">
                 <motion.div whileTap={{ scale: 0.88 }}>
@@ -485,10 +524,10 @@ const AskYourDoubt = () => {
                       )}
                     >
                       <div className="text-sm sm:text-[15px] leading-relaxed">
-                        {msg.role === "assistant" ? (
+                        {msg.role === "assistant" && msg.isNew ? (
                           <TypewriterText text={msg.content} />
                         ) : (
-                          <p>{msg.content}</p>
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
                         )}
                       </div>
                       <p
@@ -615,7 +654,7 @@ const AskYourDoubt = () => {
                     whileHover={{ scale: 1.03, backgroundColor: "#e2e8f0" }}
                     whileTap={{ scale: 0.96 }}
                     onClick={() => handleQuickQuestion(q)}
-                    className="px-4 py-2.5 text-[13px] bg-[#f0f2f5] text-[#1e1b4b] rounded-xl transition-colors text-left leading-tight"
+                    className="px-4 py-2.5 text-[13px] bg-[#f8fafc] border border-[#f1f5f9] text-[#1e1b4b] rounded-xl transition-all text-left leading-tight hover:shadow-sm"
                   >
                     {q}
                   </motion.button>
@@ -656,10 +695,10 @@ const AskYourDoubt = () => {
                       whileHover={{ x: 2 }}
                       onClick={() => handleSessionSelect(s.id)}
                       className={cn(
-                        "w-full text-left px-5 py-4 rounded-2xl transition-all border border-transparent",
+                        "w-full text-left px-5 py-4 rounded-2xl transition-all border ",
                         s.id === activeSessionId
-                          ? "bg-[#f0f2f5] border-[#e2e8f0] shadow-sm"
-                          : "hover:bg-gray-50 text-[#94a3b8]"
+                          ? "bg-[#1e1b4b]/5 border-[#1e1b4b]/10 shadow-sm"
+                          : "border-transparent hover:bg-gray-50 text-gray-400"
                       )}
                     >
                       <p className={cn(

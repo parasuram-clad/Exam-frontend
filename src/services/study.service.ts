@@ -92,9 +92,26 @@ export interface StudyNote {
     id?: number;
     user_id: number;
     topic_id: number;
-    title: string;
+    title: string;      // used as keyword
     content: string;
     status: 'draft' | 'public' | 'private';
+    updated_at?: string;
+    created_at?: string;
+}
+
+export interface MCQAnswerItem {
+    mcq_id: number;
+    selected_option: string; // "A", "B", "C", "D"
+}
+
+export interface SubmitMCQRequest {
+    user_id: number;
+    syllabus_id: number;
+    attempt_no: number;
+    difficulty?: string;
+    answers: MCQAnswerItem[];
+    started_at: string;
+    submitted_at: string;
 }
 
 const studyService = {
@@ -119,6 +136,14 @@ const studyService = {
      */
     getStudyPlan: async (planId: number): Promise<StudyPlanResponse> => {
         const response = await apiClient.get(`/study-plan/${planId}`);
+        return response.data;
+    },
+
+    /**
+     * Update study plan status
+     */
+    updateStudyPlan: async (planId: number, payload: { plan_status?: string, minutes?: number }) => {
+        const response = await apiClient.put(`/study-plan/${planId}`, payload);
         return response.data;
     },
 
@@ -151,7 +176,22 @@ const studyService = {
      */
     createNote: async (note: StudyNote) => {
         const response = await apiClient.post('/study-notes/', note);
-        return response.data;
+        return response.data as StudyNote;
+    },
+
+    /**
+     * Update an existing study note by ID
+     */
+    updateNote: async (noteId: number, note: Partial<StudyNote>) => {
+        const response = await apiClient.put(`/study-notes/${noteId}`, note);
+        return response.data as StudyNote;
+    },
+
+    /**
+     * Delete a study note by ID
+     */
+    deleteNote: async (noteId: number) => {
+        await apiClient.delete(`/study-notes/${noteId}`);
     },
 
     /**
@@ -167,6 +207,24 @@ const studyService = {
      */
     getUserRoadmap: async (userId: number) => {
         const response = await apiClient.get(`/study-plan/roadmap/${userId}`);
+        return response.data;
+    },
+
+    /**
+     * Get assessment history for a specific topic
+     */
+    getAssessmentHistory: async (userId: number, syllabusId: number) => {
+        const response = await apiClient.get('/mcq/history', {
+            params: { user_id: userId, syllabus_id: syllabusId }
+        });
+        return response.data;
+    },
+
+    /**
+     * Submit an MCQ attempt
+     */
+    submitMCQAttempt: async (payload: SubmitMCQRequest) => {
+        const response = await apiClient.post('/mcq/submit', payload);
         return response.data;
     }
 };

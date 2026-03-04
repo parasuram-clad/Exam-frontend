@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -755,10 +756,32 @@ const StudyPlanRightSidebar = ({
 // --- Main Component ---
 const StudyPlan = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<UserMe | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [userPlans, setUserPlans] = useState<StudyPlanResponse[]>([]);
-  const [roadmapData, setRoadmapData] = useState<any>(null);
+  const queryClient = useQueryClient();
+  const isDesktop = useMediaQuery("(min-width: 1280px)");
+
+  // React Query for data fetching
+  const { data: user } = useQuery({
+    queryKey: ['user-me'],
+    queryFn: () => authService.getCurrentUser(),
+    staleTime: Infinity,
+  });
+
+  const { data: userPlans = [], isLoading: plansLoading } = useQuery({
+    queryKey: ['study-plans', user?.id],
+    queryFn: () => studyService.getUserStudyPlans(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: roadmapData, isLoading: roadmapLoading } = useQuery({
+    queryKey: ['roadmap', user?.id],
+    queryFn: () => studyService.getUserRoadmap(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const loading = plansLoading || roadmapLoading;
+
   const [dynamicDayWisePlans, setDynamicDayWisePlans] = useState<Record<number, StudyTopicCard[]>>({});
   const [selectedTopic, setSelectedTopic] = useState<StudyTopicCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -777,70 +800,41 @@ const StudyPlan = () => {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const isDesktop = useMediaQuery("(min-width: 1280px)");
-
+  // Synchronize dynamic plans when data changes
   useEffect(() => {
-    const initData = async () => {
-      try {
-        setLoading(true);
-        const u = await authService.getCurrentUser();
-        setUser(u);
+    if (roadmapData?.plan && userPlans) {
+      setDynamicDayWisePlans(mapRoadmapToFrontend(roadmapData.plan, userPlans));
+      const currentDay = calculateCurrentProgressDay(userPlans);
+      setActiveDay(currentDay);
 
-        // Pre-fill setup modal with existing user details
-        if (u) {
-          setSetupData(prev => ({
-            ...prev,
-            name: u.full_name || "",
-            examType: (u.exam_type as any) || "TNPSC",
-            subDivision: u.sub_division ? u.sub_division.split(", ") : ["Group IV"],
-            targetYear: u.target_exam_year || "2026",
-            learnerType: u.learner_type || "Student"
-          }));
-        }
+      // Check for profile completeness
+      const isProfileEmpty = !user?.full_name?.trim() ||
+        !user?.exam_type?.trim() ||
+        !user?.sub_division?.trim() ||
+        !user?.target_exam_year ||
+        !user?.learner_type?.trim();
 
-        if (u) {
-          // Fetch roadmap data and raw plans in parallel
-          const [roadmap, plans] = await Promise.all([
-            studyService.getUserRoadmap(u.id).catch(() => null),
-            studyService.getUserStudyPlans(u.id).catch(() => [])
-          ]);
-
-          const planExists = roadmap && roadmap.plan && Array.isArray(roadmap.plan) && roadmap.plan.length > 0;
-
-          // Improved profile completeness check
-          const isProfileEmpty = !u.full_name?.trim() ||
-            !u.exam_type?.trim() ||
-            !u.sub_division?.trim() ||
-            !u.target_exam_year ||
-            !u.learner_type?.trim();
-
-          if (planExists) {
-            setRoadmapData(roadmap);
-            setUserPlans(plans);
-            setDynamicDayWisePlans(mapRoadmapToFrontend(roadmap.plan, plans));
-            setActiveDay(calculateCurrentProgressDay(plans));
-
-            // Only open if mandatory info is actually missing
-            if (isProfileEmpty) {
-              setIsSetupModalOpen(true);
-            } else {
-              setIsSetupModalOpen(false);
-            }
-          } else {
-            // No study plan found, definitely show modal
-            setIsSetupModalOpen(true);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load study plan data", err);
-        // Fallback for new users or unexpected errors
+      if (isProfileEmpty || roadmapData.plan.length === 0) {
         setIsSetupModalOpen(true);
-      } finally {
-        setLoading(false);
+      } else {
+        setIsSetupModalOpen(false);
       }
-    };
-    initData();
-  }, []);
+    }
+  }, [roadmapData, userPlans, user]);
+
+  // Pre-fill setup modal with user details
+  useEffect(() => {
+    if (user) {
+      setSetupData(prev => ({
+        ...prev,
+        name: user.full_name || "",
+        examType: (user.exam_type as any) || "TNPSC",
+        subDivision: user.sub_division ? user.sub_division.split(", ") : ["Group IV"],
+        targetYear: user.target_exam_year || "2026",
+        learnerType: user.learner_type || "Student"
+      }));
+    }
+  }, [user]);
 
   const mapRoadmapToFrontend = (roadmapPlan: any[], backendPlans: StudyPlanResponse[]): Record<number, StudyTopicCard[]> => {
     // Create a status map for quick lookup
@@ -941,8 +935,6 @@ const StudyPlan = () => {
     }
   };
 
-  const totalDays = roadmapData?.total_days || 120;
-
   // Find the current progress day (first day that isn't completed)
   const calculateCurrentProgressDay = (plans: StudyPlanResponse[]) => {
     if (plans.length > 0) {
@@ -965,9 +957,11 @@ const StudyPlan = () => {
     return currentFromStatic ? currentFromStatic.day : 3;
   };
 
+  const totalDays = roadmapData?.total_days || (roadmapData?.plan && roadmapData.plan.length > 0 ? Math.max(...roadmapData.plan.map((p: any) => p.day)) : 120);
   const currentProgressDay = getCurrentProgressDay();
+  const daysLeft = Math.max(0, totalDays - currentProgressDay + 1);
 
-  // Generate 120-day cycle data
+  // Generate dynamic day cycle data
   const dynamicDayCycle: DayCycleItem[] = Array.from({ length: totalDays }, (_, i) => {
     const dayNo = i + 1;
     let status: DayCycleItem['status'] = 'locked';
@@ -1007,7 +1001,21 @@ const StudyPlan = () => {
     setIsDialogOpen(true);
   };
 
-  const handleSubtopicClick = (topicId: string, subtopicId: string) => {
+  const handleSubtopicClick = async (topicId: string, subtopicId: string) => {
+    // If it's a subtopic from backend, we might want to update status to IN_PROGRESS
+    const subIdNum = parseInt(subtopicId);
+    if (!isNaN(subIdNum)) {
+      const plan = userPlans.find(p => p.id === subIdNum || p.syllabus_id === subIdNum);
+      if (plan && plan.plan_status === 'start') {
+        try {
+          await studyService.updateStudyPlan(plan.id, { plan_status: 'IN_PROGRESS' });
+          queryClient.invalidateQueries({ queryKey: ['study-plans', user?.id] });
+          queryClient.invalidateQueries({ queryKey: ['roadmap', user?.id] });
+        } catch (err) {
+          console.error("Failed to update plan status", err);
+        }
+      }
+    }
     setIsDialogOpen(false);
     navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}`);
   };
@@ -1025,11 +1033,10 @@ const StudyPlan = () => {
     }
 
     try {
-      setLoading(true);
       setIsSetupModalOpen(false);
 
       // 1. Update User Profile with name and exam details
-      await authService.updateProfile(user.id, {
+      await authService.updateProfile(user!.id, {
         full_name: setupData.name,
         exam_type: setupData.examType,
         sub_division: setupData.subDivision.join(", "),
@@ -1039,40 +1046,29 @@ const StudyPlan = () => {
 
       // 2. Generate study plan
       await studyService.generateStudyPlan({
-        user_id: user.id,
-        exam_type: setupData.examType || user.exam_type || "TNPSC",
+        user_id: user!.id,
+        exam_type: setupData.examType || user!.exam_type || "TNPSC",
         sub_division:
           setupData.subDivision.length > 0
             ? setupData.subDivision.join(", ")
-            : user.sub_division || "Group IV",
-        year: parseInt(setupData.targetYear || user.target_exam_year || "2026"),
-        learner_type: setupData.learnerType || user.learner_type || "Student",
+            : user!.sub_division || "Group IV",
+        year: parseInt(setupData.targetYear || user!.target_exam_year || "2026"),
+        learner_type: setupData.learnerType || user!.learner_type || "Student",
         daily_study_hours: parseInt(setupData.studyGoal) || 4,
       });
 
-      // 3. Fetch both after generation in parallel
-      const [roadmap, plans] = await Promise.all([
-        studyService.getUserRoadmap(user.id),
-        studyService.getUserStudyPlans(user.id),
+      // 3. Invalidate queries to trigger re-fetch
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['user-me'] }),
+        queryClient.invalidateQueries({ queryKey: ['study-plans', user!.id] }),
+        queryClient.invalidateQueries({ queryKey: ['roadmap', user!.id] }),
       ]);
 
-      if (roadmap && roadmap.plan) {
-        setRoadmapData(roadmap);
-        setUserPlans(plans);
-        setDynamicDayWisePlans(mapRoadmapToFrontend(roadmap.plan, plans));
-
-        // Refresh local user state to reflect new name/exam details
-        const updatedUser = await authService.getCurrentUser();
-        setUser(updatedUser);
-
-        setActiveDay(1);
-        toast.success("Profile updated and study plan generated successfully!");
-      }
+      setActiveDay(1);
+      toast.success("Profile updated and study plan generated successfully!");
     } catch (err) {
       console.error("Failed to generate study plan", err);
       toast.error("Failed to generate study plan.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -1106,7 +1102,7 @@ const StudyPlan = () => {
       : `${baseUrl}${user.photo_url}`
     : pic;
 
-  // --- 120-Day Cycle Navigation Logic ---
+  // --- Day Cycle Navigation Logic ---
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
 
@@ -1317,7 +1313,7 @@ const StudyPlan = () => {
           />
           <div className="relative z-10 max-w-4xl mx-auto">
             <div className="flex items-center justify-center gap-2 mb-8 sm:mb-10">
-              <span className="text-xl sm:text-2xl md:text-3xl font-medium text-accent">{totalDays}</span>
+              <span className="text-xl sm:text-2xl md:text-3xl font-medium text-accent">{daysLeft}</span>
               <span className="text-primary-foreground text-sm sm:text-base md:text-xl font-medium">Days Left for {user?.exam_type || "TNPSC"} {user?.sub_division || "Group IV"}</span>
             </div>
 
@@ -1411,9 +1407,8 @@ const StudyPlan = () => {
           </motion.section>
         ) : (
           <>
-            {/* 120-Day Cycle */}
             <motion.section variants={itemVariants}>
-              <h2 className="text-lg font-medium text-foreground mb-4">120-Day Cycle</h2>
+              <h2 className="text-lg font-medium text-foreground mb-4">{totalDays}-Day Cycle</h2>
 
               <div className="relative group/cycle">
                 {/* Navigation arrows with conditional visibility */}
@@ -1557,24 +1552,34 @@ const StudyPlan = () => {
                           </ul>
                         </div>
 
-                        {/* Action Section */}
                         <div className="px-5 pb-5 mt-auto">
                           {(() => {
+                            // Sequential Unlock Logic:
+                            // 1. Previous days must be complete (handled by isUnlocked base)
+                            // 2. Previous topics in the SAME day list must have 100% progress
+                            const isPreviousTopicComplete = index === 0 || currentStudyTopics[index - 1].progress === 100;
                             const isCurrentDayFullyComplete = currentStudyTopics.every(t => t.progress === 100);
-                            const isUnlocked = activeDay <= currentProgressDay || (activeDay === currentProgressDay + 1 && isCurrentDayFullyComplete);
+
+                            // Base unlock if a previous day is fully done
+                            const isDayUnlocked = activeDay < currentProgressDay || (activeDay === currentProgressDay) || (activeDay === currentProgressDay + 1 && isCurrentDayFullyComplete);
+
+                            // Sequential unlock within the day
+                            const isTopicUnlocked = (activeDay < currentProgressDay) || (activeDay === currentProgressDay && isPreviousTopicComplete);
+
+                            const finalIsUnlocked = isTopicUnlocked;
 
                             return (
                               <Button
-                                disabled={!isUnlocked}
+                                disabled={!finalIsUnlocked}
                                 onClick={() => handleViewDetails(topic)}
                                 className={cn(
                                   "w-full h-11 rounded-xl text-sm font-medium transition-all",
-                                  !isUnlocked
+                                  !finalIsUnlocked
                                     ? "bg-secondary text-muted-foreground cursor-not-allowed opacity-80"
                                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
                                 )}
                               >
-                                {!isUnlocked ? (
+                                {!finalIsUnlocked ? (
                                   <div className="flex items-center gap-2">
                                     <Lock className="w-4 h-4" />
                                     <span>Locked</span>

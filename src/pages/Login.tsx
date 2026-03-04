@@ -14,10 +14,13 @@ import {
 } from "@/components/ui/input-otp";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
+import { prefetchAllUserData } from "@/services/prefetch";
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
@@ -60,6 +63,10 @@ const Login = () => {
       const fullMobile = `+91${mobile}`;
       await authService.verifyOTP(fullMobile, otp);
       toast.success("Logged in successfully!");
+
+      // Start preloading data in the background
+      prefetchAllUserData(queryClient);
+
       const from = (location.state as any)?.from?.pathname || "/dashboard";
       navigate(from, { replace: true });
     } catch (err: any) {

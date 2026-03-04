@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Bell, Calendar, FileText, Trophy, Settings, User, LogOut, Medal } from "lucide-react";
+import { Bell, Calendar, FileText, Trophy, Settings, User, LogOut, Medal, AlertTriangle } from "lucide-react";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -8,6 +8,10 @@ import { Button } from "@/components/ui/button";
 import authService from "@/services/auth.service";
 import { toast } from "sonner";
 import pic from "@/assets/pic.png";
+
+import { useState, useEffect } from "react";
+import { notificationService, Notification } from "@/services/notification.service";
+import { formatDistanceToNow } from "date-fns";
 
 interface RightSidebarHeaderProps {
     user: any;
@@ -20,6 +24,23 @@ interface RightSidebarHeaderProps {
 
 export function RightSidebarHeader({ user, userName, avatarUrl, initials, className, hideLanguage }: RightSidebarHeaderProps) {
     const navigate = useNavigate();
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    const fetchNotifications = async () => {
+        try {
+            const data = await notificationService.getNotifications();
+            setNotifications(data.slice(0, 5)); // Only show top 5 in popover
+            setUnreadCount(data.filter(n => !n.read_status).length);
+        } catch (err) {
+            console.error("Failed to fetch notifications:", err);
+        }
+    };
+
+    useEffect(() => {
+        fetchNotifications();
+        // Setup polling or just leave it for now
+    }, []);
 
     const handleLogout = async () => {
         try {
@@ -32,32 +53,27 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
         }
     };
 
-    const demoNotifications = [
-        {
-            id: 1,
-            title: "New Test Released",
-            description: "Indian Polity: Unit 4 is now available for practice.",
-            time: "2 mins ago",
-            type: "test",
-            unread: true
-        },
-        {
-            id: 2,
-            title: "Study Reminder",
-            description: "Time for your scheduled Economics session.",
-            time: "1 hour ago",
-            type: "schedule",
-            unread: true
-        },
-        {
-            id: 3,
-            title: "Daily Goal Achieved!",
-            description: "Congratulations! You've completed your 3-day streak.",
-            time: "5 hours ago",
-            type: "achievement",
-            unread: false
+    const handleMarkAsRead = async (id: number) => {
+        try {
+            await notificationService.markAsRead(id);
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_status: true } : n));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+        } catch (err) {
+            console.error("Error marking as read:", err);
         }
-    ];
+    };
+
+    const getIconDetails = (category: string) => {
+        switch (category.toUpperCase()) {
+            case 'BILLING': return { Icon: AlertTriangle, bg: 'bg-rose-50', color: 'text-rose-500' };
+            case 'DAILY_TEST':
+            case 'WEEKLY_TEST':
+            case 'TEST_SERIES': return { Icon: FileText, bg: 'bg-blue-50', color: 'text-blue-500' };
+            case 'STREAK':
+            case 'ACHIEVEMENT': return { Icon: Trophy, bg: 'bg-emerald-50', color: 'text-emerald-500' };
+            default: return { Icon: Bell, bg: 'bg-indigo-50', color: 'text-indigo-500' };
+        }
+    };
 
     return (
         <div className={cn("flex items-center justify-between mb-4", className)}>
@@ -77,48 +93,62 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
                             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50 bg-[#F8FAFC]">
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-sm font-semibold text-[#0F172A]">Notifications</h3>
-                                    <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">2 New</span>
+                                    {unreadCount > 0 && (
+                                        <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{unreadCount} New</span>
+                                    )}
                                 </div>
-                                <button className="text-[11px] font-semibold text-primary hover:opacity-80 transition-opacity">
+                                <button
+                                    onClick={() => notifications.forEach(n => !n.read_status && handleMarkAsRead(n.id))}
+                                    className="text-[11px] font-semibold text-primary hover:opacity-80 transition-opacity"
+                                >
                                     Mark all as read
                                 </button>
                             </div>
 
                             <div className="max-h-[350px] overflow-y-auto">
-                                {demoNotifications.map((n) => {
-                                    const Icon = n.type === 'test' ? FileText : n.type === 'schedule' ? Calendar : Trophy;
-                                    const iconBg = n.type === 'test' ? 'bg-blue-50' : n.type === 'schedule' ? 'bg-orange-50' : 'bg-emerald-50';
-                                    const iconColor = n.type === 'test' ? 'text-blue-500' : n.type === 'schedule' ? 'text-orange-500' : 'text-emerald-500';
+                                {notifications.length === 0 ? (
+                                    <div className="p-8 text-center text-xs text-muted-foreground">
+                                        No new notifications
+                                    </div>
+                                ) : (
+                                    notifications.map((n) => {
+                                        const { Icon, bg, color } = getIconDetails(n.category);
 
-                                    return (
-                                        <div key={n.id} className={cn(
-                                            "flex gap-4 p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors cursor-pointer relative",
-                                            n.unread && "bg-primary/[0.02]"
-                                        )}>
-                                            <div className={cn("w-10 h-10 rounded-full flex items-center justify-center shrink-0", iconBg)}>
-                                                <Icon className={cn("w-5 h-5", iconColor)} />
-                                            </div>
-                                            <div className="flex-1 space-y-1">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className={cn("text-sm font-semibold leading-none", n.unread ? "text-[#0F172A]" : "text-[#64748B]")}>
-                                                        {n.title}
-                                                    </p>
-                                                    <span className="text-[10px] text-[#94A3B8] shrink-0">{n.time}</span>
+                                        return (
+                                            <div key={n.id} className={cn(
+                                                "flex gap-4 p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors cursor-pointer relative",
+                                                !n.read_status && "bg-primary/[0.02]"
+                                            )} onClick={() => handleMarkAsRead(n.id)}>
+                                                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center shrink-0", bg)}>
+                                                    <Icon className={cn("w-5 h-5", color)} />
                                                 </div>
-                                                <p className="text-xs text-[#64748B] line-clamp-2 leading-relaxed">
-                                                    {n.description}
-                                                </p>
+                                                <div className="flex-1 space-y-1">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <p className={cn("text-xs font-semibold leading-none", !n.read_status ? "text-[#0F172A]" : "text-[#64748B]")}>
+                                                            {n.category.replace('_', ' ')}
+                                                        </p>
+                                                        <span className="text-[9px] text-[#94A3B8] shrink-0">
+                                                            {formatDistanceToNow(new Date(n.date_sent), { addSuffix: true })}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[11px] text-[#64748B] line-clamp-2 leading-relaxed">
+                                                        {n.message}
+                                                    </p>
+                                                </div>
+                                                {!n.read_status && (
+                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
+                                                )}
                                             </div>
-                                            {n.unread && (
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })
+                                )}
                             </div>
 
                             <div className="p-3 bg-gray-50/50 border-t border-gray-50">
-                                <button className="w-full py-2 text-xs font-semibold text-[#64748B] hover:text-[#0F172A] transition-colors rounded-lg bg-white border border-gray-100 shadow-sm">
+                                <button
+                                    onClick={() => navigate('/notifications')}
+                                    className="w-full py-2 text-xs font-semibold text-[#64748B] hover:text-[#0F172A] transition-colors rounded-lg bg-white border border-gray-100 shadow-sm"
+                                >
                                     View all notifications
                                 </button>
                             </div>

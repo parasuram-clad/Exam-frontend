@@ -118,6 +118,13 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
         showBackButton: false,
       };
     }
+    if (currentPath.startsWith("/notifications")) {
+      return {
+        title: t('pages.notifications.title', 'Updates & Alerts'),
+        subtitle: t('pages.notifications.subtitle', 'Keep track of your learning journey'),
+        showBackButton: false,
+      };
+    }
     return {
       title: "Thani Oruvan",
       subtitle: "Your personal learning assistant",
@@ -141,7 +148,7 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
 
           {/* Mobile Brand/Logo Area */}
           <div className="lg:hidden flex items-center gap-2">
-            <span className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
+            <span className="text-lg font-medium bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
               Thani Oruvan
             </span>
           </div>
@@ -185,7 +192,7 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-50/80 border border-orange-100 rounded-full cursor-pointer active:scale-95 transition-transform"
             >
               <span className="text-base">🔥</span>
-              <span className="text-xs font-semibold text-orange-600">3</span>
+              <span className="text-xs font-medium text-orange-600">3</span>
             </div>
 
             {/* Leaderboard Badge */}
@@ -194,7 +201,7 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50/80 border border-blue-100 rounded-full cursor-pointer active:scale-95 transition-transform"
             >
               <Trophy className="w-3.5 h-3.5 text-blue-600" />
-              <span className="text-xs font-semibold text-blue-600">12th</span>
+              <span className="text-xs font-medium text-blue-600">12th</span>
             </div>
 
             {/* Profile Avatar (Small) - Direct Navigation */}

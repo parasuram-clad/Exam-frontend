@@ -5,12 +5,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import trophyHero from "@/assets/results/trophy-hero.png";
 
 export interface QuizQuestion {
-    id: number;
+    id: string | number;
+    mcq_id?: number;
     question: string;
     subject: string;
-    difficulty: 'Easy' | 'Medium' | 'Hard';
+    difficulty: 'Easy' | 'Medium' | 'Hard' | string;
     options: string[];
-    correctAnswer: number;
+    correctAnswer?: number | string;
+    correct_answer_index?: number | string;
     explanation: string;
 }
 
@@ -90,10 +92,13 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
 interface DailyQuizModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onComplete?: () => void;
+    onComplete?: (results: { score: number, answers: (number | null)[], questions: QuizQuestion[] }) => void;
     questions?: QuizQuestion[];
     title?: string;
     subtitle?: string;
+    initialAnswers?: (number | null)[];
+    initialShowEvaluation?: boolean;
+    initialShowDetails?: boolean;
 }
 
 // Pre-computed confetti positions for result screen
@@ -140,23 +145,62 @@ function TrophyIllustration() {
     );
 }
 
-export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, subtitle }: DailyQuizModalProps) {
+export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, subtitle, initialAnswers, initialShowEvaluation, initialShowDetails }: DailyQuizModalProps) {
     console.log("DailyQuizModal Props - questions:", questions);
     const activeQuestions = questions && questions.length > 0 ? questions : QUIZ_QUESTIONS;
     console.log("DailyQuizModal activeQuestions:", activeQuestions);
 
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>([]);
-    const [showEvaluation, setShowEvaluation] = useState(false);
-    const [showDetails, setShowDetails] = useState(false);
+    const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(initialAnswers || []);
+    const [showEvaluation, setShowEvaluation] = useState(initialShowEvaluation || false);
+    const [showDetails, setShowDetails] = useState(initialShowDetails || false);
+    const [frozenQuestions, setFrozenQuestions] = useState<QuizQuestion[]>([]);
 
-    // Sync state when activeQuestions change
+    // Freeze questions when the quiz starts or review mode opens
     useEffect(() => {
-        if (activeQuestions.length > 0) {
-            setSelectedAnswers(Array(activeQuestions.length).fill(null));
-            setCurrentQuestionIndex(0);
+        if (isOpen && activeQuestions.length > 0 && frozenQuestions.length === 0) {
+            setFrozenQuestions(activeQuestions);
         }
-    }, [activeQuestions]);
+    }, [isOpen, activeQuestions, frozenQuestions.length]);
+
+    // Clear frozen state when modal is fully closed
+    useEffect(() => {
+        if (!isOpen) {
+            setFrozenQuestions([]);
+        }
+    }, [isOpen]);
+
+    const displayQuestions = frozenQuestions.length > 0 ? frozenQuestions : activeQuestions;
+
+    // Sync state when activeQuestions change or review props provided
+    useEffect(() => {
+        if (displayQuestions.length > 0) {
+            // Case 1: External answers provided (e.g. Review Mode from history)
+            if (initialAnswers && initialAnswers.length === displayQuestions.length) {
+                setSelectedAnswers(initialAnswers);
+                setCurrentQuestionIndex(0);
+            }
+            // Case 2: Starting a fresh quiz (no initial answers and internal state is empty or mismatched)
+            else if (!initialAnswers && (selectedAnswers.length === 0 || selectedAnswers.length !== displayQuestions.length)) {
+                setSelectedAnswers(Array(displayQuestions.length).fill(null));
+                setCurrentQuestionIndex(0);
+            }
+        }
+    }, [displayQuestions.length, initialAnswers]);
+
+    useEffect(() => {
+        // Only force the evaluation screen if explicitly passed as true via props
+        if (initialShowEvaluation === true) {
+            setShowEvaluation(true);
+        }
+    }, [initialShowEvaluation]);
+
+    useEffect(() => {
+        // Only force details if explicitly passed as true
+        if (initialShowDetails === true) {
+            setShowDetails(true);
+        }
+    }, [initialShowDetails]);
 
     if (!isOpen) return null;
 
@@ -171,7 +215,7 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
         );
     }
 
-    const currentQuestion = activeQuestions[currentQuestionIndex];
+    const currentQuestion = displayQuestions[currentQuestionIndex];
     if (!currentQuestion && !showEvaluation) return null;
 
     const currentAnswer = selectedAnswers[currentQuestionIndex];
@@ -183,7 +227,7 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
     };
 
     const handleNext = () => {
-        if (currentQuestionIndex < activeQuestions.length - 1) {
+        if (currentQuestionIndex < displayQuestions.length - 1) {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
         }
     };
@@ -195,24 +239,40 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
     };
 
     const handleEvaluate = () => {
+        const finalScore = calculateScore();
         setShowEvaluation(true);
         setShowDetails(false);
-        onComplete?.();
+        onComplete?.({
+            score: finalScore,
+            answers: selectedAnswers,
+            questions: displayQuestions
+        });
     };
 
     const handleClose = () => {
         // Reset state
         setCurrentQuestionIndex(0);
-        setSelectedAnswers(Array(activeQuestions.length).fill(null));
+        setSelectedAnswers(Array(displayQuestions.length).fill(null));
         setShowEvaluation(false);
         setShowDetails(false);
+        setFrozenQuestions([]);
         onClose();
     };
 
     const calculateScore = () => {
         let correct = 0;
-        activeQuestions.forEach((question, index) => {
-            if (selectedAnswers[index] === question.correctAnswer) {
+        displayQuestions.forEach((question, index) => {
+            const rawCorrect = question.correctAnswer !== undefined ? question.correctAnswer : question.correct_answer_index;
+            // Handle both number and letter "A" if it comes as string
+            let correctIdx: number;
+            if (typeof rawCorrect === 'string') {
+                const letterMap: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
+                correctIdx = isNaN(Number(rawCorrect)) ? (letterMap[rawCorrect.toUpperCase()] ?? 0) : Number(rawCorrect);
+            } else {
+                correctIdx = Number(rawCorrect);
+            }
+
+            if (selectedAnswers[index] !== null && Number(selectedAnswers[index]) === correctIdx) {
                 correct++;
             }
         });
@@ -234,7 +294,7 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
     };
 
     const score = calculateScore();
-    const accuracy = Math.round((score / activeQuestions.length) * 100);
+    const accuracy = Math.round((score / (displayQuestions.length || 1)) * 100);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={handleClose}>
@@ -394,7 +454,7 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                                 <p className="text-foreground text-sm font-medium">Your Score</p>
                                 <p className="text-4xl tracking-tight my-1.5">
                                     <span className="text-green-500 font-semibold">{score}</span>
-                                    <span className="text-muted-foreground text-2xl font-medium"> / {activeQuestions.length}</span>
+                                    <span className="text-muted-foreground text-2xl font-medium"> / {displayQuestions.length}</span>
                                 </p>
                                 <p className="text-foreground text-base font-medium">{accuracy}% Accuracy</p>
                             </div>
@@ -434,9 +494,21 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                                     <div className="px-6 pb-8 border-t border-border pt-5">
                                         <p className="font-semibold text-foreground text-base mb-4">Detailed Review</p>
                                         <div className="flex flex-col gap-4">
-                                            {activeQuestions.map((question, index) => {
-                                                const isCorrect = selectedAnswers[index] === (question?.correctAnswer ?? -1);
+                                            {displayQuestions.map((question, index) => {
+                                                const rawCorrect = question.correctAnswer !== undefined ? question.correctAnswer : question.correct_answer_index;
+                                                let correctIdx: number;
+                                                const letterMap: Record<string, string> = { "0": "A", "1": "B", "2": "C", "3": "D" };
+
+                                                if (typeof rawCorrect === 'string') {
+                                                    const charMap: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
+                                                    correctIdx = isNaN(Number(rawCorrect)) ? (charMap[rawCorrect.toUpperCase()] ?? 0) : Number(rawCorrect);
+                                                } else {
+                                                    correctIdx = Number(rawCorrect);
+                                                }
+
+                                                const isCorrect = selectedAnswers[index] !== null && Number(selectedAnswers[index]) === correctIdx;
                                                 const userAnswer = selectedAnswers[index];
+
                                                 return (
                                                     <div key={question?.id || index} className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm">
                                                         <div className="flex justify-between items-start">
@@ -458,14 +530,16 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                                                                 <div className="flex gap-2 items-start">
                                                                     <p className="text-muted-foreground text-sm shrink-0 w-24">Your answer:</p>
                                                                     <p className={cn('text-sm font-medium', isCorrect ? 'text-green-600' : 'text-red-600')}>
-                                                                        {question.options[userAnswer]}
+                                                                        <span className="font-bold mr-1">{letterMap[String(userAnswer)]}.</span> {question.options?.[userAnswer] || "N/A"}
                                                                     </p>
                                                                 </div>
                                                             )}
                                                             {!isCorrect && (
                                                                 <div className="flex gap-2 items-start">
                                                                     <p className="text-muted-foreground text-sm shrink-0 w-24">Correct answer:</p>
-                                                                    <p className="text-green-600 text-sm font-medium">{question.options[question.correctAnswer]}</p>
+                                                                    <p className="text-green-600 text-sm font-medium">
+                                                                        <span className="font-bold mr-1">{letterMap[String(correctIdx)]}.</span> {question.options?.[correctIdx] || "N/A"}
+                                                                    </p>
                                                                 </div>
                                                             )}
                                                         </div>

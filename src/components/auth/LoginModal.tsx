@@ -19,6 +19,8 @@ import { X } from "lucide-react";
 import authService from "@/services/auth.service";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { prefetchAllUserData } from "@/services/prefetch";
 
 interface LoginModalProps {
     isOpen: boolean;
@@ -33,6 +35,7 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
     const [isLoading, setIsLoading] = useState(false);
     const [timer, setTimer] = useState(30);
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         let interval: NodeJS.Timeout;
@@ -81,6 +84,10 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
             const fullMobile = `+91${mobile}`;
             await authService.verifyOTP(fullMobile, otp);
             toast.success("Logged in successfully!");
+
+            // Start preloading data in the background
+            prefetchAllUserData(queryClient);
+
             onClose();
             navigate("/dashboard?welcome=true");
         } catch (err: any) {

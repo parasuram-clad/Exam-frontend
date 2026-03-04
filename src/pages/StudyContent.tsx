@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import authService, { UserMe } from "@/services/auth.service";
+import authService from "@/services/auth.service";
 import studyService from "@/services/study.service";
 import { toast } from "sonner";
 import { useParams, useNavigate } from "react-router-dom";
@@ -16,14 +16,19 @@ import {
   X,
   Book,
   PenTool,
-  History,
+  History as HistoryIcon,
   Sparkles,
   Save,
   Edit3,
   Trash2,
+  BarChart2,
+  Calendar,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DailyQuizModal, QUIZ_QUESTIONS } from "@/components/dashboard/DailyQuizModal";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Types from StudyInterface
 type Mode = "reading" | "study" | "revision";
@@ -528,7 +533,6 @@ const StudyContent = () => {
   const navigate = useNavigate();
 
   const [sections, setSections] = useState<ContentSection[]>(contentSections);
-  const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>("reading");
   const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset>("light");
   const [showTopBar, setShowTopBar] = useState(false);
@@ -546,103 +550,133 @@ const StudyContent = () => {
   const [focusedNoteKeyword, setFocusedNoteKeyword] = useState<string | null>(null);
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [tempNoteText, setTempNoteText] = useState("");
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+  const [assessmentStartTime, setAssessmentStartTime] = useState<string | null>(null);
+  const [viewHistoryAnswers, setViewHistoryAnswers] = useState<(number | null)[] | undefined>(undefined);
+  const [showResultsOnly, setShowResultsOnly] = useState(false);
+  const [resultsQuestions, setResultsQuestions] = useState<any[] | undefined>(undefined);
 
   const readingPanelRef = useRef<HTMLDivElement>(null);
+  const notesPanelRef = useRef<HTMLDivElement>(null);
+
+  const queryClient = useQueryClient();
+
+  const { data: user } = useQuery({
+    queryKey: ['user-me'],
+    queryFn: () => authService.getCurrentUser(),
+    staleTime: Infinity,
+  });
+
+  const { data: allNotes = [] } = useQuery({
+    queryKey: ['user-notes', user?.id],
+    queryFn: () => studyService.getUserNotes(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const [topicAssessment, setTopicAssessment] = useState<any>(null);
   const [topicData, setTopicData] = useState<any>(null);
 
+  const parsedSubtopicId = parseInt(subtopicId || "");
+
+  const { data: topicDataResponse } = useQuery({
+    queryKey: ['topic-content', parsedSubtopicId, user?.id],
+    queryFn: () => studyService.getTopicContentBySyllabusId(parsedSubtopicId, user!.id),
+    enabled: !!user?.id && !isNaN(parsedSubtopicId),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: assessmentHistory } = useQuery({
+    queryKey: ['assessment-history', user?.id, parsedSubtopicId],
+    queryFn: () => studyService.getAssessmentHistory(user!.id, parsedSubtopicId),
+    enabled: !!user?.id && !isNaN(parsedSubtopicId),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isNoteDirty = (keyword: string, currentContent: string) => {
+    if (!subtopicId || isNaN(parseInt(subtopicId))) return false;
+    const existing = allNotes.find(
+      n => n.topic_id === parseInt(subtopicId) && n.title === keyword
+    );
+    if (!existing) return currentContent.trim() !== "";
+    return existing.content !== currentContent;
+  };
+
+  // Initialize assessment status from history
   useEffect(() => {
-    const fetchContent = async () => {
-      if (!subtopicId || isNaN(parseInt(subtopicId))) {
-        setLoading(false);
-        // Map mock content for safety
-        const mappedMock = contentSections.map(s => ({
-          ...s,
-          type: 'reading',
-          content_blocks: s.paragraphs.map((p, i) => ({
-            block_id: `${s.id}-b${i}`,
-            type: 'paragraph',
-            text: p,
-            keywords: s.keywords,
-            pyqs: []
-          }))
+    if (assessmentHistory?.attempts?.length > 0) {
+      setIsAssessmentFinished(true);
+    }
+  }, [assessmentHistory]);
+
+  useEffect(() => {
+    if (!subtopicId || isNaN(parsedSubtopicId)) {
+      // Map mock content for safety
+      const mappedMock = contentSections.map(s => ({
+        ...s,
+        type: 'reading',
+        content_blocks: s.paragraphs.map((p, i) => ({
+          block_id: `${s.id}-b${i}`,
+          type: 'paragraph',
+          text: p,
+          keywords: s.keywords,
+          pyqs: []
+        }))
+      }));
+      setSections(mappedMock as any);
+      setVisibleKeywords(mappedMock[0].keywords);
+      return;
+    }
+
+    if (topicDataResponse && topicDataResponse.task) {
+      setTopicData(topicDataResponse);
+      const learningContent = topicDataResponse.task.learning_content;
+      const mappedSections: ContentSection[] = learningContent.sections.map((s: any) => ({
+        id: s.section_id,
+        title: s.title,
+        type: s.type,
+        content_blocks: s.content_blocks,
+        mindmap_structure: s.mindmap_structure
+      }));
+
+      setSections(mappedSections);
+      setVisibleKeywords(mappedSections[0]?.content_blocks?.[0]?.keywords || []);
+
+      // Store assessment if needed
+      const assessmentSource = topicDataResponse.task?.assessment || topicDataResponse.task?.learning_content?.assessment;
+
+      if (assessmentSource && assessmentSource.questions && assessmentSource.questions.length > 0) {
+        const mappedQuestions = assessmentSource.questions.map((q: any, idx: number) => ({
+          id: q.id || `q-${idx}`,
+          question: q.question,
+          subject: topicDataResponse.task.subject || "General Science",
+          difficulty: q.difficulty || "Medium",
+          options: q.options,
+          correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : q.correct_answer_index,
+          explanation: q.explanation
         }));
-        setSections(mappedMock as any);
-        setVisibleKeywords(mappedMock[0].keywords);
-        return;
+        const finalAssessment = {
+          ...assessmentSource,
+          questions: mappedQuestions
+        };
+        setTopicAssessment(finalAssessment);
+      } else {
+        setTopicAssessment(null);
       }
+    }
+  }, [topicDataResponse, subtopicId]);
 
-      try {
-        setLoading(true);
-        const user = await authService.getCurrentUser();
-        const response = await studyService.getTopicContentBySyllabusId(parseInt(subtopicId), user.id);
-
-        if (response && response.task) {
-          setTopicData(response);
-          const learningContent = response.task.learning_content;
-          const mappedSections: ContentSection[] = learningContent.sections.map(s => ({
-            id: s.section_id,
-            title: s.title,
-            type: s.type,
-            content_blocks: s.content_blocks,
-            mindmap_structure: s.mindmap_structure
-          }));
-
-          setSections(mappedSections);
-          setVisibleKeywords(mappedSections[0]?.content_blocks[0]?.keywords || []);
-
-          // Store assessment if needed
-          console.log("Full Topic Content Response:", response);
-          const assessmentSource = response.task?.assessment || response.task?.learning_content?.assessment;
-
-          if (assessmentSource && assessmentSource.questions && assessmentSource.questions.length > 0) {
-            console.log("Backend Assessment Questions found:", assessmentSource.questions.length);
-            const mappedQuestions = assessmentSource.questions.map((q: any, idx: number) => ({
-              id: q.id || `q-${idx}`,
-              question: q.question,
-              subject: response.task.subject || "General Science",
-              difficulty: q.difficulty || "Medium",
-              options: q.options,
-              correctAnswer: q.correct_answer_index,
-              explanation: q.explanation
-            }));
-            const finalAssessment = {
-              ...assessmentSource,
-              questions: mappedQuestions
-            };
-            console.log("Successfully mapped assessment questions:", finalAssessment.questions);
-            setTopicAssessment(finalAssessment);
-          } else {
-            console.warn("No assessment found in backend response task or learning_content:", response.task);
-            // If No assessment from backend, we can decide if we want to show anything or keep it null
-            setTopicAssessment(null);
-          }
-
-          // Fetch existing notes for this topic
-          try {
-            const notes = await studyService.getUserNotes(user.id);
-            const topicNotes = notes.filter(n => n.topic_id === parseInt(subtopicId));
-            const notesMap: Record<string, string> = {};
-            topicNotes.forEach(n => {
-              notesMap[n.title] = n.content;
-            });
-            setKeywordNotes(notesMap);
-          } catch (nErr) {
-            console.error("Failed to fetch notes", nErr);
-          }
-        } else {
-          console.error("Response or task is missing:", response);
-        }
-      } catch (err) {
-        console.error("Failed to fetch study content", err);
-        toast.error("Failed to load study material.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchContent();
-  }, [subtopicId]);
+  // Synchronize notes when allNotes or subtopicId changes
+  useEffect(() => {
+    if (allNotes && subtopicId) {
+      const topicNotes = allNotes.filter(n => n.topic_id === parseInt(subtopicId));
+      const notesMap: Record<string, string> = {};
+      topicNotes.forEach(n => {
+        notesMap[n.title] = n.content;
+      });
+      setKeywordNotes(notesMap);
+    }
+  }, [allNotes, subtopicId]);
 
   // When keyword changes, reset editing state
   useEffect(() => {
@@ -733,6 +767,11 @@ const StudyContent = () => {
         break;
       }
     }
+
+    // Scroll notes panel to top so the active note is visible first
+    if (notesPanelRef.current) {
+      notesPanelRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const getBackgroundStyle = () => {
@@ -764,511 +803,811 @@ const StudyContent = () => {
     setIsAssessmentStarted(true);
     setIsAssessmentFinished(false);
     setTimeLeft(600);
+    setAssessmentStartTime(new Date().toISOString());
+  };
+
+  const handleAssessmentComplete = async (results: { score: number, answers: (number | null)[], questions: any[] }) => {
+    setIsAssessmentFinished(true);
+    setQuizScore(results.score);
+
+    if (!user?.id || !subtopicId || isNaN(parsedSubtopicId) || !assessmentStartTime) return;
+
+    try {
+      // Map frontend answers to backend format
+      const answerMap = ["A", "B", "C", "D"];
+      const answers = results.answers.map((ansIndex, idx) => {
+        const question = results.questions[idx];
+        // Safely extract numeric ID from strings like "q52" or use existing mcq_id
+        let mcq_id = Number(question.mcq_id);
+        if (isNaN(mcq_id) && question.id) {
+          const numericMatch = String(question.id).match(/\d+/);
+          mcq_id = numericMatch ? parseInt(numericMatch[0]) : 0;
+        }
+
+        return {
+          mcq_id: mcq_id || 0,
+          selected_option: ansIndex !== null ? answerMap[ansIndex] : "A" // fallback to A if skipped
+        };
+      }).filter(a => a.mcq_id > 0);
+
+      const nextAttemptNo = (assessmentHistory?.total_attempts || 0) + 1;
+
+      const response = await studyService.submitMCQAttempt({
+        user_id: user.id,
+        syllabus_id: parsedSubtopicId,
+        attempt_no: nextAttemptNo,
+        difficulty: results.questions[0]?.difficulty?.toLowerCase() || "easy",
+        answers: answers,
+        started_at: assessmentStartTime,
+        submitted_at: new Date().toISOString()
+      });
+
+      // Save for "View Details" button to use immediately
+      setViewHistoryAnswers(results.answers);
+      setResultsQuestions(results.questions);
+
+      toast.success("Assessment submitted successfully!");
+
+      setIsAssessmentFinished(true);
+
+      // Invalidate queries to refresh progress and history
+      queryClient.invalidateQueries({ queryKey: ['study-plans', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['roadmap', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['topic-content', parsedSubtopicId, user.id] });
+      queryClient.invalidateQueries({ queryKey: ['assessment-history', user.id, parsedSubtopicId] });
+
+    } catch (error) {
+      console.error("Failed to submit assessment:", error);
+      toast.error("Failed to save assessment progress.");
+    }
   };
 
   const isInQuizMode = isAssessmentStarted && !isAssessmentFinished;
 
-  const handleDeleteNote = (keyword: string) => {
+  const handleDeleteNote = async (keyword: string) => {
+    // Remove from local state immediately (optimistic)
     setKeywordNotes(prev => {
       const next = { ...prev };
       delete next[keyword];
       return next;
     });
+    if (selectedKeyword === keyword) setSelectedKeyword(null);
+
+    // Delete from backend
+    if (subtopicId && !isNaN(parseInt(subtopicId)) && user) {
+      const existing = allNotes.find(
+        n => n.topic_id === parseInt(subtopicId) && n.title === keyword
+      );
+      if (existing?.id) {
+        try {
+          await studyService.deleteNote(existing.id);
+          queryClient.invalidateQueries({ queryKey: ['user-notes', user.id] });
+        } catch (err) {
+          console.error('Failed to delete note', err);
+          toast.error('Failed to delete note.');
+        }
+      }
+    }
   };
 
   const handleNoteContentChange = (keyword: string, content: string) => {
     setKeywordNotes(prev => ({ ...prev, [keyword]: content }));
-    // Auto-save logic can be added here if desired
   };
 
   const handleSaveNote = async (keyword: string, content: string) => {
-    if (!subtopicId || isNaN(parseInt(subtopicId))) {
-      // For mock data, just update local state
-      setKeywordNotes(prev => ({ ...prev, [keyword]: content }));
-      return;
-    }
+    // Update local state immediately
+    setKeywordNotes(prev => ({ ...prev, [keyword]: content }));
+
+    if (!subtopicId || isNaN(parseInt(subtopicId)) || !user) return;
 
     try {
-      const user = await authService.getCurrentUser();
-      await studyService.createNote({
-        user_id: user.id,
-        topic_id: parseInt(subtopicId),
-        title: keyword,
-        content: content,
-        status: 'private'
-      });
-      setKeywordNotes(prev => ({ ...prev, [keyword]: content }));
-      toast.success("Note saved successfully!");
-    } catch (err) {
-      console.error("Failed to save note", err);
-      toast.error("Failed to save note to server.");
+      // Check if a note for this topic + keyword already exists
+      const existing = allNotes.find(
+        n => n.topic_id === parseInt(subtopicId) && n.title === keyword
+      );
+
+      if (existing?.id) {
+        // UPDATE existing note
+        await studyService.updateNote(existing.id, { content });
+      } else {
+        // CREATE new note
+        await studyService.createNote({
+          user_id: user.id,
+          topic_id: parseInt(subtopicId),
+          title: keyword,
+          content,
+          status: 'private',
+        });
+      }
+
+      // Refresh notes cache
+      queryClient.invalidateQueries({ queryKey: ['user-notes', user.id] });
+      toast.success('Note saved!');
+    } catch (err: any) {
+      console.error('Failed to save note:', err);
+      if (err.response) {
+        console.error('Server error details:', err.response.data);
+      }
+      toast.error(`Failed to save note: ${err.response?.data?.detail || err.message}`);
     }
   };
 
-  const renderReadingContent = () => (
-    <div className="flex flex-col gap-10 py-12 px-8 md:px-16 max-w-[800px] mx-auto">
-      {/* Topic Header & Introduction */}
-      <div className="space-y-4">
-        <h1 className={cn(
-          "font-['Inter:Medium',sans-serif] font-medium leading-[32px] sm:leading-[36px] text-[24px] sm:text-[28px] tracking-[0.0703px]",
-          getTextColor()
-        )}>
-          {sections[0]?.title || "Study Topic"}
-        </h1>
-        {topicData?.task?.short_description && (
-          <p className={cn("text-[15px] opacity-60 italic", getTextColor())}>
-            {topicData.task.short_description}
-          </p>
-        )}
-        {topicData?.task?.learning_content?.introduction && (
-          <div className={cn("p-6 rounded-2xl border bg-accent/5", backgroundPreset === 'dark' ? "border-gray-800" : "border-gray-100")}>
-            <p className={cn("text-[16px] leading-relaxed", getTextColor())}>
-              {topicData.task.learning_content.introduction}
+  const renderReadingContent = () => {
+    return (
+      <div className="flex flex-col gap-10 py-12 px-8 md:px-16 max-w-[800px] mx-auto">
+        {/* Topic Header & Introduction */}
+        <div className="space-y-4">
+          <h1 className={cn(
+            "font-['Inter:Medium',sans-serif] font-medium leading-[32px] sm:leading-[36px] text-[24px] sm:text-[28px] tracking-[0.0703px]",
+            getTextColor()
+          )}>
+            {sections[0]?.title || "Study Topic"}
+          </h1>
+          {topicData?.task?.short_description && (
+            <p className={cn("text-[15px] opacity-60 italic", getTextColor())}>
+              {topicData.task.short_description}
             </p>
-          </div>
-        )}
-      </div>
+          )}
+          {topicData?.task?.learning_content?.introduction && (
+            <div className={cn("p-6 rounded-2xl border bg-accent/5", backgroundPreset === 'dark' ? "border-gray-800" : "border-gray-100")}>
+              <p className={cn("text-[16px] leading-relaxed", getTextColor())}>
+                {topicData.task.learning_content.introduction}
+              </p>
+            </div>
+          )}
+        </div>
 
-      {sections.map((section, idx) => (
-        <div key={section.id} id={`section-${section.id}`} className="space-y-8 scroll-mt-24">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <h2 className={cn(
-              "font-['Inter:Medium',sans-serif] font-medium leading-[26px] sm:leading-[30px] text-[18px] sm:text-[22px] tracking-[-0.4492px]",
-              getTextColor()
-            )}>
-              {section.title}
-            </h2>
-            {section.mindmap_structure && (
-              <button
-                onClick={() => handleMindMapClick(idx)}
-                className={cn(
-                  "flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg transition-all shadow-sm border",
-                  backgroundPreset === 'dark' ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-white border-gray-200 text-gray-600"
-                )}
-                title="View Interactive Mind Map"
-              >
-                <MindMapIcon />
-              </button>
-            )}
-          </div>
+        {sections.map((section, idx) => (
+          <div key={section.id} id={`section-${section.id}`} className="space-y-8 scroll-mt-24">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <h2 className={cn(
+                "font-['Inter:Medium',sans-serif] font-medium leading-[26px] sm:leading-[30px] text-[18px] sm:text-[22px] tracking-[-0.4492px]",
+                getTextColor()
+              )}>
+                {section.title}
+              </h2>
+              {section.mindmap_structure && (
+                <button
+                  onClick={() => handleMindMapClick(idx)}
+                  className={cn(
+                    "flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg transition-all shadow-sm border",
+                    backgroundPreset === 'dark' ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-white border-gray-200 text-gray-600"
+                  )}
+                  title="View Interactive Mind Map"
+                >
+                  <MindMapIcon />
+                </button>
+              )}
+            </div>
 
-          <div className={cn("space-y-6 text-[16px] leading-[26px] tracking-[-0.3125px] font-['Inter:Regular',sans-serif]", getTextColor())}>
-            {section.content_blocks?.map((block, bIdx) => {
-              const pyqKey = `${section.id}-${bIdx}`;
-              const hasPyqs = block.pyqs && block.pyqs.length > 0;
-              const isExpanded = openPyqAccordion === pyqKey;
+            <div className={cn("space-y-6 text-[16px] leading-[26px] tracking-[-0.3125px] font-['Inter:Regular',sans-serif]", getTextColor())}>
+              {section.content_blocks?.map((block, bIdx) => {
+                const pyqKey = `${section.id}-${bIdx}`;
+                const hasPyqs = block.pyqs && block.pyqs.length > 0;
+                const isExpanded = openPyqAccordion === pyqKey;
 
-              return (
-                <div key={block.block_id} id={`block-${block.block_id}`} className="space-y-4">
-                  <div className="relative group">
-                    {block.sub_heading && (
-                      <h4 className="font-bold mb-2">{block.sub_heading}</h4>
-                    )}
+                return (
+                  <div key={block.block_id} id={`block-${block.block_id}`} className="space-y-4">
+                    <div className="relative group">
+                      {block.sub_heading && (
+                        <h4 className="font-bold mb-2">{block.sub_heading}</h4>
+                      )}
 
-                    {block.type === 'paragraph' && (
-                      <p className="text-justify inline">
-                        {block.text}
-                      </p>
-                    )}
+                      {block.type === 'paragraph' && (
+                        <p className="text-justify inline">
+                          {block.text}
+                        </p>
+                      )}
 
-                    {block.type === 'image' && block.image && (
-                      <div className="my-6">
-                        <img
-                          src={block.image}
-                          alt={block.sub_heading || "Topic Image"}
-                          className="rounded-2xl border shadow-lg max-w-full h-auto mx-auto"
-                          loading="eager"
-                          fetchPriority="high"
-                        />
-                        {block.text && (
-                          <p className="text-sm text-center mt-3 opacity-60">{block.text}</p>
-                        )}
-                      </div>
-                    )}
+                      {block.type === 'image' && block.image && (
+                        <div className="my-6">
+                          <img
+                            src={block.image}
+                            alt={block.sub_heading || "Topic Image"}
+                            className="rounded-2xl border shadow-lg max-w-full h-auto mx-auto"
+                            loading="eager"
+                            fetchPriority="high"
+                          />
+                          {block.text && (
+                            <p className="text-sm text-center mt-3 opacity-60">{block.text}</p>
+                          )}
+                        </div>
+                      )}
 
-                    {block.type === 'video' && (
-                      <div className="my-6 aspect-video bg-gray-100 rounded-2xl flex items-center justify-center border border-dashed border-gray-300">
-                        <div className="text-center">
-                          <Play className="w-12 h-12 text-accent/40 mx-auto mb-3" />
-                          <p className="text-sm font-medium opacity-50">Video content available in full version</p>
+                      {block.type === 'video' && (
+                        <div className="my-6 aspect-video bg-gray-100 rounded-2xl flex items-center justify-center border border-dashed border-gray-300">
+                          <div className="text-center">
+                            <Play className="w-12 h-12 text-accent/40 mx-auto mb-3" />
+                            <p className="text-sm font-medium opacity-50">Video content available in full version</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {hasPyqs && (
+                        <button
+                          onClick={() => handlePyqToggle(section.id, bIdx)}
+                          className="inline-block ml-2 align-middle"
+                        >
+                          <BulbIcon isActive={isExpanded} />
+                        </button>
+                      )}
+                    </div>
+
+                    {isExpanded && hasPyqs && (
+                      <div className={cn(
+                        "my-4 rounded-xl border p-4 transition-all duration-300",
+                        backgroundPreset === 'dark' ? "bg-[#2a2a2a] border-gray-700" : "bg-gray-50 border-gray-200"
+                      )}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-[16px]">💡</span>
+                          <h4 className={cn("font-['Inter:Medium',sans-serif] text-[14px] font-medium opacity-70", getTextColor())}>Asked in Exams</h4>
+                        </div>
+                        <div className="space-y-3">
+                          {block.pyqs.map((pyq: any, i: number) => (
+                            <div key={i} className={cn("p-4 rounded-lg", backgroundPreset === 'dark' ? "bg-[#1a1a1a]" : "bg-white shadow-sm")}>
+                              <p className="text-[12px] font-medium mb-1 opacity-50 uppercase tracking-wider">{pyq.exam_name} – {pyq.year}</p>
+                              <p className="text-[14px] leading-[20px] mb-3">{pyq.question}</p>
+                              <button
+                                onClick={() => handleAnswerToggle(`pyq-${pyqKey}-${i}`)}
+                                className="text-[13px] font-medium text-blue-500 hover:text-blue-600 transition-colors"
+                              >
+                                {openAnswers.has(`pyq-${pyqKey}-${i}`) ? "Hide Answer" : "View Answer"}
+                              </button>
+                              {openAnswers.has(`pyq-${pyqKey}-${i}`) && (
+                                <div className="mt-3 pt-3 border-t border-gray-100/10">
+                                  <p className="text-[12px] font-medium text-green-500 mb-1">Answer:</p>
+                                  <p className="text-[14px]">{pyq.answer}</p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
-
-                    {hasPyqs && (
-                      <button
-                        onClick={() => handlePyqToggle(section.id, bIdx)}
-                        className="inline-block ml-2 align-middle"
-                      >
-                        <BulbIcon isActive={isExpanded} />
-                      </button>
-                    )}
                   </div>
+                );
+              })}
 
-                  {isExpanded && hasPyqs && (
-                    <div className={cn(
-                      "my-4 rounded-xl border p-4 transition-all duration-300",
-                      backgroundPreset === 'dark' ? "bg-[#2a2a2a] border-gray-700" : "bg-gray-50 border-gray-200"
-                    )}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-[16px]">💡</span>
-                        <h4 className={cn("font-['Inter:Medium',sans-serif] text-[14px] font-medium opacity-70", getTextColor())}>Asked in Exams</h4>
-                      </div>
-                      <div className="space-y-3">
-                        {block.pyqs.map((pyq: any, i: number) => (
-                          <div key={i} className={cn("p-4 rounded-lg", backgroundPreset === 'dark' ? "bg-[#1a1a1a]" : "bg-white shadow-sm")}>
-                            <p className="text-[12px] font-medium mb-1 opacity-50 uppercase tracking-wider">{pyq.exam_name} – {pyq.year}</p>
-                            <p className="text-[14px] leading-[20px] mb-3">{pyq.question}</p>
-                            <button
-                              onClick={() => handleAnswerToggle(`pyq-${pyqKey}-${i}`)}
-                              className="text-[13px] font-medium text-blue-500 hover:text-blue-600 transition-colors"
-                            >
-                              {openAnswers.has(`pyq-${pyqKey}-${i}`) ? "Hide Answer" : "View Answer"}
-                            </button>
-                            {openAnswers.has(`pyq-${pyqKey}-${i}`) && (
-                              <div className="mt-3 pt-3 border-t border-gray-100/10">
-                                <p className="text-[12px] font-medium text-green-500 mb-1">Answer:</p>
-                                <p className="text-[14px]">{pyq.answer}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Infographics Integration based on Section ID */}
-            {section.id === 'kingdoms' && <ThreeKingdomsInfographic isDark={backgroundPreset === 'dark'} />}
-            {section.id === 'sangam' && <SangamTimelineInfographic isDark={backgroundPreset === 'dark'} />}
-            {section.id === 'administration' && <AdministrationHierarchyInfographic isDark={backgroundPreset === 'dark'} />}
-            {section.id === 'trade' && <TradeNetworkInfographic isDark={backgroundPreset === 'dark'} />}
-            {section.id === 'architecture' && <TempleArchitectureInfographic isDark={backgroundPreset === 'dark'} />}
+              {/* Infographics Integration based on Section ID */}
+              {section.id === 'kingdoms' && <ThreeKingdomsInfographic isDark={backgroundPreset === 'dark'} />}
+              {section.id === 'sangam' && <SangamTimelineInfographic isDark={backgroundPreset === 'dark'} />}
+              {section.id === 'administration' && <AdministrationHierarchyInfographic isDark={backgroundPreset === 'dark'} />}
+              {section.id === 'trade' && <TradeNetworkInfographic isDark={backgroundPreset === 'dark'} />}
+              {section.id === 'architecture' && <TempleArchitectureInfographic isDark={backgroundPreset === 'dark'} />}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
 
-      {/* Assessment Activation Section */}
-      <div className="pt-16 border-t border-gray-200/20">
-        <div className={cn(
-          "p-10 md:p-14 rounded-[32px] text-center space-y-8",
-          backgroundPreset === 'dark' ? 'bg-[#2a2a2a]' : 'bg-[#fafafa]'
-        )}>
-          <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto transition-transform hover:scale-110">
-            {isAssessmentFinished ? (
-              <CheckCircle className="w-9 h-9 text-emerald-500" />
-            ) : (
-              <Brain className="w-9 h-9 text-accent" />
-            )}
-          </div>
-          <h2 className={cn("text-[22px] font-medium font-['Inter:Medium',sans-serif]", getTextColor())}>
-            {isAssessmentFinished ? "Chapter Assessment Completed" : "Final Chapter Evaluation"}
-          </h2>
-          <p className={cn("text-[15px] opacity-50 max-w-sm mx-auto", getTextColor())}>
-            {isAssessmentFinished
-              ? "You have successfully completed the assessment for this chapter. Great job!"
-              : "Validate your understanding with a synchronized exam assessment"}
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button
-              onClick={() => navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}/mindmap`)}
-              variant="outline"
-              className={cn(
-                "px-8 py-6 text-[15px] rounded-xl transition-all border font-medium hover:bg-accent/5",
-                backgroundPreset === 'dark' ? "border-gray-700 text-gray-300 hover:text-white" : "border-gray-200 text-gray-700"
+        {/* Assessment Activation Section */}
+        <div className="pt-16 border-t border-gray-200/20">
+          <div className={cn(
+            "p-10 md:p-14 rounded-[32px] text-center space-y-8",
+            backgroundPreset === 'dark' ? 'bg-[#2a2a2a]' : 'bg-[#fafafa]'
+          )}>
+            <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto transition-transform hover:scale-110">
+              {isAssessmentFinished ? (
+                <CheckCircle className="w-9 h-9 text-emerald-500" />
+              ) : (
+                <Brain className="w-9 h-9 text-accent" />
               )}
-            >
-              <MindMapIcon />
-              <span className="ml-2.5">View Mind Map</span>
-            </Button>
+            </div>
+            <h2 className={cn("text-[22px] font-medium font-['Inter:Medium',sans-serif]", getTextColor())}>
+              {isAssessmentFinished ? "Chapter Assessment Completed" : "Final Chapter Evaluation"}
+            </h2>
+            <p className={cn("text-[15px] opacity-50 max-w-sm mx-auto", getTextColor())}>
+              {isAssessmentFinished
+                ? "You have successfully completed the assessment for this chapter. Great job!"
+                : "Validate your understanding with a synchronized exam assessment"}
+            </p>
 
-            {isAssessmentFinished ? (
-              <div className="bg-emerald-500 text-white p-3 text-[15px] rounded-xl shadow-md font-medium flex items-center justify-center cursor-default animate-fade-in">
-                Assessment Completed ✅
-              </div>
-            ) : (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button
-                onClick={startAssessment}
-                disabled={!topicAssessment}
+                onClick={() => navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}/mindmap`)}
+                variant="outline"
                 className={cn(
-                  "bg-[#1c1c1e] text-white hover:bg-black px-10 py-6 text-[15px] rounded-xl transition-all shadow-md font-medium",
-                  !topicAssessment && "opacity-50 cursor-not-allowed"
+                  "px-8 py-6 text-[15px] rounded-xl transition-all border font-medium hover:bg-accent/5",
+                  backgroundPreset === 'dark' ? "border-gray-700 text-gray-300 hover:text-white" : "border-gray-200 text-gray-700"
                 )}
               >
-                <Play className="w-5 h-5 mr-2.5 fill-current" />
-                {!topicAssessment ? "Loading Assessment..." : "Start Assessment"}
+                <MindMapIcon />
+                <span className="ml-2.5">View Mind Map</span>
               </Button>
-            )}
+
+              {isAssessmentFinished && (
+                <button
+                  onClick={() => {
+                    // Try to find latest attempt in history if not in local state
+                    if (!viewHistoryAnswers && assessmentHistory?.attempts?.length > 0) {
+                      const latest = assessmentHistory.attempts[assessmentHistory.attempts.length - 1];
+                      if (latest.questions) {
+                        const letterToIdx = { "A": 0, "B": 1, "C": 2, "D": 3 };
+                        const ans = latest.questions.map((q: any) => letterToIdx[q.selected_option as keyof typeof letterToIdx] ?? null);
+                        const ques = latest.questions.map((q: any) => ({
+                          ...q,
+                          difficulty: q.difficulty || latest.difficulty
+                        }));
+                        setViewHistoryAnswers(ans);
+                        setResultsQuestions(ques);
+                      }
+                    }
+                    setShowResultsOnly(true);
+                    setIsAssessmentStarted(true);
+                  }}
+                  className="bg-emerald-50 transition-all hover:bg-emerald-100 border border-emerald-200 text-emerald-700 px-5 py-3 text-[15px] rounded-lg shadow-sm font-medium flex items-center justify-center gap-3 animate-fade-in group"
+                >
+                  <BarChart2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  View Results
+                </button>
+              )}
+
+              {!isAssessmentFinished && (
+                <Button
+                  onClick={startAssessment}
+                  disabled={!topicAssessment}
+                  className={cn(
+                    "bg-[#1c1c1e] text-white hover:bg-black px-10 py-6 text-[15px] rounded-xl transition-all shadow-md font-medium",
+                    !topicAssessment && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <Play className="w-5 h-5 mr-2.5 fill-current" />
+                  {!topicAssessment ? "Loading Assessment..." : "Start Assessment"}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className={cn("fixed inset-0 z-50 overflow-hidden", getBackgroundStyle())}>
-      {loading ? (
-        <div className="flex items-center justify-center h-full">
-          <div className="flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            <p className={cn("text-sm", getTextColor())}>Generating your study material...</p>
+      {/* Top Control Bar from StudyInterface */}
+      <div
+        className="fixed top-0 left-0 right-0 h-16 z-[100]"
+        onMouseEnter={() => setShowTopBar(true)}
+        onMouseLeave={() => setShowTopBar(false)}
+      >
+        <div className={cn(
+          "absolute inset-0 transition-opacity duration-200",
+          showTopBar ? "opacity-100" : "opacity-0 pointer-events-none",
+          backgroundPreset === 'dark' ? "bg-[#1a1a1a] border-b border-gray-800" : "bg-white border-b border-gray-200 shadow-sm"
+        )}>
+          <div className="max-w-[1400px] mx-auto h-full px-4 sm:px-8 flex items-center justify-between gap-4">
+            <div className="flex-1 flex items-center">
+              <button
+                onClick={() => navigate('/study-plan')}
+                className={cn("flex items-center gap-1.5 font-['Inter:Regular',sans-serif] text-[13px] sm:text-[14px] opacity-70 hover:opacity-100 transition-opacity", getTextColor())}
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden xs:inline">Back</span>
+              </button>
+            </div>
+
+            <div className="flex-shrink-0 flex items-center gap-1 sm:gap-2 bg-gray-100/10 p-1 rounded-xl">
+              {[
+                { id: 'reading', icon: Book, label: 'Reading' },
+                { id: 'study', icon: PenTool, label: 'Study' },
+                { id: 'revision', icon: HistoryIcon, label: 'Revision' },
+              ].map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id as Mode)}
+                  className={cn(
+                    "px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-all flex items-center gap-1.5 sm:gap-2",
+                    mode === m.id
+                      ? "bg-[#1f2937] text-white shadow-sm"
+                      : cn("text-[13px] sm:text-[14px] opacity-40 hover:opacity-100", getTextColor())
+                  )}
+                  title={`${m.label} Mode`}
+                >
+                  <m.icon className="w-4 h-4" />
+                  <span className="text-[13px] sm:text-[14px] font-medium hidden sm:inline">{m.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 flex items-center justify-end gap-2 sm:gap-4">
+              <span className={cn("text-[13px] sm:text-[14px] opacity-60 hidden lg:inline", getTextColor())}>Display:</span>
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                {(['light', 'warm', 'dark'] as BackgroundPreset[]).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setBackgroundPreset(p)}
+                    className={cn(
+                      "px-2 sm:px-3 py-1 rounded-lg text-[11px] sm:text-[12px] font-medium transition-all border",
+                      backgroundPreset === p
+                        ? "bg-[#1f2937] text-white border-[#1f2937]"
+                        : cn("bg-transparent border-gray-200/20", getTextColor())
+                    )}
+                  >
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-      ) : (
-        <>
-          {/* Top Control Bar from StudyInterface */}
-          <div
-            className="fixed top-0 left-0 right-0 h-16 z-[100]"
-            onMouseEnter={() => setShowTopBar(true)}
-            onMouseLeave={() => setShowTopBar(false)}
-          >
+      </div>
+
+      <div className="w-full h-full overflow-hidden">
+        {mode === 'reading' && (
+          <div className="w-full h-full overflow-y-auto bg-[#f5f5f5]">
+            <div className={cn("h-full overflow-y-auto pt-20", getBackgroundStyle())} style={{ maxWidth: '800px', margin: '0 auto' }} ref={readingPanelRef}>
+              {renderReadingContent()}
+            </div>
+          </div>
+        )}
+
+        {mode === 'study' && (
+          <div className="flex flex-col lg:flex-row h-full w-full overflow-hidden">
+            {/* Reading Panel */}
             <div className={cn(
-              "absolute inset-0 transition-opacity duration-200",
-              showTopBar ? "opacity-100" : "opacity-0 pointer-events-none",
-              backgroundPreset === 'dark' ? "bg-[#1a1a1a] border-b border-gray-800" : "bg-white border-b border-gray-200 shadow-sm"
-            )}>
-              <div className="max-w-[1400px] mx-auto h-full px-4 sm:px-8 flex items-center justify-between gap-4">
-                <div className="flex-1 flex items-center">
-                  <button
-                    onClick={() => navigate('/study-plan')}
-                    className={cn("flex items-center gap-1.5 font-['Inter:Regular',sans-serif] text-[13px] sm:text-[14px] opacity-70 hover:opacity-100 transition-opacity", getTextColor())}
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span className="hidden xs:inline">Back</span>
-                  </button>
+              "w-full lg:w-[60%] h-[35%] lg:h-full overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200/10 transition-all duration-300 pt-20 lg:pt-24",
+              focusedNoteKeyword ? "h-0 opacity-0 invisible lg:h-full lg:opacity-100 lg:visible" : "h-[35%]",
+              getBackgroundStyle()
+            )} ref={readingPanelRef}>
+              {renderReadingContent()}
+            </div>
+
+            {/* Right Side Panels (Keywords + Notes) */}
+            <div className="w-full lg:w-[40%] flex-1 lg:h-full bg-[#fafaf9] flex flex-col overflow-hidden pb-20 lg:pb-0">
+              {/* Keywords Bar */}
+              <div className={cn(
+                "flex-shrink-0 lg:h-[30%] lg:overflow-y-auto border-b border-gray-200/60 p-4 sm:p-6 bg-white/50 backdrop-blur-sm transition-all duration-300",
+                focusedNoteKeyword ? "h-0 p-0 opacity-0 overflow-hidden border-none lg:h-[30%] lg:p-6 lg:opacity-100 lg:overflow-y-auto lg:border-b" : "h-auto"
+              )}><div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-medium">Keywords</h3>
+
                 </div>
 
-                <div className="flex-shrink-0 flex items-center gap-1 sm:gap-2 bg-gray-100/10 p-1 rounded-xl">
-                  {[
-                    { id: 'reading', icon: Book, label: 'Reading' },
-                    { id: 'study', icon: PenTool, label: 'Study' },
-                    { id: 'revision', icon: History, label: 'Revision' }
-                  ].map(m => (
+                <div className="flex flex-wrap gap-2 transition-all duration-300">
+                  {visibleKeywords.map(kw => (
                     <button
-                      key={m.id}
-                      onClick={() => setMode(m.id as Mode)}
+                      key={kw}
+                      onClick={() => handleKeywordClick(kw)}
                       className={cn(
-                        "px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-all flex items-center gap-1.5 sm:gap-2",
-                        mode === m.id
-                          ? "bg-[#1f2937] text-white shadow-sm"
-                          : cn("text-[13px] sm:text-[14px] opacity-40 hover:opacity-100", getTextColor())
+                        "px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[12px] sm:text-[14px] transition-all border font-medium",
+                        selectedKeyword === kw
+                          ? "bg-[#1f2937] border-[#1f2937] text-white shadow-md font-medium"
+                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
                       )}
-                      title={`${m.label} Mode`}
                     >
-                      <m.icon className="w-4 h-4" />
-                      <span className="text-[13px] sm:text-[14px] font-medium hidden sm:inline">{m.label}</span>
+                      {kw}
                     </button>
                   ))}
                 </div>
+              </div>
 
-                <div className="flex-1 flex items-center justify-end gap-2 sm:gap-4">
-                  <span className={cn("text-[13px] sm:text-[14px] opacity-60 hidden lg:inline", getTextColor())}>Display:</span>
-                  <div className="flex items-center gap-1 sm:gap-1.5">
-                    {(['light', 'warm', 'dark'] as BackgroundPreset[]).map(p => (
-                      <button
-                        key={p}
-                        onClick={() => setBackgroundPreset(p)}
-                        className={cn(
-                          "px-2 sm:px-3 py-1 rounded-lg text-[11px] sm:text-[12px] font-medium transition-all border",
-                          backgroundPreset === p
-                            ? "bg-[#1f2937] text-white border-[#1f2937]"
-                            : cn("bg-transparent border-gray-200/20", getTextColor())
-                        )}
-                      >
-                        {p.charAt(0).toUpperCase() + p.slice(1)}
-                      </button>
-                    ))}
-                  </div>
+              {/* Notes List Section */}
+              <div className="flex-1 p-4 sm:p-8 flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-medium">
+                    {focusedNoteKeyword ? `Editing: ${focusedNoteKeyword}` : 'Notes'}
+                  </h3>
+                  {focusedNoteKeyword && (
+                    <button
+                      onClick={() => (document.activeElement as HTMLElement)?.blur()}
+                      className="text-[12px] font-bold text-blue-500 uppercase tracking-wider py-1 px-3 bg-blue-50 rounded-lg"
+                    >
+                      Done
+                    </button>
+                  )}
+                </div>
+                <div
+                  ref={notesPanelRef}
+                  className="flex-1 overflow-y-auto space-y-4 pr-1 no-scrollbar"
+                >
+                  {Object.keys(keywordNotes).length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center py-12 sm:py-20">
+                      <div className="w-12 h-12 rounded-2xl bg-gray-200/50 flex items-center justify-center mb-4">
+                        <PenTool className="w-6 h-6" />
+                      </div>
+                      <p className="font-['Inter:Regular',sans-serif] text-[13px] sm:text-[14px] text-gray-700 italic">
+                        Select a keyword to start taking notes
+                      </p>
+                    </div>
+                  ) : (
+                    Object.entries(keywordNotes)
+                      .sort(([a], [b]) => {
+                        if (a === selectedKeyword) return -1;
+                        if (b === selectedKeyword) return 1;
+                        return 0;
+                      })
+                      .map(([keyword, content]) => (
+                        <div
+                          key={keyword}
+                          className={cn(
+                            "bg-white border rounded-2xl p-4 sm:p-5 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.02)]",
+                            selectedKeyword === keyword ? "border-accent ring-1 ring-accent/20" : "border-gray-200"
+                          )}
+                          onMouseEnter={() => setHoveredNoteId(keyword)}
+                          onMouseLeave={() => setHoveredNoteId(null)}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h4 className="font-['Inter:Medium',sans-serif] text-[14px] sm:text-[15px] font-medium text-gray-900 leading-tight">{keyword}</h4>
+                              <p className="font-['Inter:Regular',sans-serif] text-[10px] text-gray-400 mt-1">
+                                Ref: {topicData?.task?.topic || "Study Topic"}
+                              </p>
+                            </div>
+                            {hoveredNoteId === keyword && (
+                              <button
+                                onClick={() => handleDeleteNote(keyword)}
+                                className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                              >
+                                <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                                  <path d="M4 6V13C4 13.5523 4.44772 14 5 14H11C11.5523 14 12 13.5523 12 13V6M2 4H14M6 4V2.5C6 2.22386 6.22386 2 6.5 2H9.5C9.77614 2 10 2.22386 10 2.5V4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                          <textarea
+                            value={content}
+                            onFocus={() => setFocusedNoteKeyword(keyword)}
+                            onBlur={() => {
+                              setFocusedNoteKeyword(null);
+                              handleSaveNote(keyword, content);
+                            }}
+                            onChange={(e) => handleNoteContentChange(keyword, e.target.value)}
+                            placeholder="Synthesize your understanding..."
+                            className={cn(
+                              "w-full p-4 bg-white border-2 transition-all duration-300 rounded-2xl resize-none font-['Inter:Regular',sans-serif] text-[14px] leading-relaxed shadow-sm",
+                              focusedNoteKeyword === keyword
+                                ? "min-h-[400px] border-blue-500/30 ring-4 ring-blue-500/5 text-gray-900"
+                                : "min-h-[120px] border-gray-100 text-gray-600 bg-gray-50/30"
+                            )}
+                          />
+                        </div>
+                      ))
+                  )}
                 </div>
               </div>
             </div>
           </div>
+        )}
 
-          <div className="w-full h-full overflow-hidden">
-            {mode === 'reading' && (
-              <div className="w-full h-full overflow-y-auto bg-[#f5f5f5]">
-                <div className={cn("h-full overflow-y-auto pt-20", getBackgroundStyle())} style={{ maxWidth: '800px', margin: '0 auto' }} ref={readingPanelRef}>
-                  {renderReadingContent()}
-                </div>
-              </div>
-            )}
-
-            {mode === 'study' && (
-              <div className="flex flex-col lg:flex-row h-full w-full overflow-hidden">
-                {/* Reading Panel */}
-                <div className={cn(
-                  "w-full lg:w-[60%] h-[35%] lg:h-full overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200/10 transition-all duration-300 pt-20 lg:pt-24",
-                  focusedNoteKeyword ? "h-0 opacity-0 invisible lg:h-full lg:opacity-100 lg:visible" : "h-[35%]",
-                  getBackgroundStyle()
-                )} ref={readingPanelRef}>
-                  {renderReadingContent()}
-                </div>
-
-                {/* Right Side Panels (Keywords + Notes) */}
-                <div className="w-full lg:w-[40%] flex-1 lg:h-full bg-[#fafaf9] flex flex-col overflow-hidden pb-20 lg:pb-0">
-                  {/* Keywords Bar */}
-                  <div className={cn(
-                    "flex-shrink-0 lg:h-[30%] lg:overflow-y-auto border-b border-gray-200/60 p-4 sm:p-6 bg-white/50 backdrop-blur-sm transition-all duration-300",
-                    focusedNoteKeyword ? "h-0 p-0 opacity-0 overflow-hidden border-none lg:h-[30%] lg:p-6 lg:opacity-100 lg:overflow-y-auto lg:border-b" : "h-auto"
-                  )}><div className="flex items-center justify-between mb-3 sm:mb-4">
-                      <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-medium">Keywords</h3>
-
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 transition-all duration-300">
-                      {visibleKeywords.map(kw => (
-                        <button
-                          key={kw}
-                          onClick={() => handleKeywordClick(kw)}
-                          className={cn(
-                            "px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[12px] sm:text-[14px] transition-all border font-medium",
-                            selectedKeyword === kw
-                              ? "bg-[#1f2937] border-[#1f2937] text-white shadow-md font-medium"
-                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
-                          )}
-                        >
-                          {kw}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Notes List Section */}
-                  <div className="flex-1 p-4 sm:p-8 flex flex-col overflow-hidden">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-['Inter:Medium',sans-serif] text-[11px] sm:text-[13px] text-gray-400 font-medium">
-                        {focusedNoteKeyword ? `Editing: ${focusedNoteKeyword}` : 'Notes'}
-                      </h3>
-                      {focusedNoteKeyword && (
-                        <button
-                          onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                          className="text-[12px] font-bold text-blue-500 uppercase tracking-wider py-1 px-3 bg-blue-50 rounded-lg"
-                        >
-                          Done
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex-1 overflow-y-auto space-y-4 pr-1 no-scrollbar">
-                      {Object.keys(keywordNotes).length === 0 ? (
-                        <div className="flex-1 flex flex-col items-center justify-center text-center py-12 sm:py-20">
-                          <div className="w-12 h-12 rounded-2xl bg-gray-200/50 flex items-center justify-center mb-4">
-                            <PenTool className="w-6 h-6" />
-                          </div>
-                          <p className="font-['Inter:Regular',sans-serif] text-[13px] sm:text-[14px] text-gray-700 italic">
-                            Select a keyword to start taking notes
-                          </p>
-                        </div>
-                      ) : (
-                        Object.entries(keywordNotes).map(([keyword, content]) => (
-                          <div
-                            key={keyword}
-                            className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
-                            onMouseEnter={() => setHoveredNoteId(keyword)}
-                            onMouseLeave={() => setHoveredNoteId(null)}
-                          >
-                            <div className="flex items-start justify-between mb-3">
-                              <div>
-                                <h4 className="font-['Inter:Medium',sans-serif] text-[14px] sm:text-[15px] font-medium text-gray-900 leading-tight">{keyword}</h4>
-                                <p className="font-['Inter:Regular',sans-serif] text-[10px] text-gray-400 mt-1">Ref: Tamil Nadu History</p>
-                              </div>
-                              {hoveredNoteId === keyword && (
-                                <button
-                                  onClick={() => handleDeleteNote(keyword)}
-                                  className="text-gray-400 hover:text-red-600 transition-colors p-1"
-                                >
-                                  <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-                                    <path d="M4 6V13C4 13.5523 4.44772 14 5 14H11C11.5523 14 12 13.5523 12 13V6M2 4H14M6 4V2.5C6 2.22386 6.22386 2 6.5 2H9.5C9.77614 2 10 2.22386 10 2.5V4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                  </svg>
-                                </button>
-                              )}
-                            </div>
-                            <textarea
-                              value={content}
-                              onFocus={() => setFocusedNoteKeyword(keyword)}
-                              onBlur={() => {
-                                setFocusedNoteKeyword(null);
-                                handleSaveNote(keyword, content);
-                              }}
-                              onChange={(e) => handleNoteContentChange(keyword, e.target.value)}
-                              placeholder="Synthesize your understanding..."
-                              className={cn(
-                                "w-full p-4 bg-white border-2 transition-all duration-300 rounded-2xl resize-none font-['Inter:Regular',sans-serif] text-[14px] leading-relaxed shadow-sm",
-                                focusedNoteKeyword === keyword
-                                  ? "min-h-[400px] border-blue-500/30 ring-4 ring-blue-500/5 text-gray-900"
-                                  : "min-h-[120px] border-gray-100 text-gray-600 bg-gray-50/30"
-                              )}
-                            />
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {mode === 'revision' && (
-              <div className="w-full h-full overflow-y-auto bg-[#fdfcfa] px-6 sm:px-10 md:px-24 py-16">
-                <div className="max-w-[850px] mx-auto space-y-8 sm:space-y-10">
-                  <div className="text-center sm:text-left">
-                    <h2 className="text-[24px] sm:text-[28px] font-medium text-gray-900 font-['Inter:Medium',sans-serif]">Revision Notes</h2>
-                  </div>
-
-                  {Object.keys(keywordNotes).length > 0 ? (
-                    <div className="grid gap-8">
-                      {Object.entries(keywordNotes).map(([k, n]) => (
-                        <div key={k} className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm transition-all hover:shadow-md">
-                          <div className="mb-6">
-                            <h4 className="text-md font-medium text-gray-900 leading-tight font-['Inter:Medium',sans-serif]">
-                              {k}
-                            </h4>
-                            <p className="text-sm text-gray-500 mt-1 font-['Inter:Regular',sans-serif]">
-                              History of Tamil Nadu: Ancient Kingdoms and Cultural Heritage
-                            </p>
-                          </div>
-
-                          <div className="relative group/rev-note">
-                            <textarea
-                              value={n}
-                              onChange={(e) => handleNoteContentChange(k, e.target.value)}
-                              placeholder="Your captured analysis will appear here..."
-                              className="w-full min-h-[150px] p-6 bg-[#fcfcfc] border border-gray-100 rounded-lg resize-none font-['Inter:Regular',sans-serif] text-[16px] leading-[26px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="py-24 text-center">
-                      <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-100">
-                        <History className="w-10 h-10 text-gray-200" />
-                      </div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">Synthesis Required</h3>
-                      <p className="text-gray-400 max-w-sm mx-auto">
-                        Toggle to Study Mode and capture your analysis across key concepts to populate your revision profile.
-                      </p>
-                    </div>
+        {mode === 'revision' && (
+          <div className="w-full h-full overflow-y-auto bg-[#fdfcfa] px-6 sm:px-10 md:px-24 py-16">
+            <div className="max-w-[850px] mx-auto space-y-8 sm:space-y-10">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h2 className="text-[24px] sm:text-[28px] font-medium text-gray-900 font-['Inter:Medium',sans-serif]">Revision Notes</h2>
+                  {topicData?.task?.topic && (
+                    <p className="text-sm text-gray-400 mt-1 font-['Inter:Regular',sans-serif]">
+                      {topicData.task.subject} — {topicData.task.topic}
+                    </p>
                   )}
                 </div>
+                <span className="text-[13px] text-gray-400">
+                  {Object.keys(keywordNotes).length} keyword{Object.keys(keywordNotes).length !== 1 ? 's' : ''} captured
+                </span>
               </div>
-            )}
+
+              {Object.keys(keywordNotes).length > 0 ? (
+                <div className="grid gap-6">
+                  {Object.entries(keywordNotes).map(([k, n]) => (
+                    <div key={k} className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm transition-all hover:shadow-md">
+                      {/* Keyword header */}
+                      <div className="flex items-start justify-between mb-4 gap-3">
+                        <div>
+                          <span className="inline-block  py-1 rounded-full  text-[#1f2937] text-lg font-medium mb-1">
+                            {k}
+                          </span>
+                          {topicData?.task?.topic && (
+                            <p className="text-[11px] text-gray-400 mt-0.5 font-['Inter:Regular',sans-serif]">
+                              {topicData.task.topic}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteNote(k)}
+                          className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                          title="Delete note"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Note textarea */}
+                      <textarea
+                        value={n}
+                        onChange={(e) => handleNoteContentChange(k, e.target.value)}
+                        onBlur={(e) => {
+                          if (e.target.value.trim()) handleSaveNote(k, e.target.value);
+                        }}
+                        placeholder="Write your notes here..."
+                        className="w-full min-h-[130px] p-4 bg-[#fcfcfc] border border-gray-100 rounded-lg resize-none font-['Inter:Regular',sans-serif] text-[15px] leading-[26px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-300 transition-all"
+                      />
+
+                      {/* Save button */}
+                      {isNoteDirty(k, n) && (
+                        <div className="flex justify-end mt-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <button
+                            onClick={() => handleSaveNote(k, n)}
+                            className="flex items-center gap-1.5 px-4 py-1.5 text-[13px] font-medium bg-[#1f2937] text-white rounded-lg hover:bg-black transition-all"
+                          >
+                            <Save className="w-3.5 h-3.5" />
+                            Save
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-24 text-center">
+                  <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-100">
+                    <HistoryIcon className="w-10 h-10 text-gray-200" />
+                  </div>
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No Notes Yet</h3>
+                  <p className="text-gray-400 max-w-sm mx-auto">
+                    Switch to Study Mode, click a keyword, and write notes. They'll appear here automatically.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
+        )}
+      </div>
 
-          <DailyQuizModal
-            isOpen={isAssessmentStarted}
-            onClose={() => setIsAssessmentStarted(false)}
-            onComplete={() => {
-              setIsAssessmentFinished(true);
-            }}
-            title={topicData?.task?.topic || "Study Assessment"}
-            subtitle={`${topicAssessment?.total_questions || topicAssessment?.questions?.length || 0} Questions • 10 Minutes`}
-            questions={topicAssessment?.questions || []}
-          />
 
-          <style>{`
+      <DailyQuizModal
+        isOpen={isAssessmentStarted}
+        onClose={() => {
+          setIsAssessmentStarted(false);
+          setShowResultsOnly(false);
+          // Don't clear viewHistoryAnswers yet to avoid flickering on close
+        }}
+        onComplete={handleAssessmentComplete}
+        title={topicData?.task?.topic || "Study Assessment"}
+        subtitle={`${topicAssessment?.total_questions || topicAssessment?.questions?.length || 0} Questions • 10 Minutes`}
+        questions={showResultsOnly && resultsQuestions?.length ? resultsQuestions : (topicAssessment?.questions || [])}
+        initialAnswers={showResultsOnly ? viewHistoryAnswers : undefined}
+        initialShowEvaluation={showResultsOnly}
+        initialShowDetails={showResultsOnly}
+      />
+
+      {/* Analytics Modal */}
+      <Dialog open={isAnalyticsModalOpen} onOpenChange={setIsAnalyticsModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 border-none rounded-[32px] bg-[#fdfcfa] shadow-2xl">
+          <div className="relative overflow-hidden">
+            {/* Header with Background Accent */}
+            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none" />
+
+            <div className="relative p-8 sm:p-10">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                    <BarChart2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-medium text-gray-900 font-['Inter:Medium',sans-serif]">Performance Analytics</h2>
+                    <p className="text-sm text-gray-400 mt-1 font-['Inter:Regular',sans-serif]">
+                      {topicData?.task?.topic || "Study Session Overview"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsAnalyticsModalOpen(false)}
+                  className="w-10 h-10 rounded-full bg-gray-100/50 hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-all hover:rotate-90"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {!assessmentHistory || assessmentHistory.total_attempts === 0 ? (
+                <div className="py-24 text-center bg-white border border-dashed border-gray-200 rounded-[32px]">
+                  <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <BarChart2 className="w-10 h-10 text-gray-200" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Data Captured</h3>
+                  <p className="text-gray-400 max-w-xs mx-auto text-sm leading-relaxed">
+                    Once you complete a topic assessment, your detailed performance metrics and history will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-10">
+                  {/* Score Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    {[
+                      { label: "Total Attempts", value: assessmentHistory.total_attempts, sub: "Assessments taken", color: "text-gray-900" },
+                      { label: "Avg Accuracy", value: `${Math.round(assessmentHistory.attempts.reduce((acc: any, curr: any) => acc + curr.score_percentage, 0) / assessmentHistory.total_attempts)}%`, sub: "Knowledge mastery", color: "text-blue-600" },
+                      { label: "Personal Best", value: `${Math.max(...assessmentHistory.attempts.map((a: any) => a.score_percentage))}%`, sub: "Top achievement", color: "text-green-600" }
+                    ].map((stat, i) => (
+                      <div key={stat.label} className="bg-white p-6 rounded-[24px] border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col items-center text-center group hover:border-gray-300 transition-all duration-300">
+                        <p className="text-[10px] uppercase font-medium text-gray-400 tracking-[0.1em] mb-3">{stat.label}</p>
+                        <p className={cn("text-4xl font-medium mb-2", stat.color)}>{stat.value}</p>
+                        <p className="text-[11px] text-gray-400 font-medium">{stat.sub}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* List */}
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between px-1">
+                      <h3 className="text-[11px] font-medium text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <HistoryIcon className="w-3.5 h-3.5" />
+                        Detailed Attempt Log
+                      </h3>
+                      <span className="text-[11px] text-gray-400 font-medium bg-gray-100 px-2 py-0.5 rounded-full">
+                        {assessmentHistory.attempts.length} Entries
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {assessmentHistory.attempts.map((attempt: any) => (
+                        <div
+                          key={attempt.attempt_id}
+                          onClick={() => {
+                            if (attempt.questions) {
+                              const letterToIdx = { "A": 0, "B": 1, "C": 2, "D": 3 };
+                              const ans = attempt.questions.map((q: any) => letterToIdx[q.selected_option as keyof typeof letterToIdx] ?? null);
+                              const ques = attempt.questions.map((q: any) => ({
+                                ...q,
+                                difficulty: q.difficulty || attempt.difficulty
+                              }));
+                              setViewHistoryAnswers(ans);
+                              setResultsQuestions(ques);
+                              setShowResultsOnly(true);
+                              setIsAssessmentStarted(true);
+                              setIsAnalyticsModalOpen(false);
+                            }
+                          }}
+                          className="bg-white border border-gray-100 p-6 rounded-[24px] flex items-center justify-between hover:border-gray-200 hover:shadow-lg hover:shadow-gray-100/50 transition-all duration-300 group cursor-pointer"
+                        >
+                          <div className="flex items-center gap-5">
+                            <div className="w-14 h-14 rounded-[20px] bg-gray-50 flex flex-col items-center justify-center transition-colors group-hover:bg-blue-50">
+                              <span className="text-[10px] uppercase font-medium text-gray-400 group-hover:text-blue-400">Att</span>
+                              <span className="text-lg font-medium text-gray-700 group-hover:text-blue-600 leading-none">#{attempt.attempt_no}</span>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium text-gray-900">Assessment</p>
+                                <span className={cn(
+                                  "text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider",
+                                  attempt.difficulty === 'hard' ? "bg-red-50 text-red-600" : attempt.difficulty === 'medium' ? "bg-orange-50 text-orange-600" : "bg-green-50 text-green-600"
+                                )}>
+                                  {attempt.difficulty}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-400 font-medium">Completed on {new Date(attempt.submitted_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="flex items-baseline justify-end gap-1">
+                              <p className={cn(
+                                "text-3xl font-medium",
+                                attempt.score_percentage >= 80 ? "text-green-600" : attempt.score_percentage >= 50 ? "text-blue-600" : "text-red-500"
+                              )}>{attempt.score_percentage}%</p>
+                            </div>
+                            <div className="flex items-center justify-end gap-1.5 mt-1">
+                              <div className="flex h-1.5 w-24 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className={cn(
+                                    "h-full rounded-full transition-all duration-500",
+                                    attempt.score_percentage >= 80 ? "bg-green-500" : attempt.score_percentage >= 50 ? "bg-blue-500" : "bg-red-500"
+                                  )}
+                                  style={{ width: `${attempt.score_percentage}%` }}
+                                />
+                              </div>
+                              <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">
+                                {attempt.correct_answers}/{attempt.total_questions}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <style>{`
         @keyframes bulbOnOffLoop {
           0%, 40% { transform: scale(1); opacity: 0.8; }
           45%, 95% { transform: scale(1.1) rotate(6deg); opacity: 1; filter: drop-shadow(0 0 12px rgba(251,191,36,0.4)); }
@@ -1297,8 +1636,6 @@ const StudyContent = () => {
           scrollbar-width: none;
         }
       `}</style>
-        </>
-      )}
     </div>
   );
 };

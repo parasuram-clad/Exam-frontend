@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import authService, { UserMe } from "@/services/auth.service";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Bell, ChevronLeft, ChevronRight, Calendar, FileText, Trophy } from "lucide-react";
@@ -93,7 +94,11 @@ const todaysPlan: StudyPlanItem[] = [
 const Index = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [user, setUser] = useState<UserMe | null>(null);
+  const { data: user } = useQuery<UserMe>({
+    queryKey: ['user-me'],
+    queryFn: () => authService.getCurrentUser(),
+    enabled: authService.isAuthenticated(),
+  });
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   // useMediaQuery to detect desktop (xl breakpoint)
@@ -257,17 +262,7 @@ const Index = () => {
     },
   ];
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const u = await authService.getCurrentUser();
-        setUser(u);
-      } catch (err) {
-        console.error("Failed to fetch user", err);
-      }
-    };
-    fetchUser();
-  }, []);
+  // No need for local fetchUser effect anymore as it's handled by useQuery and pre-fetched
 
   const userName = user?.full_name || user?.username || "Arun";
   const initials = userName
