@@ -17,11 +17,20 @@ export const notificationService = {
         return response.data;
     },
 
+    async getUnreadCount(): Promise<number> {
+        const response = await apiClient.get<{ unread_count: number }>("/notifications/unread-count");
+        return response.data.unread_count;
+    },
+
     async markAsRead(notificationId: number): Promise<Notification> {
         const response = await apiClient.patch<Notification>(`/notifications/${notificationId}`, {
             read_status: true,
         });
         return response.data;
+    },
+
+    async markAllAsRead(): Promise<void> {
+        await apiClient.patch("/notifications/mark-all-read");
     },
 
     async deleteNotification(notificationId: number): Promise<void> {

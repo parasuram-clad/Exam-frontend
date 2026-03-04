@@ -768,9 +768,16 @@ const StudyPlan = () => {
 
   const { data: userPlans = [], isLoading: plansLoading } = useQuery({
     queryKey: ['study-plans', user?.id],
-    queryFn: () => studyService.getUserStudyPlans(user!.id),
+    queryFn: async () => {
+      try {
+        return await studyService.getUserStudyPlans(user!.id);
+      } catch {
+        return [];
+      }
+    },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 
   const { data: roadmapData, isLoading: roadmapLoading } = useQuery({
@@ -778,6 +785,7 @@ const StudyPlan = () => {
     queryFn: () => studyService.getUserRoadmap(user!.id),
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 
   const loading = plansLoading || roadmapLoading;
@@ -787,6 +795,7 @@ const StudyPlan = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeDay, setActiveDay] = useState<number>(1);
   const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [setupData, setSetupData] = useState({
     name: "",
     medium: "",
@@ -806,21 +815,30 @@ const StudyPlan = () => {
       setDynamicDayWisePlans(mapRoadmapToFrontend(roadmapData.plan, userPlans));
       const currentDay = calculateCurrentProgressDay(userPlans);
       setActiveDay(currentDay);
-
-      // Check for profile completeness
-      const isProfileEmpty = !user?.full_name?.trim() ||
-        !user?.exam_type?.trim() ||
-        !user?.sub_division?.trim() ||
-        !user?.target_exam_year ||
-        !user?.learner_type?.trim();
-
-      if (isProfileEmpty || roadmapData.plan.length === 0) {
-        setIsSetupModalOpen(true);
-      } else {
-        setIsSetupModalOpen(false);
-      }
     }
-  }, [roadmapData, userPlans, user]);
+  }, [roadmapData, userPlans]);
+
+  // Modal open logic: check after loading is done
+  useEffect(() => {
+    if (loading || isGenerating) return;
+
+    // Check if user has no study plan rows at all
+    const hasNoPlan = !userPlans || userPlans.length === 0;
+
+    // Check if key profile fields are missing
+    const isProfileEmpty =
+      !user?.full_name?.trim() ||
+      !user?.exam_type?.trim() ||
+      !user?.sub_division?.trim() ||
+      !user?.target_exam_year ||
+      !user?.learner_type?.trim();
+
+    if (isProfileEmpty || hasNoPlan) {
+      setIsSetupModalOpen(true);
+    } else {
+      setIsSetupModalOpen(false);
+    }
+  }, [loading, isGenerating, user, userPlans]);
 
   // Pre-fill setup modal with user details
   useEffect(() => {
@@ -828,9 +846,10 @@ const StudyPlan = () => {
       setSetupData(prev => ({
         ...prev,
         name: user.full_name || "",
+        medium: user.preferred_language === 'ta' ? 'tamil' : 'english',
         examType: (user.exam_type as any) || "TNPSC",
         subDivision: user.sub_division ? user.sub_division.split(", ") : ["Group IV"],
-        targetYear: user.target_exam_year || "2026",
+        targetYear: user.target_exam_year?.toString() || "2026",
         learnerType: user.learner_type || "Student"
       }));
     }
@@ -1033,7 +1052,12 @@ const StudyPlan = () => {
     }
 
     try {
+      setIsGenerating(true);
       setIsSetupModalOpen(false);
+
+      // Parse daily study hours from "4 Hours" => 4
+      const dailyHours = parseInt(setupData.studyGoal.replace(/[^0-9]/g, '')) || 4;
+      const preferredLang = setupData.medium === 'tamil' ? 'ta' : 'en';
 
       // 1. Update User Profile with name and exam details
       await authService.updateProfile(user!.id, {
@@ -1041,7 +1065,8 @@ const StudyPlan = () => {
         exam_type: setupData.examType,
         sub_division: setupData.subDivision.join(", "),
         target_exam_year: parseInt(setupData.targetYear),
-        learner_type: setupData.learnerType
+        learner_type: setupData.learnerType,
+        preferred_language: preferredLang,
       });
 
       // 2. Generate study plan
@@ -1052,9 +1077,10 @@ const StudyPlan = () => {
           setupData.subDivision.length > 0
             ? setupData.subDivision.join(", ")
             : user!.sub_division || "Group IV",
-        year: parseInt(setupData.targetYear || user!.target_exam_year || "2026"),
+        year: parseInt(setupData.targetYear || user!.target_exam_year?.toString() || "2026"),
         learner_type: setupData.learnerType || user!.learner_type || "Student",
-        daily_study_hours: parseInt(setupData.studyGoal) || 4,
+        daily_study_hours: dailyHours,
+        language: setupData.medium === 'tamil' ? 'Tamil' : 'English',
       });
 
       // 3. Invalidate queries to trigger re-fetch
@@ -1065,10 +1091,13 @@ const StudyPlan = () => {
       ]);
 
       setActiveDay(1);
-      toast.success("Profile updated and study plan generated successfully!");
+      toast.success("Study plan generated successfully!");
     } catch (err) {
       console.error("Failed to generate study plan", err);
-      toast.error("Failed to generate study plan.");
+      toast.error("Failed to generate study plan. Please try again.");
+      setIsSetupModalOpen(true); // re-open modal on failure
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -1147,7 +1176,7 @@ const StudyPlan = () => {
     }
   };
 
-  if (loading) {
+  if (loading || isGenerating) {
     return (
       <DashboardLayout
         hideHeader={isDesktop}
@@ -1187,6 +1216,18 @@ const StudyPlan = () => {
               ))}
             </div>
           </section>
+
+          {isGenerating && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center ">
+              <div className="flex flex-col items-center gap-4 bg-card rounded-2xl p-8 shadow-xl border border-border max-w-sm w-full mx-4">
+                <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                <div className="text-center">
+                  <h3 className="text-base font-medium text-foreground">Generating Your Plan</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Our AI is building a personalized study plan for you...</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </DashboardLayout>
     );
@@ -1870,9 +1911,15 @@ const StudyPlan = () => {
             <div className="relative z-10 flex justify-center pb-2">
               <Button
                 onClick={handleGeneratePlan}
-                className="h-11 px-8 rounded-full bg-[#1E293B] hover:bg-[#0F172A] text-white text-sm font-medium shadow-md transition-all active:scale-95"
+                disabled={isGenerating}
+                className="h-11 px-8 rounded-full bg-[#1E293B] hover:bg-[#0F172A] text-white text-sm font-medium shadow-md transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Create My Smart Plan
+                {isGenerating ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Generating...
+                  </span>
+                ) : "Create My Smart Plan"}
               </Button>
             </div>
           </div>

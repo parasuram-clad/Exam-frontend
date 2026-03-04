@@ -10,6 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { LanguageToggle } from './LanguageToggle';
 import authService from "@/services/auth.service";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { notificationService } from "@/services/notification.service";
 
 import { RightSidebarHeader } from "./RightSidebarHeader";
 
@@ -30,7 +32,25 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
   const currentPath = location.pathname;
   const initials = userName.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
 
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['notifications-unread-count'],
+    queryFn: () => notificationService.getUnreadCount(),
+    refetchInterval: 30 * 1000,
+    staleTime: 20 * 1000,
+    retry: false,
+  });
+
   const getPageDetails = () => {
+    const normalizedPath = currentPath.toLowerCase();
+
+    if (normalizedPath.startsWith("/notifications")) {
+      return {
+        title: t('pages.notifications.title', 'Updates & Alerts'),
+        subtitle: t('pages.notifications.subtitle', 'Keep track of your learning journey'),
+        showBackButton: false,
+      };
+    }
+
     if (currentPath === "/dashboard") {
       return {
         title: `${t('header.hello')} ${userName.split(" ")[0]} 👋`,
@@ -118,13 +138,6 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
         showBackButton: false,
       };
     }
-    if (currentPath.startsWith("/notifications")) {
-      return {
-        title: t('pages.notifications.title', 'Updates & Alerts'),
-        subtitle: t('pages.notifications.subtitle', 'Keep track of your learning journey'),
-        showBackButton: false,
-      };
-    }
     return {
       title: "Thani Oruvan",
       subtitle: "Your personal learning assistant",
@@ -202,6 +215,19 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
             >
               <Trophy className="w-3.5 h-3.5 text-blue-600" />
               <span className="text-xs font-medium text-blue-600">12th</span>
+            </div>
+
+            {/* Notification Bell (Mobile Only) */}
+            <div
+              onClick={() => navigate("/notifications")}
+              className="relative p-1.5 text-muted-foreground hover:text-foreground transition-all cursor-pointer active:scale-95"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 min-w-[14px] h-3.5 flex items-center justify-center bg-rose-500 rounded-full border-2 border-white text-[7px] text-white font-medium px-0.5">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </div>
 
             {/* Profile Avatar (Small) - Direct Navigation */}

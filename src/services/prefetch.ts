@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import authService, { UserMe } from './auth.service';
 import studyService from './study.service';
 import chatbotService from './chatbot.service';
+import { notificationService } from './notification.service';
 
 /**
  * Prefetches all essential data for a user to make the application feel instantaneous.
@@ -57,6 +58,19 @@ export const prefetchAllUserData = async (queryClient: QueryClient, user?: UserM
                 queryKey: ['user-notes', userId],
                 queryFn: () => studyService.getUserNotes(userId),
                 staleTime: 1000 * 60 * 5,
+            }),
+
+            // Notifications (full list + unread count for badge)
+            queryClient.prefetchQuery({
+                queryKey: ['notifications'],
+                queryFn: () => notificationService.getNotifications(),
+                staleTime: 1000 * 60 * 2,
+            }),
+
+            queryClient.prefetchQuery({
+                queryKey: ['notifications-unread-count'],
+                queryFn: () => notificationService.getUnreadCount(),
+                staleTime: 1000 * 60 * 1,
             }),
         ]);
 

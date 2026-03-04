@@ -20,6 +20,7 @@ export interface StudyPlanGenerateRequest {
     year: number;
     learner_type: string;
     daily_study_hours: number;
+    language?: 'English' | 'Tamil' | 'Hindi';
 }
 
 export interface TopicContentBlock {
