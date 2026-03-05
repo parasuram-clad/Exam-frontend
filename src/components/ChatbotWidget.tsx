@@ -65,7 +65,7 @@ export function ChatbotWidget() {
     }, [location.pathname]);
 
     const [inputValue, setInputValue] = useState("");
-    const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
+    const [position, setPosition] = useState<Position | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState<Position>({ x: 0, y: 0 });
     const [expansionDir, setExpansionDir] = useState<ExpansionDirection>({
@@ -492,7 +492,7 @@ export function ChatbotWidget() {
                 ref={buttonRef}
                 style={{
                     position: 'fixed',
-                    ...(position.x === 0 && position.y === 0 && !isDragging
+                    ...(position === null
                         ? { right: '1.5rem', bottom: '1.5rem' }
                         : { left: `${position.x}px`, top: `${position.y}px` }),
                     width: `${ICON_SIZE}px`,
@@ -562,7 +562,7 @@ export function ChatbotWidget() {
                         transition={{ duration: 0.4 }}
                         style={{
                             position: 'fixed',
-                            ...(position.x === 0 && position.y === 0
+                            ...(position === null
                                 ? { right: '5.5rem', bottom: '2rem' }
                                 : {
                                     left: position.x > window.innerWidth / 2 ? 'auto' : `${position.x + ICON_SIZE + 12}px`,

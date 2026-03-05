@@ -173,7 +173,7 @@ export default function Notifications() {
                             <button
                                 onClick={() => setFilter('all')}
                                 className={cn(
-                                    "px-5 py-1.5 text-[11px] font-medium rounded-lg transition-all",
+                                    "px-5 py-1.5 text-[11px] font-medium rounded-sm transition-all",
                                     filter === 'all' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                                 )}>
                                 All
@@ -181,7 +181,7 @@ export default function Notifications() {
                             <button
                                 onClick={() => setFilter('unread')}
                                 className={cn(
-                                    "px-5 py-1.5 text-[11px] font-medium rounded-lg transition-all",
+                                    "px-5 py-1.5 text-[11px] font-medium rounded-sm transition-all",
                                     filter === 'unread' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                                 )}>
                                 Unread

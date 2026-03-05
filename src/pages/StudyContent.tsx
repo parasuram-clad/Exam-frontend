@@ -553,6 +553,9 @@ const StudyContent = () => {
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [assessmentStartTime, setAssessmentStartTime] = useState<string | null>(null);
   const [viewHistoryAnswers, setViewHistoryAnswers] = useState<(number | null)[] | undefined>(undefined);
+  const [viewHistoryTimeTaken, setViewHistoryTimeTaken] = useState<number | undefined>(undefined);
+  const [isAssessmentSubmitted, setIsAssessmentSubmitted] = useState(false);
+  const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false);
   const [showResultsOnly, setShowResultsOnly] = useState(false);
   const [resultsQuestions, setResultsQuestions] = useState<any[] | undefined>(undefined);
 
@@ -803,14 +806,14 @@ const StudyContent = () => {
     setIsAssessmentStarted(true);
     setIsAssessmentFinished(false);
     setTimeLeft(600);
+    setIsAssessmentSubmitted(false);
     setAssessmentStartTime(new Date().toISOString());
   };
 
   const handleAssessmentComplete = async (results: { score: number, answers: (number | null)[], questions: any[] }) => {
-    setIsAssessmentFinished(true);
-    setQuizScore(results.score);
-
     if (!user?.id || !subtopicId || isNaN(parsedSubtopicId) || !assessmentStartTime) return;
+
+    setIsSubmittingAssessment(true);
 
     try {
       // Map frontend answers to backend format
@@ -835,20 +838,36 @@ const StudyContent = () => {
       const response = await studyService.submitMCQAttempt({
         user_id: user.id,
         syllabus_id: parsedSubtopicId,
-        attempt_no: nextAttemptNo,
         difficulty: results.questions[0]?.difficulty?.toLowerCase() || "easy",
         answers: answers,
         started_at: assessmentStartTime,
         submitted_at: new Date().toISOString()
       });
 
-      // Save for "View Details" button to use immediately
-      setViewHistoryAnswers(results.answers);
-      setResultsQuestions(results.questions);
+      // Map backend results back to frontend format
+      const letterToIdx: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
+      const ans = response.results.map((r: any) => letterToIdx[r.selected_option] ?? null);
+      const ques = response.results.map((r: any) => ({
+        id: r.mcq_id,
+        mcq_id: r.mcq_id,
+        question: r.question,
+        subject: results.questions[0]?.subject || "General Science",
+        difficulty: results.questions[0]?.difficulty || "Medium",
+        options: r.options,
+        correctAnswer: r.correct_answer_index,
+        explanation: r.explanation
+      }));
 
-      toast.success("Assessment submitted successfully!");
+      setViewHistoryAnswers(ans);
+      setResultsQuestions(ques);
+      setViewHistoryTimeTaken(response.time_taken_seconds || (600 - timeLeft));
+      setQuizScore(response.correct_answers);
 
       setIsAssessmentFinished(true);
+      setIsAssessmentSubmitted(true);
+      setIsSubmittingAssessment(false);
+
+      toast.success("Assessment submitted successfully!");
 
       // Invalidate queries to refresh progress and history
       queryClient.invalidateQueries({ queryKey: ['study-plans', user.id] });
@@ -857,6 +876,7 @@ const StudyContent = () => {
       queryClient.invalidateQueries({ queryKey: ['assessment-history', user.id, parsedSubtopicId] });
 
     } catch (error) {
+      setIsSubmittingAssessment(false);
       console.error("Failed to submit assessment:", error);
       toast.error("Failed to save assessment progress.");
     }
@@ -936,7 +956,7 @@ const StudyContent = () => {
     return (
       <div className="flex flex-col gap-10 py-12 px-8 md:px-16 max-w-[800px] mx-auto">
         {/* Topic Header & Introduction */}
-        <div className="space-y-4">
+        {/* <div className="space-y-4">
           <h1 className={cn(
             "font-['Inter:Medium',sans-serif] font-medium leading-[32px] sm:leading-[36px] text-[24px] sm:text-[28px] tracking-[0.0703px]",
             getTextColor()
@@ -955,7 +975,7 @@ const StudyContent = () => {
               </p>
             </div>
           )}
-        </div>
+        </div> */}
 
         {sections.map((section, idx) => (
           <div key={section.id} id={`section-${section.id}`} className="space-y-8 scroll-mt-24">
@@ -1128,6 +1148,8 @@ const StudyContent = () => {
                         }));
                         setViewHistoryAnswers(ans);
                         setResultsQuestions(ques);
+                        setViewHistoryTimeTaken(latest.time_taken_seconds);
+                        setIsAssessmentSubmitted(true);
                       }
                     }
                     setShowResultsOnly(true);
@@ -1462,10 +1484,14 @@ const StudyContent = () => {
         onComplete={handleAssessmentComplete}
         title={topicData?.task?.topic || "Study Assessment"}
         subtitle={`${topicAssessment?.total_questions || topicAssessment?.questions?.length || 0} Questions • 10 Minutes`}
-        questions={showResultsOnly && resultsQuestions?.length ? resultsQuestions : (topicAssessment?.questions || [])}
-        initialAnswers={showResultsOnly ? viewHistoryAnswers : undefined}
-        initialShowEvaluation={showResultsOnly}
+        questions={(showResultsOnly || isAssessmentFinished) && resultsQuestions?.length ? resultsQuestions : (topicAssessment?.questions || [])}
+        initialAnswers={(showResultsOnly || isAssessmentFinished) ? viewHistoryAnswers : undefined}
+        initialShowEvaluation={showResultsOnly || isAssessmentFinished}
         initialShowDetails={showResultsOnly}
+        timeTaken={(showResultsOnly || isAssessmentFinished) ? viewHistoryTimeTaken : undefined}
+        isSubmitted={isAssessmentSubmitted}
+        isLoading={isSubmittingAssessment}
+        score={quizScore}
       />
 
       {/* Analytics Modal */}
@@ -1549,6 +1575,8 @@ const StudyContent = () => {
                               }));
                               setViewHistoryAnswers(ans);
                               setResultsQuestions(ques);
+                              setViewHistoryTimeTaken(attempt.time_taken_seconds);
+                              setIsAssessmentSubmitted(true);
                               setShowResultsOnly(true);
                               setIsAssessmentStarted(true);
                               setIsAnalyticsModalOpen(false);

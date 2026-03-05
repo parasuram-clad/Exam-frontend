@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -19,20 +19,32 @@ import {
     isBefore
 } from "date-fns";
 
+export interface DayCycleItem {
+    day: number;
+    status: "completed" | "current" | "locked" | "assessment";
+    label: string;
+    date?: string;
+    isAssessment?: boolean;
+    isRevision?: boolean;
+}
+
 interface StudyPlanCalendarProps {
     onDateClick?: (date: Date) => void;
     selectedDate?: Date;
-    currentProgressDay: number;
-    totalDays: number;
+    planDays?: DayCycleItem[];
 }
 
-export function StudyPlanCalendar({ onDateClick, selectedDate, currentProgressDay, totalDays }: StudyPlanCalendarProps) {
+import { ClipboardList, RotateCcw } from "lucide-react";
+
+export function StudyPlanCalendar({ onDateClick, selectedDate, planDays = [] }: StudyPlanCalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const today = startOfDay(new Date());
 
-    // Calculate the start date of the study cycle (Day 1)
-    const cycleStartDate = subDays(today, currentProgressDay - 1);
-    const cycleEndDate = addDays(cycleStartDate, totalDays - 1);
+    useEffect(() => {
+        if (selectedDate && !isSameMonth(selectedDate, currentMonth)) {
+            setCurrentMonth(startOfMonth(selectedDate));
+        }
+    }, [selectedDate]);
 
     const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
     const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
@@ -48,11 +60,17 @@ export function StudyPlanCalendar({ onDateClick, selectedDate, currentProgressDa
         end: endDate,
     });
 
+    // Helper to find plan item for a day
+    const getPlanForDay = (date: Date) => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        return planDays.find(d => d.date === dateStr);
+    };
+
     return (
         <div className="bg-white rounded-2xl p-6 border border-border/50 shadow-sm w-full">
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-semibold text-[#1a2b4b]">
+                <h3 className="text-lg font-medium text-[#1a2b4b]">
                     {format(currentMonth, "MMMM yyyy")}
                 </h3>
                 <div className="flex items-center gap-2">
@@ -68,7 +86,7 @@ export function StudyPlanCalendar({ onDateClick, selectedDate, currentProgressDa
             {/* Weekdays */}
             <div className="grid grid-cols-7 text-center mb-4">
                 {["S", "M", "T", "W", "T", "F", "S"].map((day, i) => (
-                    <div key={`${day}-${i}`} className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.1em]">
+                    <div key={`${day}-${i}`} className="text-[10px] font-medium text-slate-300 uppercase tracking-[0.1em]">
                         {day}
                     </div>
                 ))}
@@ -83,36 +101,51 @@ export function StudyPlanCalendar({ onDateClick, selectedDate, currentProgressDa
                     const isToday = isSameDay(checkDay, today);
 
                     // Check if date has a study plan
-                    const hasPlan = (isSameDay(checkDay, cycleStartDate) || isAfter(checkDay, cycleStartDate)) &&
-                        (isSameDay(checkDay, cycleEndDate) || isBefore(checkDay, cycleEndDate));
-
-                    const isCompleted = hasPlan && isBefore(checkDay, today);
+                    const planItem = getPlanForDay(checkDay);
+                    const isCompleted = planItem?.status === 'completed';
 
                     return (
                         <div key={index} className="flex items-center justify-center relative h-8 w-full">
                             {isSelectedMonth ? (
                                 <button
-                                    onClick={() => hasPlan && onDateClick?.(checkDay)}
-                                    disabled={!hasPlan}
+                                    onClick={() => planItem && onDateClick?.(checkDay)}
+                                    // Removed disabled={!planItem} to let user interact with all dates if they want, 
+                                    // but we highlight specifically the plan items
                                     className={cn(
-                                        "w-7 h-7 flex items-center justify-center rounded-full text-xs font-semibold transition-all duration-200 relative",
-                                        !hasPlan && "text-slate-200 cursor-not-allowed opacity-50",
-                                        hasPlan && !isSelected && !isToday && !isCompleted && "text-[#1a2b4b] hover:bg-primary/5",
+                                        "w-7 h-7 flex items-center justify-center rounded-full text-xs font-medium transition-all duration-200 relative",
+                                        !planItem && isToday && "text-[#72C146] border border-[#72C146]/30",
+                                        !planItem && !isToday && "text-slate-200 cursor-not-allowed opacity-50",
+
+                                        planItem && !isSelected && !isToday && !isCompleted && "text-[#1a2b4b] hover:bg-primary/5",
 
                                         // Completed status
-                                        isCompleted && !isSelected && " text-primary shadow-sm",
+                                        isCompleted && !isSelected && !isToday && "bg-[#1a2b4b] text-white",
 
-                                        // Today status
+                                        // Today status (Override if it's today)
                                         isToday && !isSelected && "bg-[#72C146] text-white shadow-[0_4px_10px_rgba(114,193,70,0.3)]",
 
                                         // Selected status (High priority)
                                         isSelected && "bg-accent text-accent-foreground shadow-lg ring-2 ring-accent/30 scale-110 z-10"
                                     )}
                                 >
-                                    {format(day, "d")}
+                                    <div className="flex flex-col items-center">
+                                        <span className="leading-none">{format(day, "d")}</span>
+                                        {planItem?.isAssessment && (
+                                            <ClipboardList className={cn(
+                                                "w-[8px] h-[8px] mt-[1px]",
+                                                isSelected || isToday || isCompleted ? "text-white/80" : "text-primary"
+                                            )} />
+                                        )}
+                                        {planItem?.isRevision && (
+                                            <RotateCcw className={cn(
+                                                "w-[8px] h-[8px] mt-[1px]",
+                                                isSelected || isToday || isCompleted ? "text-white/80" : "text-orange-500"
+                                            )} />
+                                        )}
+                                    </div>
                                 </button>
                             ) : (
-                                <div className="text-slate-200 text-xs font-semibold opacity-30">{format(day, "d")}</div>
+                                <div className="text-slate-200 text-xs font-medium opacity-30">{format(day, "d")}</div>
                             )}
                         </div>
                     );
@@ -125,15 +158,15 @@ export function StudyPlanCalendar({ onDateClick, selectedDate, currentProgressDa
             <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-[#1a2b4b]" />
-                    <span className="text-[11px] font-semibold text-slate-400">Completed</span>
+                    <span className="text-[11px] font-medium text-slate-400">Completed</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-[#72C146]" />
-                    <span className="text-[11px] font-semibold text-slate-400">Today</span>
+                    <span className="text-[11px] font-medium text-slate-400">Today</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-accent" />
-                    <span className="text-[11px] font-semibold text-slate-400">Selected</span>
+                    <span className="text-[11px] font-medium text-slate-400">Selected</span>
                 </div>
             </div>
         </div>

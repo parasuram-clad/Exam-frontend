@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { CheckCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -99,6 +100,10 @@ interface DailyQuizModalProps {
     initialAnswers?: (number | null)[];
     initialShowEvaluation?: boolean;
     initialShowDetails?: boolean;
+    timeTaken?: number; // seconds
+    isSubmitted?: boolean;
+    isLoading?: boolean;
+    score?: number | null;
 }
 
 // Pre-computed confetti positions for result screen
@@ -145,7 +150,7 @@ function TrophyIllustration() {
     );
 }
 
-export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, subtitle, initialAnswers, initialShowEvaluation, initialShowDetails }: DailyQuizModalProps) {
+export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, subtitle, initialAnswers, initialShowEvaluation, initialShowDetails, timeTaken, isSubmitted, isLoading, score }: DailyQuizModalProps) {
     console.log("DailyQuizModal Props - questions:", questions);
     const activeQuestions = questions && questions.length > 0 ? questions : QUIZ_QUESTIONS;
     console.log("DailyQuizModal activeQuestions:", activeQuestions);
@@ -189,20 +194,35 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
     }, [displayQuestions.length, initialAnswers]);
 
     useEffect(() => {
-        // Only force the evaluation screen if explicitly passed as true via props
-        if (initialShowEvaluation === true) {
-            setShowEvaluation(true);
-        }
-    }, [initialShowEvaluation]);
+        if (isOpen) {
+            if (initialShowEvaluation !== undefined) setShowEvaluation(initialShowEvaluation);
+            if (initialShowDetails !== undefined) setShowDetails(initialShowDetails);
 
-    useEffect(() => {
-        // Only force details if explicitly passed as true
-        if (initialShowDetails === true) {
-            setShowDetails(true);
+            // If we have answers provided, also sync those
+            if (initialAnswers && initialAnswers.length === displayQuestions.length) {
+                setSelectedAnswers(initialAnswers);
+            }
         }
-    }, [initialShowDetails]);
+    }, [isOpen, initialShowEvaluation, initialShowDetails]);
 
     if (!isOpen) return null;
+
+    if (isLoading) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-white rounded-[32px] p-10 max-w-sm w-full mx-auto shadow-2xl flex flex-col items-center text-center space-y-6 animate-in fade-in zoom-in duration-300">
+                    <div className="relative">
+                        <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+                        <CheckCircle className="absolute inset-0 m-auto w-6 h-6 text-blue-600/30" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-semibold text-gray-900">Saving Your Progress</h3>
+                        <p className="text-sm text-gray-500 mt-2">Connecting to secure server and recording your results...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (isOpen && (!activeQuestions || activeQuestions.length === 0)) {
         return (
@@ -239,11 +259,10 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
     };
 
     const handleEvaluate = () => {
-        const finalScore = calculateScore();
-        setShowEvaluation(true);
-        setShowDetails(false);
+        // Just notify parent to start submission
+        // Parent will set isLoading=true, and later initialShowEvaluation=true
         onComplete?.({
-            score: finalScore,
+            score: calculateScore(),
             answers: selectedAnswers,
             questions: displayQuestions
         });
@@ -293,8 +312,15 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
         }
     };
 
-    const score = calculateScore();
-    const accuracy = Math.round((score / (displayQuestions.length || 1)) * 100);
+    const displayScore = score !== undefined && score !== null ? score : calculateScore();
+    const accuracy = Math.round((displayScore / (displayQuestions.length || 1)) * 100);
+
+    const formatTime = (seconds?: number) => {
+        if (seconds === undefined) return null;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}m ${secs}s`;
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={handleClose}>
@@ -451,12 +477,28 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
 
                             {/* Score */}
                             <div className="flex flex-col items-center mt-2 mb-5">
-                                <p className="text-foreground text-sm font-medium">Your Score</p>
-                                <p className="text-4xl tracking-tight my-1.5">
-                                    <span className="text-green-500 font-semibold">{score}</span>
-                                    <span className="text-muted-foreground text-2xl font-medium"> / {displayQuestions.length}</span>
+
+                                <p className="text-4xl tracking-tight my-1.5 font-medium">
+                                    <span className="text-green-500">{displayScore}</span>
+                                    <span className="text-muted-foreground text-2xl"> / {displayQuestions.length}</span>
                                 </p>
-                                <p className="text-foreground text-base font-medium">{accuracy}% Accuracy</p>
+                                <div className="flex items-center gap-3">
+                                    <p className="text-foreground text-[15px] font-medium">{accuracy}% Accuracy</p>
+                                    {timeTaken !== undefined && (
+                                        <>
+                                            <div className="size-1 bg-border rounded-full" />
+                                            <p className="text-foreground text-[15px] font-medium">
+                                                Time: {formatTime(timeTaken)}
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+                                {isSubmitted && (
+                                    <div className="mt-2 px-2 py-0.5 bg-green-50 rounded-full border border-green-100 flex items-center gap-1.5 animate-in fade-in zoom-in duration-300">
+                                        <div className="size-1.5 bg-green-500 rounded-full animate-pulse" />
+                                        <span className="text-[10px] font-medium text-green-600 uppercase tracking-wider">Assessment Recorded</span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Motivational note */}

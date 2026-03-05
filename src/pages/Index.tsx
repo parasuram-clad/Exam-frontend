@@ -7,7 +7,8 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import authService, { UserMe } from "@/services/auth.service";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { prefetchAllUserData } from "@/services/prefetch";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Bell, ChevronLeft, ChevronRight, Calendar, FileText, Trophy } from "lucide-react";
@@ -99,6 +100,7 @@ const Index = () => {
     queryFn: () => authService.getCurrentUser(),
     enabled: authService.isAuthenticated(),
   });
+  const queryClient = useQueryClient();
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   // useMediaQuery to detect desktop (xl breakpoint)
@@ -503,6 +505,9 @@ const Index = () => {
                 {/* Action */}
                 <Button
                   onClick={() => navigate("/study-plan")}
+                  onMouseEnter={() => {
+                    if (user?.id) prefetchAllUserData(queryClient, user);
+                  }}
                   className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-xl font-medium h-10 mt-auto text-sm"
                 >
                   {item.buttonLabel}

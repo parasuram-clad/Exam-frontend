@@ -108,7 +108,6 @@ export interface MCQAnswerItem {
 export interface SubmitMCQRequest {
     user_id: number;
     syllabus_id: number;
-    attempt_no: number;
     difficulty?: string;
     answers: MCQAnswerItem[];
     started_at: string;

@@ -1,16 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import authService, { UserMe } from "@/services/auth.service";
-import studyService, { StudyPlanResponse } from "@/services/study.service";
+import studyService, { StudyPlanResponse, StudyNote } from "@/services/study.service";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { DashboardLayout } from "@/components/layout";
 import { StudyPlanCalendar } from "@/components/dashboard";
+import { DayCycleItem } from "@/components/dashboard/StudyPlanCalendar";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Check, Lock, BookOpen, ClipboardList, ArrowLeft, ChevronLeft, ChevronRight, Search, Bell, Calendar, Pencil, Save, SlidersHorizontal, ChevronDown, Lightbulb, Book, Target, Globe, Zap } from "lucide-react";
+import { Check, Lock, BookOpen, ClipboardList, RotateCcw, ArrowLeft, ChevronLeft, ChevronRight, Search, Bell, Calendar, Pencil, Save, SlidersHorizontal, ChevronDown, Lightbulb, Book, Target, Globe, Zap, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { prefetchTopic } from "@/services/prefetch";
 
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -68,11 +70,6 @@ const getSubjectIconFallback = (subject: string) => {
 };
 
 // --- Types ---
-interface DayCycleItem {
-  day: number;
-  status: "completed" | "current" | "locked" | "assessment";
-  label: string;
-}
 
 interface Subtopic {
   id: string;
@@ -287,8 +284,8 @@ const StudyPlanRightSidebar = ({
   initials,
   onDateClick,
   selectedDate,
-  currentProgressDay,
-  totalDays,
+  planDays,
+  notes = [],
   mobileView = 'all'
 }: {
   user: UserMe | null,
@@ -296,12 +293,40 @@ const StudyPlanRightSidebar = ({
   initials: string,
   onDateClick?: (date: Date) => void,
   selectedDate?: Date,
-  currentProgressDay: number,
-  totalDays: number,
+  planDays: DayCycleItem[],
+  notes?: StudyNote[],
   mobileView?: 'streak' | 'leaderboard' | 'all'
 }) => {
   const [noteSearch, setNoteSearch] = useState("");
-  const [localNotes, setLocalNotes] = useState(notesData);
+  const [localNotes, setLocalNotes] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (notes) {
+      if (notes.length > 0) {
+        const formatted = notes.map(n => {
+          const date = new Date(n.created_at || new Date());
+          return {
+            id: n.id,
+            month: format(date, "MMM"),
+            day: parseInt(format(date, "dd")),
+            title: n.title,
+            subtitle: "Topic Note",
+            fullDate: format(date, "yyyy-MM-dd"),
+            content: n.content
+          };
+        });
+        // Sort newer first
+        formatted.sort((a, b) => new Date(b.fullDate).getTime() - new Date(a.fullDate).getTime());
+        setLocalNotes(formatted);
+      } else {
+        // If query returned, but it's empty, show empty state
+        setLocalNotes([]);
+      }
+    } else {
+      // Fallback only while loading or if not provided
+      setLocalNotes(notesData);
+    }
+  }, [notes]);
   const [selectedDetailNote, setSelectedDetailNote] = useState<typeof notesData[0] | null>(null);
   const [showAllNotesView, setShowAllNotesView] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -309,6 +334,7 @@ const StudyPlanRightSidebar = ({
   const [selectedYear, setSelectedYear] = useState(2026);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [editBuffer, setEditBuffer] = useState<typeof notesData[0] | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
 
   const handleEditClick = () => {
@@ -316,19 +342,42 @@ const StudyPlanRightSidebar = ({
     setIsEditing(true);
   };
 
-  const handleSaveEdit = () => {
+  const queryClient = useQueryClient();
+
+  const handleSaveEdit = async () => {
     if (!editBuffer || !selectedDetailNote) return;
+    setIsSaving(true);
 
-    const updatedNotes = localNotes.map(n =>
-      n.fullDate === selectedDetailNote.fullDate && n.title === selectedDetailNote.title
-        ? editBuffer
-        : n
-    );
+    try {
+      if (editBuffer.id) {
+        // Real-time backend sync
+        await studyService.updateNote(editBuffer.id, {
+          title: editBuffer.title,
+          content: editBuffer.content
+        });
+        toast.success("Note synchronized successfully");
+      } else {
+        // Fallback for static mock data
+        const updatedNotes = localNotes.map(n =>
+          n.fullDate === selectedDetailNote.fullDate && n.title === selectedDetailNote.title
+            ? editBuffer
+            : n
+        );
+        setLocalNotes(updatedNotes);
+        toast.success("Mock note updated");
+      }
 
-    setLocalNotes(updatedNotes);
-    setSelectedDetailNote(editBuffer);
-    setIsEditing(false);
-    toast.success("Note updated successfully");
+      // Refresh data from server to ensure UI reflects database state
+      await queryClient.invalidateQueries({ queryKey: ['user-notes', user?.id] });
+
+      setSelectedDetailNote(editBuffer);
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to update note:", error);
+      toast.error("Sync error: Failed to save changes to cloud");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -548,8 +597,7 @@ const StudyPlanRightSidebar = ({
           <StudyPlanCalendar
             onDateClick={onDateClick}
             selectedDate={selectedDate}
-            currentProgressDay={currentProgressDay}
-            totalDays={totalDays}
+            planDays={planDays}
           />
 
           {/* Notes Section */}
@@ -689,10 +737,15 @@ const StudyPlanRightSidebar = ({
                   <Button
                     variant="default"
                     size="icon"
+                    disabled={isSaving}
                     className="h-10 w-10 rounded-xl bg-[#1E293B] hover:bg-[#1E293B]/90 text-white shadow-md transition-all shrink-0"
                     onClick={handleSaveEdit}
                   >
-                    <Save className="w-4 h-4" />
+                    {isSaving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
                   </Button>
                 )}
               </div>
@@ -786,6 +839,13 @@ const StudyPlan = () => {
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
     retry: false,
+  });
+
+  const { data: allNotes = [] } = useQuery({
+    queryKey: ['user-notes', user?.id],
+    queryFn: () => studyService.getUserNotes(user!.id),
+    enabled: !!user?.id,
+    staleTime: 1 * 60 * 1000,
   });
 
   const loading = plansLoading || roadmapLoading;
@@ -983,20 +1043,44 @@ const StudyPlan = () => {
   // Generate dynamic day cycle data
   const dynamicDayCycle: DayCycleItem[] = Array.from({ length: totalDays }, (_, i) => {
     const dayNo = i + 1;
+    const roadmapDay = roadmapData?.plan?.find((p: any) => p.day === dayNo);
+    const planDateStr = roadmapDay?.date;
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+    const hasTest = roadmapDay?.items?.some((it: any) => it.type === 'TEST');
+    const hasRevision = roadmapDay?.items?.some((it: any) => it.type === 'REVISION');
+    const testItem = roadmapDay?.items?.find((it: any) => it.type === 'TEST');
+    const revisionItem = roadmapDay?.items?.find((it: any) => it.type === 'REVISION');
+
     let status: DayCycleItem['status'] = 'locked';
 
+    // 1. Check if it's a completed day based on progress
     if (dayNo < currentProgressDay) {
       status = 'completed';
-    } else if (dayNo === currentProgressDay) {
+    }
+    // 2. Check if it's the current day
+    else if (dayNo === currentProgressDay) {
       status = 'current';
-    } else if (dayNo % 7 === 0) {
+    }
+    // 3. Mark assessments/revisions if they are NOT completed/current
+    else if (hasTest) {
       status = 'assessment';
+    } else if (hasRevision) {
+      status = 'locked'; // Revision still counts as locked until it's 'current'
+    }
+
+    // 4. Override with locked status if it's in the future and not completed
+    if (planDateStr && planDateStr > todayStr && dayNo > currentProgressDay && status !== 'completed') {
+      status = 'locked';
     }
 
     return {
       day: dayNo,
       status,
-      label: dayNo % 7 === 0 ? "Assessment" : `Day ${dayNo}`
+      label: hasTest ? (testItem?.title || "Assessment") : hasRevision ? (revisionItem?.title || "Revision") : `Day ${dayNo}`,
+      date: planDateStr,
+      isAssessment: hasTest,
+      isRevision: hasRevision
     };
   });
 
@@ -1012,7 +1096,42 @@ const StudyPlan = () => {
     .filter(t => !selectedSubject || t.title === selectedSubject);
 
   const handleDayClick = (day: DayCycleItem) => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const todayDayNo = roadmapData?.plan?.find((p: any) => p.date === todayStr)?.day || 0;
+    const isFuture = day.date && day.date > todayStr;
+
+    // Rule: If accessing future days
+    if (isFuture && day.status !== 'completed') {
+      // Allow access specifically if they finished today's actual goals
+      if (day.day === currentProgressDay) {
+        toast.info(`Great job! You've finished today's goals. Accessing Day ${day.day} earlier than scheduled.`);
+      } else {
+        toast.warning(`Day ${day.day} is scheduled for ${day.date ? format(new Date(day.date), 'MMM dd, yyyy') : 'the future'}. Please focus on your current tasks!`);
+        return;
+      }
+    }
+
+    // Rule: Check if previous assessment is completed
+    const previousAssessmentDay = Math.floor((day.day - 1) / 7) * 7;
+    if (previousAssessmentDay > 0 && day.day > previousAssessmentDay) {
+      const assessmentRows = userPlans.filter(p => p.day_no === previousAssessmentDay);
+      const isAssessmentDone = assessmentRows.length > 0 && assessmentRows.every(p => p.plan_status === 'COMPLETED');
+
+      if (!isAssessmentDone) {
+        toast.warning(`Please complete the Assessment on Day ${previousAssessmentDay} before proceeding to Day ${day.day}.`);
+        return;
+      }
+    }
+
     setActiveDay(day.day);
+
+    // Prefetch topics for the clicked day
+    const dayTopics = dynamicDayWisePlans[day.day] || [];
+    if (dayTopics.length > 0 && user?.id) {
+      dayTopics.forEach(topic => {
+        topic.subtopics.forEach(st => prefetchTopic(queryClient, st.id, user.id));
+      });
+    }
   };
 
   const handleViewDetails = (topic: StudyTopicCard) => {
@@ -1161,16 +1280,11 @@ const StudyPlan = () => {
 
   // Helper to map calendar date to Study Day #
   const handleCalendarDateClick = (date: Date) => {
-    const today = startOfDay(new Date());
-    const clickedDate = startOfDay(date);
-    const diff = differenceInDays(clickedDate, today);
+    const clickedDateStr = format(date, 'yyyy-MM-dd');
+    const dayMatch = roadmapData?.plan?.find((p: any) => p.date === clickedDateStr);
 
-    // activeDay is relative to our currentProgressDay (actual study day)
-    // If we click today, show currentProgressDay, etc.
-    const targetDay = currentProgressDay + diff;
-
-    if (targetDay >= 1 && targetDay <= totalDays) {
-      setActiveDay(targetDay);
+    if (dayMatch) {
+      setActiveDay(dayMatch.day);
     } else {
       toast.info("No study plan defined for this date.");
     }
@@ -1243,14 +1357,19 @@ const StudyPlan = () => {
           initials={initials}
           onDateClick={handleCalendarDateClick}
           selectedDate={(() => {
+            const activeDayData = roadmapData?.plan?.find((p: any) => p.day === activeDay);
+            if (activeDayData?.date) {
+              return new Date(activeDayData.date);
+            }
+            // Fallback to relative calculation if date is missing
             const today = startOfDay(new Date());
             const daysOffset = activeDay - currentProgressDay;
             const date = new Date(today);
             date.setDate(today.getDate() + daysOffset);
             return date;
           })()}
-          currentProgressDay={currentProgressDay}
-          totalDays={totalDays}
+          planDays={dynamicDayCycle}
+          notes={allNotes}
         />
       )}
     >
@@ -1493,6 +1612,7 @@ const StudyPlan = () => {
                           whileHover={item.status !== "locked" ? { scale: 0.95, y: -2 } : {}}
                           whileTap={item.status !== "locked" ? { scale: 0.95 } : {}}
                           onClick={() => handleDayClick(item)}
+                          title={item.date ? `Scheduled for: ${format(new Date(item.date), 'MMM dd, yyyy')}` : undefined}
                           className={cn(
                             "w-11 h-11 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center transition-all duration-200 relative cursor-pointer",
                             item.status === "completed" && "bg-primary text-primary-foreground",
@@ -1503,10 +1623,17 @@ const StudyPlan = () => {
                             activeDay === item.day && item.status !== "locked" && "ring-4 ring-accent/40 scale-105"
                           )}
                         >
-                          {item.status === "completed" && <Check className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />}
-                          {item.status === "current" && <BookOpen className="w-5 h-5 md:w-6 md:h-6" />}
-                          {item.status === "locked" && <Lock className="w-4 h-4 md:w-5 md:h-5" />}
-                          {item.status === "assessment" && <ClipboardList className="w-4 h-4 md:w-5 md:h-5" />}
+                          {item.status === "completed" ? (
+                            <Check className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
+                          ) : item.isAssessment ? (
+                            <ClipboardList className="w-4 h-4 md:w-5 md:h-5" />
+                          ) : item.isRevision ? (
+                            <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
+                          ) : item.status === "current" ? (
+                            <BookOpen className="w-5 h-5 md:w-6 md:h-6" />
+                          ) : (
+                            <Lock className="w-4 h-4 md:w-5 md:h-5" />
+                          )}
                         </motion.button>
                         <span className={cn(
                           "text-[10px] md:text-[11px] mt-2 font-medium text-center leading-tight",
@@ -1595,24 +1722,19 @@ const StudyPlan = () => {
 
                         <div className="px-5 pb-5 mt-auto">
                           {(() => {
-                            // Sequential Unlock Logic:
-                            // 1. Previous days must be complete (handled by isUnlocked base)
-                            // 2. Previous topics in the SAME day list must have 100% progress
-                            const isPreviousTopicComplete = index === 0 || currentStudyTopics[index - 1].progress === 100;
-                            const isCurrentDayFullyComplete = currentStudyTopics.every(t => t.progress === 100);
-
-                            // Base unlock if a previous day is fully done
-                            const isDayUnlocked = activeDay < currentProgressDay || (activeDay === currentProgressDay) || (activeDay === currentProgressDay + 1 && isCurrentDayFullyComplete);
-
-                            // Sequential unlock within the day
-                            const isTopicUnlocked = (activeDay < currentProgressDay) || (activeDay === currentProgressDay && isPreviousTopicComplete);
-
-                            const finalIsUnlocked = isTopicUnlocked;
+                            // Sequential Unlock Logic removed as per user request:
+                            // All topics in the current day should be unlocked.
+                            const finalIsUnlocked = (activeDay <= currentProgressDay);
 
                             return (
                               <Button
                                 disabled={!finalIsUnlocked}
                                 onClick={() => handleViewDetails(topic)}
+                                onMouseEnter={() => {
+                                  if (finalIsUnlocked && user?.id) {
+                                    topic.subtopics.forEach(st => prefetchTopic(queryClient, st.id, user.id));
+                                  }
+                                }}
                                 className={cn(
                                   "w-full h-11 rounded-xl text-sm font-medium transition-all",
                                   !finalIsUnlocked
@@ -1673,6 +1795,9 @@ const StudyPlan = () => {
                       </div>
                       <Button
                         onClick={() => handleSubtopicClick(selectedTopic.id, subtopic.id)}
+                        onMouseEnter={() => {
+                          if (user?.id) prefetchTopic(queryClient, subtopic.id, user.id);
+                        }}
                         className="bg-card hover:bg-card/90 text-foreground px-6 rounded-xl font-medium shrink-0"
                       >
                         {subtopic.status === "continue" ? "Continue" : subtopic.status === "completed" ? "Review" : "Start Now"}

@@ -118,30 +118,31 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
                         <button className="relative p-2 text-muted-foreground hover:text-foreground transition-all hover:bg-muted/50 rounded-full h-10 w-10 active:scale-95">
                             <Bell className="w-5 h-5" />
                             {unreadCount > 0 && (
-                                <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 flex items-center justify-center bg-rose-500 rounded-full border-2 border-white text-[8px] text-white font-medium px-0.5 animate-pulse">
-                                    {unreadCount > 99 ? '99+' : unreadCount}
-                                </span>
+                                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white ring-2 ring-white animate-pulse" />
                             )}
                         </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80 p-0 overflow-hidden rounded-2xl border-none shadow-2xl mr-4 mt-2" align="end">
                         <div className="flex flex-col">
                             {/* Header */}
-                            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-[#F8FAFC]">
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-[#F8FAFC]">
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-sm font-medium text-[#0F172A]">Notifications</h3>
                                     {unreadCount > 0 && (
-                                        <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
+                                        <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 text-[10px] font-medium border border-rose-100">
                                             {unreadCount} New
                                         </span>
                                     )}
                                 </div>
                                 <button
-                                    onClick={handleMarkAllRead}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleMarkAllRead();
+                                    }}
                                     disabled={unreadCount === 0}
-                                    className="text-[11px] font-medium text-primary hover:opacity-70 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
+                                    className="text-[11px] font-medium text-primary hover:text-primary/70 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
                                 >
-                                    <Check className="w-3 h-3" />
+                                    <Check className="w-3.5 h-3.5" />
                                     Mark all read
                                 </button>
                             </div>
@@ -173,33 +174,33 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
                                             <div
                                                 key={n.id}
                                                 className={cn(
-                                                    "flex gap-3 px-4 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors cursor-pointer relative",
-                                                    !n.read_status && "bg-primary/[0.02]"
+                                                    "flex gap-3 px-4 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer relative",
+                                                    !n.read_status && "bg-rose-50/30"
                                                 )}
                                                 onClick={() => handleMarkAsRead(n.id)}
                                             >
                                                 {/* Unread accent stripe */}
                                                 {!n.read_status && (
-                                                    <div className="absolute left-0 top-4 bottom-4 w-0.5 bg-primary rounded-r-full" />
+                                                    <div className="absolute left-0 top-3 bottom-3 w-1 bg-rose-500 rounded-r-full" />
                                                 )}
-                                                <div className={cn("w-9 h-9 rounded-full flex items-center justify-center shrink-0", bg)}>
-                                                    <Icon className={cn("w-4 h-4", color)} />
+                                                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center shrink-0 border border-transparent", bg)}>
+                                                    <Icon className={cn("w-5 h-5", color)} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                                                    <div className="flex items-center justify-between gap-2 mb-1">
                                                         <p className={cn("text-[11px] font-medium leading-none truncate", !n.read_status ? "text-[#0F172A]" : "text-[#64748B]")}>
                                                             {n.category.replace(/_/g, ' ')}
                                                         </p>
-                                                        <span className="text-[9px] text-[#94A3B8] shrink-0">
+                                                        <span className="text-[9px] text-[#94A3B8] shrink-0 font-medium tracking-tight">
                                                             {formatDistanceToNow(new Date(n.date_sent), { addSuffix: true })}
                                                         </span>
                                                     </div>
-                                                    <p className="text-[11px] text-[#64748B] line-clamp-2 leading-relaxed">
+                                                    <p className={cn("text-[11px] line-clamp-2 leading-relaxed", !n.read_status ? "text-[#334155] font-medium" : "text-[#64748B]")}>
                                                         {n.message}
                                                     </p>
                                                 </div>
                                                 {!n.read_status && (
-                                                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full shrink-0" />
+                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white shrink-0" />
                                                 )}
                                             </div>
                                         );

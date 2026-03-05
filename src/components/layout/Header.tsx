@@ -224,9 +224,7 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
             >
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 min-w-[14px] h-3.5 flex items-center justify-center bg-rose-500 rounded-full border-2 border-white text-[7px] text-white font-medium px-0.5">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white ring-2 ring-white animate-pulse" />
               )}
             </div>
 
