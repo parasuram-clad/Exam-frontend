@@ -206,6 +206,14 @@ const studyService = {
     },
 
     /**
+     * Fetch mind map structure
+     */
+    getTopicMindMap: async (syllabusId: number, params: { content_type_id: number; language: string }) => {
+        const response = await apiClient.get(`/study/mindmap/${syllabusId}`, { params });
+        return response.data;
+    },
+
+    /**
      * Create a study note
      */
     createNote: async (note: StudyNote) => {
@@ -255,10 +263,28 @@ const studyService = {
     },
 
     /**
+     * Start an MCQ attempt (fetch questions)
+     */
+    startMCQAttempt: async (payload: { user_id: number; syllabus_id: number; difficulty?: string }) => {
+        const response = await apiClient.post('/mcq/start', payload);
+        return response.data;
+    },
+
+    /**
      * Submit an MCQ attempt
      */
     submitMCQAttempt: async (payload: SubmitMCQRequest) => {
         const response = await apiClient.post('/mcq/submit', payload);
+        return response.data;
+    },
+
+    /**
+     * Get an MCQ attempt result
+     */
+    getMCQResult: async (userId: number, syllabusId: number) => {
+        const response = await apiClient.get('/mcq/result', {
+            params: { user_id: userId, syllabus_id: syllabusId }
+        });
         return response.data;
     },
     /**
@@ -299,6 +325,49 @@ const studyService = {
      */
     getWeeklyTestHistory: async (userId: number) => {
         const response = await apiClient.get('/weekly-test/history', {
+            params: { user_id: userId }
+        });
+        return response.data;
+    },
+
+    /**
+     * Get monthly test questions
+     */
+    getMonthlyTestQuestions: async (userId: number, monthNo: number) => {
+        const response = await apiClient.get('/monthly-test/questions', {
+            params: { user_id: userId, month_no: monthNo }
+        });
+        return response.data;
+    },
+
+    /**
+     * Submit monthly test
+     */
+    submitMonthlyTest: async (payload: {
+        monthly_test_id: number;
+        answers: { mcq_id: number; selected_option: string }[];
+        started_at: string;
+        submitted_at: string;
+    }) => {
+        const response = await apiClient.post('/monthly-test/submit', payload);
+        return response.data;
+    },
+
+    /**
+     * Get monthly test result
+     */
+    getMonthlyTestResult: async (userId: number, monthNo: number) => {
+        const response = await apiClient.get('/monthly-test/result', {
+            params: { user_id: userId, month_no: monthNo }
+        });
+        return response.data;
+    },
+
+    /**
+     * Get monthly test history
+     */
+    getMonthlyTestHistory: async (userId: number) => {
+        const response = await apiClient.get('/monthly-test/history', {
             params: { user_id: userId }
         });
         return response.data;

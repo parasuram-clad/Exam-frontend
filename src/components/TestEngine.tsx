@@ -49,7 +49,7 @@ const TestEngine = ({
     const [currentQuestion, setCurrentQuestion] = useState(0);
     const [answers, setAnswers] = useState<Record<number, Answer>>({});
     const [visitedQuestions, setVisitedQuestions] = useState<Set<number>>(new Set([0]));
-    const [timeLeft, setTimeLeft] = useState(initialTime);
+    const [timeSpent, setTimeSpent] = useState(0);
     const [showSubmitModal, setShowSubmitModal] = useState(false);
 
     useEffect(() => {
@@ -58,14 +58,7 @@ const TestEngine = ({
 
     useEffect(() => {
         const timer = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 0) {
-                    clearInterval(timer);
-                    onComplete(answers);
-                    return 0;
-                }
-                return prev - 1;
-            });
+            setTimeSpent((prev) => prev + 1);
         }, 1000);
 
         return () => clearInterval(timer);
@@ -173,7 +166,7 @@ const TestEngine = ({
                                 </div>
                             </div>
                             <div className="text-xl sm:text-3xl font-bold text-[#0F172A] shrink-0 tabular-nums">
-                                {formatTime(timeLeft)}
+                                {formatTime(timeSpent)}
                             </div>
                         </div>
                     </div>

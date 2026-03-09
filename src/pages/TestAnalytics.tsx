@@ -152,7 +152,7 @@ const getScoreColor = (score: number, total: number) => {
 
 // ── Main Component ──
 const TestAnalytics = () => {
-    const { subject } = useParams<{ subject: string; testId: string }>();
+    const { subject, testId } = useParams<{ subject: string; testId: string }>();
     const [searchParams] = useSearchParams();
     const weekNoStr = searchParams.get('week');
     const weekNo = weekNoStr ? parseInt(weekNoStr) : null;
@@ -174,9 +174,19 @@ const TestAnalytics = () => {
     }, []);
 
     const { data: resultData, isLoading: resultLoading } = useQuery({
-        queryKey: ['weekly-test-result', user?.id, weekNo],
-        queryFn: () => studyService.getWeeklyTestResult(user!.id, weekNo!),
-        enabled: !!user?.id && !!weekNo && subject === 'weekly',
+        queryKey: [subject === 'weekly' ? 'weekly-test-result' : 'monthly-test-result', user?.id, weekNo, testId],
+        queryFn: async () => {
+            if (subject === 'weekly') {
+                const wNo = weekNo || parseInt(testId || "1");
+                return await studyService.getWeeklyTestResult(user!.id, wNo);
+            } else if (subject === 'monthly') {
+                const mNoStr = searchParams.get('month');
+                const mNo = mNoStr ? parseInt(mNoStr) : parseInt(testId || "1");
+                return await studyService.getMonthlyTestResult(user!.id, mNo);
+            }
+            return null;
+        },
+        enabled: !!user?.id && (subject === 'weekly' || subject === 'monthly'),
     });
 
     const { data: dashboardData } = useQuery({
@@ -189,26 +199,45 @@ const TestAnalytics = () => {
     const data = resultData ? {
         correct: resultData.correct_answers || 0,
         incorrect: resultData.wrong_answers || 0,
-        unattempted: 0,
+        unattempted: resultData.unattempted || 0,
         total: resultData.total_questions || 0,
         timeTaken: resultData.time_spent_seconds ? `${Math.floor(resultData.time_spent_seconds / 60)}m ${resultData.time_spent_seconds % 60}s` : "0m",
         score: resultData.correct_answers || 0,
         totalMarks: resultData.total_questions || 0,
         accuracy: resultData.score_percentage || 0,
-        units: resultData.unit_wise_analysis?.map((u: any) => ({
-            name: u.unit_name,
-            icon: u.unit_name.toLowerCase().includes('science') ? scienceIcon : u.unit_name.toLowerCase().includes('history') ? historyIcon : geographyIcon,
-            badge: u.performance_level,
-            badgeColor: u.performance_level === 'Excellence' ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700",
-            score: u.score,
-            total: u.total,
-            questionCount: u.question_count,
-            topics: u.topics?.map((t: any) => ({
-                name: t.topic_name,
-                score: t.score,
-                total: t.total
-            })) || []
-        })) || [],
+        units: resultData.unit_analysis?.map((partData: any) => {
+            const percentage = partData.total > 0 ? (partData.correct / partData.total) * 100 : 0;
+            const badge = percentage >= 80 ? "Excellence" : percentage >= 50 ? "Moderate" : "Needs Improvement";
+            const badgeColor = badge === "Excellence" ? "bg-green-100 text-green-700" :
+                badge === "Moderate" ? "bg-yellow-100 text-yellow-700" :
+                    "bg-red-100 text-red-700";
+
+            const allTopics: any[] = [];
+            if (partData.subjects) {
+                partData.subjects.forEach((subj: any) => {
+                    if (subj.topics) {
+                        subj.topics.forEach((t: any) => {
+                            allTopics.push({
+                                name: t.topic,
+                                score: t.correct,
+                                total: t.total
+                            });
+                        });
+                    }
+                });
+            }
+
+            return {
+                name: partData.part,
+                icon: partData.part.toLowerCase().includes('science') ? scienceIcon : partData.part.toLowerCase().includes('history') ? historyIcon : geographyIcon,
+                badge: badge,
+                badgeColor: badgeColor,
+                score: partData.correct,
+                total: partData.total,
+                questionCount: partData.total,
+                topics: allTopics
+            };
+        }) || [],
         leaderboard: resultData.leaderboard?.map((l: any) => ({
             rank: l.rank,
             name: l.name,
@@ -226,8 +255,8 @@ const TestAnalytics = () => {
             initials: l.initials || l.name.split(' ').map((n: any) => n[0]).join('').substring(0, 2).toUpperCase(),
             marks: l.total_marks,
             accuracy: `${l.accuracy}%`,
-            isYou: l.is_current_user,
-            color: l.is_current_user ? "bg-slate-500" : (l.rank === 1 ? "bg-amber-500" : "bg-blue-600")
+            isYou: l.is_current_user || l.is_you,
+            color: (l.is_current_user || l.is_you) ? "bg-slate-500" : (l.rank === 1 ? "bg-amber-500" : "bg-blue-600")
         })) || []
     } : {
         ...generateAnalytics(),
@@ -239,8 +268,8 @@ const TestAnalytics = () => {
             initials: l.initials || l.name.split(' ').map((n: any) => n[0]).join('').substring(0, 2).toUpperCase(),
             marks: l.total_marks,
             accuracy: `${l.accuracy}%`,
-            isYou: l.is_current_user,
-            color: l.is_current_user ? "bg-slate-500" : (l.rank === 1 ? "bg-amber-500" : "bg-blue-600")
+            isYou: l.is_current_user || l.is_you,
+            color: (l.is_current_user || l.is_you) ? "bg-slate-500" : (l.rank === 1 ? "bg-amber-500" : "bg-blue-600")
         })) || []
     };
 
@@ -315,10 +344,10 @@ const TestAnalytics = () => {
         >
             <div className="hidden lg:block px-4 lg:px-0">
                 <h1 className="text-xl sm:text-2xl font-medium text-[#1e293b] capitalize">
-                    {subject === 'weekly' ? `Weekly Test review` : 'Test Series'}
+                    {subject === 'weekly' ? `Weekly Test Review` : subject === 'monthly' ? `Monthly Test Review` : 'Test Series'}
                 </h1>
                 <p className="text-[12px] sm:text-sm text-[#64748B] mt-0.5 font-medium">
-                    {subject === 'weekly' && weekNo ? `Week ${weekNo}` : 'TNPSC – Group II'} | 2026
+                    {subject === 'weekly' ? `Week ${weekNo || testId}` : subject === 'monthly' ? `Month ${searchParams.get('month') || testId}` : 'TNPSC – Group II'} | 2026
                 </p>
             </div>
             <div

@@ -24,6 +24,7 @@ import {
   BarChart2,
   Calendar,
   Layers,
+  Loader2
 } from "lucide-react";
 import { cn, getErrorMessage } from "@/lib/utils";
 import { DailyQuizModal, QUIZ_QUESTIONS } from "@/components/dashboard/DailyQuizModal";
@@ -562,6 +563,7 @@ const StudyContent = () => {
   // New state for reading time calculation
   const [activeReadingSessionId, setActiveReadingSessionId] = useState<number | null>(null);
   const [elapsedReadingSeconds, setElapsedReadingSeconds] = useState(0);
+  const [isMindMapLoading, setIsMindMapLoading] = useState(false);
 
   const readingPanelRef = useRef<HTMLDivElement>(null);
   const notesPanelRef = useRef<HTMLDivElement>(null);
@@ -593,7 +595,7 @@ const StudyContent = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: assessmentHistory } = useQuery({
+  const { data: assessmentHistory, isLoading: isLoadingHistory } = useQuery({
     queryKey: ['assessment-history', user?.id, parsedSubtopicId],
     queryFn: () => studyService.getAssessmentHistory(user!.id, parsedSubtopicId),
     enabled: !!user?.id && !isNaN(parsedSubtopicId),
@@ -695,28 +697,35 @@ const StudyContent = () => {
   // Handle topic timing
   useEffect(() => {
     let isActive = true;
-    if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
-      const startTiming = async () => {
-        try {
-          const timing = await studyService.startTopicTiming(user.id, parsedSubtopicId);
-          if (isActive) setActiveReadingSessionId(timing.id);
+    let started = false;
+
+    if (!user?.id || isNaN(parsedSubtopicId) || isLoadingHistory) return;
+    if (assessmentHistory?.attempts?.length > 0) return;
+
+    const startTiming = async () => {
+      try {
+        const timing = await studyService.startTopicTiming(user.id, parsedSubtopicId);
+        if (isActive) {
+          setActiveReadingSessionId(timing.id);
+          started = true;
           console.log("Topic timing started");
-        } catch (err: any) {
-          if (err.response?.status !== 400) {
-            console.error("Failed to start topic timing", err);
-          }
         }
-      };
-      startTiming();
-    }
+      } catch (err: any) {
+        if (err.response?.status !== 400) {
+          console.error("Failed to start topic timing", err);
+        }
+      }
+    };
+    startTiming();
 
     return () => {
       isActive = false;
-      if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
+      if (started && user?.id && !isNaN(parsedSubtopicId)) {
         studyService.stopTopicTiming(user.id, parsedSubtopicId).catch(() => { });
+        queryClient.invalidateQueries({ queryKey: ['topic-timings'] });
       }
     };
-  }, [user?.id, parsedSubtopicId]);
+  }, [user?.id, parsedSubtopicId, assessmentHistory, isLoadingHistory]);
 
   // When keyword changes, reset editing state
   useEffect(() => {
@@ -797,21 +806,29 @@ const StudyContent = () => {
     return () => observer.disconnect();
   }, [sections, mode]);
 
-  const handleMindMapClick = (sectionIndex: number) => {
-    const section = sections[sectionIndex];
-    if (section && section.mindmap_structure) {
-      navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}/mindmap`, {
-        state: {
-          mindmapData: section.mindmap_structure,
-          sectionTitle: section.title
-        }
-      });
-    } else {
-      // Fallback to full topic mindmap if possible
-      navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}/mindmap`);
+  const handleTopicMindMapClick = async () => {
+    if (!user?.id || !parsedSubtopicId || isNaN(parsedSubtopicId)) return;
+    try {
+      setIsMindMapLoading(true);
+      const res = await studyService.getTopicMindMap(parsedSubtopicId, { content_type_id: 1, language: 'English' });
+      if (res && res.mindmap) {
+        navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}/mindmap`, {
+          state: {
+            mindmapData: res.mindmap,
+            sectionTitle: topicData?.task?.topic || sections[0]?.title || "Study Topic"
+          }
+        });
+      } else {
+        // Fallback without dynamic data
+        navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}/mindmap`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load topic mind map");
+    } finally {
+      setIsMindMapLoading(false);
     }
   };
-
   const handleKeywordClick = (kw: string) => {
     setSelectedKeyword(kw);
     if (keywordNotes[kw] === undefined) {
@@ -861,19 +878,55 @@ const StudyContent = () => {
     setOpenAnswers(newHistory);
   };
 
-  const startAssessment = () => {
-    // End reading session explicitly
-    if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
-      studyService.stopTopicTiming(user.id, parsedSubtopicId)
-        .then(() => queryClient.invalidateQueries({ queryKey: ['topic-timings'] }))
-        .catch(() => { });
-    }
+  const startAssessment = async () => {
+    if (!user?.id || !parsedSubtopicId || isNaN(parsedSubtopicId)) return;
 
-    setIsAssessmentStarted(true);
-    setIsAssessmentFinished(false);
-    setTimeLeft(600);
-    setIsAssessmentSubmitted(false);
-    setAssessmentStartTime(new Date().toISOString());
+    // End reading session explicitly
+    try {
+      await studyService.stopTopicTiming(user.id, parsedSubtopicId);
+      queryClient.invalidateQueries({ queryKey: ['topic-timings'] });
+    } catch { }
+
+    try {
+      const response = await studyService.startMCQAttempt({
+        user_id: user.id,
+        syllabus_id: parsedSubtopicId,
+        difficulty: "easy"
+      });
+
+      if (response && response.questions) {
+        const mappedQuestions = response.questions.map((q: any) => ({
+          id: q.mcq_id,
+          mcq_id: q.mcq_id,
+          question: q.question,
+          subject: topicData?.task?.subject || "General Science",
+          difficulty: response.difficulty || "easy",
+          options: [q.options.A, q.options.B, q.options.C, q.options.D],
+          correct_answer_index: q.correct_answer_index,
+          explanation: q.explanation,
+          is_correct: q.is_correct
+        }));
+
+        setTopicAssessment({
+          total_questions: response.total_questions,
+          questions: mappedQuestions
+        });
+      }
+
+      setIsAssessmentStarted(true);
+      setIsAssessmentFinished(false);
+      setTimeLeft(600);
+      setIsAssessmentSubmitted(false);
+      setAssessmentStartTime(new Date().toISOString());
+    } catch (err: any) {
+      if (err.response?.status === 403) {
+        toast.error(err.response.data.detail || "You have already attempted this topic today.");
+      } else if (err.response?.status === 404) {
+        toast.error("Questions not generated for this topic yet.");
+      } else {
+        toast.error("Failed to start assessment.");
+      }
+    }
   };
 
   const handleAssessmentComplete = async (results: { answers: (number | null)[], questions: any[] }) => {
@@ -914,17 +967,20 @@ const StudyContent = () => {
       const letterToIdx: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
 
       const ans = response.results.map((r: any) => letterToIdx[r.selected_option] ?? null);
-      const ques = response.results.map((r: any) => ({
-        id: r.mcq_id,
-        mcq_id: r.mcq_id,
-        question: r.question,
-        subject: results.questions[0]?.subject || "General Science",
-        difficulty: results.questions[0]?.difficulty || "Medium",
-        options: r.options,
-        correct_answer_index: r.correct_answer_index,
-        explanation: r.explanation,
-        is_correct: r.is_correct
-      }));
+      const ques = response.results.map((r: any, idx: number) => {
+        const originalQ = results.questions[idx] || {};
+        return {
+          id: r.mcq_id,
+          mcq_id: r.mcq_id,
+          question: r.question,
+          subject: originalQ.subject || "General Science",
+          difficulty: originalQ.difficulty || "Medium",
+          options: [r.options?.A || "", r.options?.B || "", r.options?.C || "", r.options?.D || ""],
+          correct_answer_index: r.correct_answer_index,
+          explanation: r.explanation,
+          is_correct: r.is_correct
+        };
+      });
 
       setQuizScore(response.correct_answers);
       setViewHistoryAnswers(ans);
@@ -1028,48 +1084,45 @@ const StudyContent = () => {
     return (
       <div className="flex flex-col gap-10 py-12 px-8 md:px-16 max-w-[800px] mx-auto">
         {/* Topic Header & Introduction */}
-        {/* <div className="space-y-4">
-          <h1 className={cn(
-            "font-['Inter:Medium',sans-serif] font-medium leading-[32px] sm:leading-[36px] text-[24px] sm:text-[28px] tracking-[0.0703px]",
-            getTextColor()
-          )}>
-            {sections[0]?.title || "Study Topic"}
-          </h1>
+        <div className="space-y-4 relative">
+          <div className="flex items-center gap-4">
+            <h1 className={cn(
+              "font-['Inter:Medium',sans-serif] font-medium leading-[32px] sm:leading-[36px] text-[24px] sm:text-[28px] tracking-[0.0703px]",
+              getTextColor()
+            )}>
+              {topicData?.task?.topic || sections[0]?.title || "Study Topic"}
+            </h1>
+
+            <button
+              onClick={handleTopicMindMapClick}
+              disabled={isMindMapLoading}
+              className={cn(
+                "flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-sm border",
+                backgroundPreset === 'dark' ? "bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700" : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50",
+                isMindMapLoading && "opacity-50 cursor-not-allowed"
+              )}
+              title="View Topic Mind Map"
+            >
+              {isMindMapLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <MindMapIcon />}
+            </button>
+          </div>
+
           {topicData?.task?.short_description && (
-            <p className={cn("text-[15px] opacity-60 italic", getTextColor())}>
+            <p className={cn("mt-2 text-[15px] opacity-60 italic max-w-2xl", getTextColor())}>
               {topicData.task.short_description}
             </p>
           )}
-          {topicData?.task?.learning_content?.introduction && (
-            <div className={cn("p-6 rounded-2xl border bg-accent/5", backgroundPreset === 'dark' ? "border-gray-800" : "border-gray-100")}>
-              <p className={cn("text-[16px] leading-relaxed", getTextColor())}>
-                {topicData.task.learning_content.introduction}
-              </p>
-            </div>
-          )}
-        </div> */}
+        </div>
 
         {sections.map((section, idx) => (
           <div key={section.id} id={`section-${section.id}`} className="space-y-8 scroll-mt-24">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <h2 className={cn(
-                "font-['Inter:Medium',sans-serif] font-medium leading-[26px] sm:leading-[30px] text-[18px] sm:text-[22px] tracking-[-0.4492px]",
+                "font-['Inter:Medium',sans-serif] font-semibold leading-[26px] sm:leading-[30px] text-[18px] sm:text-[22px] tracking-[-0.4492px]",
                 getTextColor()
               )}>
                 {section.title}
               </h2>
-              {section.mindmap_structure && (
-                <button
-                  onClick={() => handleMindMapClick(idx)}
-                  className={cn(
-                    "flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg transition-all shadow-sm border",
-                    backgroundPreset === 'dark' ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-white border-gray-200 text-gray-600"
-                  )}
-                  title="View Interactive Mind Map"
-                >
-                  <MindMapIcon />
-                </button>
-              )}
             </div>
 
             <div className={cn("space-y-6 text-[16px] leading-[26px] tracking-[-0.3125px] font-['Inter:Regular',sans-serif]", getTextColor())}>
@@ -1082,7 +1135,7 @@ const StudyContent = () => {
                   <div key={block.block_id} id={`block-${block.block_id}`} className="space-y-4">
                     <div className="relative group">
                       {block.sub_heading && (
-                        <h4 className="font-medium mb-2">{block.sub_heading}</h4>
+                        <h4 className="font-semibold mb-2">{block.sub_heading}</h4>
                       )}
 
                       {block.type === 'paragraph' && (
@@ -1168,7 +1221,8 @@ const StudyContent = () => {
               {section.id === 'architecture' && <TempleArchitectureInfographic isDark={backgroundPreset === 'dark'} />}
             </div>
           </div>
-        ))}
+        ))
+        }
 
         {/* Assessment Activation Section */}
         <div className="pt-16 border-t border-gray-200/20">
@@ -1194,7 +1248,8 @@ const StudyContent = () => {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button
-                onClick={() => navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}/mindmap`)}
+                onClick={handleTopicMindMapClick}
+                disabled={isMindMapLoading}
                 variant="outline"
                 className={cn(
                   "px-8 py-6 text-[15px] rounded-xl transition-all border font-medium hover:bg-accent/5",
@@ -1207,21 +1262,51 @@ const StudyContent = () => {
 
               {isAssessmentFinished && (
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     // Try to find latest attempt in history if not in local state
-                    if (!viewHistoryAnswers && assessmentHistory?.attempts?.length > 0) {
-                      const latest = assessmentHistory.attempts[assessmentHistory.attempts.length - 1];
-                      if (latest.questions) {
-                        const letterToIdx = { "A": 0, "B": 1, "C": 2, "D": 3 };
-                        const ans = latest.questions.map((q: any) => letterToIdx[q.selected_option as keyof typeof letterToIdx] ?? null);
-                        const ques = latest.questions.map((q: any) => ({
-                          ...q,
-                          difficulty: q.difficulty || latest.difficulty
-                        }));
-                        setViewHistoryAnswers(ans);
-                        setResultsQuestions(ques);
-                        setViewHistoryTimeTaken(latest.time_taken_seconds);
-                        setIsAssessmentSubmitted(true);
+                    if (!viewHistoryAnswers) {
+                      if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
+                        try {
+                          const result = await studyService.getMCQResult(user.id, parsedSubtopicId);
+                          if (result && result.questions) {
+                            const letterToIdx: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
+                            const ans = result.questions.map((q: any) => letterToIdx[q.selected_option] ?? null);
+                            const ques = result.questions.map((q: any) => ({
+                              ...q,
+                              id: q.mcq_id,
+                              options: [q.options?.A || "", q.options?.B || "", q.options?.C || "", q.options?.D || ""],
+                              difficulty: q.difficulty || result.difficulty,
+                              explanation: q.reason || q.explanation || ""
+                            }));
+                            setViewHistoryAnswers(ans);
+                            setResultsQuestions(ques);
+                            setViewHistoryTimeTaken(result.time_taken_seconds);
+                            setQuizScore(result.correct_answers);
+                            setIsAssessmentSubmitted(true);
+                          }
+                        } catch (error) {
+                          console.error('Failed to get MCQ result:', error);
+                          // Fallback to history
+                          if (assessmentHistory?.attempts?.length > 0) {
+                            const latest = assessmentHistory.attempts[assessmentHistory.attempts.length - 1];
+                            if (latest.questions) {
+                              const letterToIdx = { "A": 0, "B": 1, "C": 2, "D": 3 };
+                              const ans = latest.questions.map((q: any) => letterToIdx[q.selected_option as keyof typeof letterToIdx] ?? null);
+                              const ques = latest.questions.map((q: any) => ({
+                                ...q,
+                                id: q.mcq_id,
+                                options: [q.options?.A || "", q.options?.B || "", q.options?.C || "", q.options?.D || ""],
+                                difficulty: q.difficulty || latest.difficulty,
+                                explanation: q.explanation || ""
+                              }));
+                              setViewHistoryAnswers(ans);
+                              setResultsQuestions(ques);
+                              setViewHistoryTimeTaken(latest.time_taken_seconds);
+                              setQuizScore(latest.correct_answers);
+                              setIsAssessmentSubmitted(true);
+                            }
+                          }
+                        }
                       }
                     }
                     setShowResultsOnly(true);
@@ -1237,20 +1322,20 @@ const StudyContent = () => {
               {!isAssessmentFinished && (
                 <Button
                   onClick={startAssessment}
-                  disabled={!topicAssessment}
+                  disabled={!topicData}
                   className={cn(
                     "bg-[#1c1c1e] text-white hover:bg-black px-10 py-6 text-[15px] rounded-xl transition-all shadow-md font-medium",
-                    !topicAssessment && "opacity-50 cursor-not-allowed"
+                    !topicData && "opacity-50 cursor-not-allowed"
                   )}
                 >
                   <Play className="w-5 h-5 mr-2.5 fill-current" />
-                  {!topicAssessment ? "Loading Assessment..." : "Start Assessment"}
+                  {!topicData ? "Loading..." : "Start Assessment"}
                 </Button>
               )}
             </div>
           </div>
         </div>
-      </div>
+      </div >
     );
   };
 

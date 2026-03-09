@@ -879,6 +879,20 @@ const StudyPlan = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: weeklyHistoryData } = useQuery({
+    queryKey: ['weekly-history', user?.id],
+    queryFn: () => studyService.getWeeklyTestHistory(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: monthlyHistoryData } = useQuery({
+    queryKey: ['monthly-history', user?.id],
+    queryFn: () => studyService.getMonthlyTestHistory(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const loading = plansLoading || roadmapLoading || dashboardLoading;
 
   const [dynamicDayWisePlans, setDynamicDayWisePlans] = useState<Record<number, StudyTopicCard[]>>({});
@@ -924,11 +938,13 @@ const StudyPlan = () => {
   // Synchronize dynamic plans when data changes
   useEffect(() => {
     if (roadmapData?.plan && userPlans) {
-      setDynamicDayWisePlans(mapRoadmapToFrontend(roadmapData.plan, userPlans, topicTimings));
+      const wHistory = weeklyHistoryData?.history || [];
+      const mHistory = monthlyHistoryData?.history || [];
+      setDynamicDayWisePlans(mapRoadmapToFrontend(roadmapData.plan, userPlans, topicTimings, wHistory, mHistory));
       const currentDay = calculateCurrentProgressDay(userPlans);
       setActiveDay(currentDay);
     }
-  }, [roadmapData, userPlans, topicTimings]);
+  }, [roadmapData, userPlans, topicTimings, weeklyHistoryData, monthlyHistoryData]);
 
   // Modal open logic: check after loading is done
   useEffect(() => {
@@ -967,7 +983,7 @@ const StudyPlan = () => {
     }
   }, [user]);
 
-  const mapRoadmapToFrontend = (roadmapPlan: any[], backendPlans: StudyPlanResponse[], timings: TopicTiming[]): Record<number, StudyTopicCard[]> => {
+  const mapRoadmapToFrontend = (roadmapPlan: any[], backendPlans: StudyPlanResponse[], timings: TopicTiming[], weeklyHistory: any[], monthlyHistory: any[]): Record<number, StudyTopicCard[]> => {
     // Create a status map for quick lookup
     const statusMap: Record<number, string> = {};
     backendPlans.forEach(p => {
@@ -1005,27 +1021,52 @@ const StudyPlan = () => {
           };
         } else {
           // Handle TEST/REVISION
-          const status = statusMap[dayPlan.day] || 'start'; // This is simplified for tests
+          let statusStr = statusMap[dayPlan.day] || 'start'; // This is simplified for tests
           const weekNo = Math.ceil(dayPlan.day / 7);
+
+          let timeSpent = 0;
+          let totalTime = item.minutes;
+
+          if (item.type === 'TEST' && item.identifier) {
+            if (item.identifier.startsWith('WEEK_')) {
+              const testNo = parseInt(item.identifier.split('_')[1], 10);
+              const historyRec = weeklyHistory.find((h: any) => h.week_no === testNo);
+              if (historyRec && historyRec.status === 'COMPLETED') {
+                statusStr = 'COMPLETED';
+                timeSpent = Math.ceil((historyRec.time_spent_seconds || 0) / 60);
+              }
+            } else if (item.identifier.startsWith('MONTH_')) {
+              const testNo = parseInt(item.identifier.split('_')[1], 10);
+              const historyRec = monthlyHistory.find((h: any) => h.month_no === testNo);
+              if (historyRec && historyRec.status === 'COMPLETED') {
+                statusStr = 'COMPLETED';
+                timeSpent = Math.ceil((historyRec.time_spent_seconds || 0) / 60);
+              }
+            }
+          } else {
+            if (statusStr === 'COMPLETED') {
+              timeSpent = item.minutes;
+            }
+          }
 
           return {
             id: `${item.type.toLowerCase()}-${dayPlan.day}-${idx}`,
             image: item.type === 'TEST' ? studyPlan4 : studyPlan2,
-            title: item.title || (item.type === 'TEST' ? 'Weekly Test' : 'Revision'),
+            title: (item.title || (item.type === 'TEST' ? 'Weekly Test' : 'Revision')).replace('_', ' '),
             topicCount: 1,
-            progress: status === 'COMPLETED' ? 100 : 0,
+            progress: statusStr === 'COMPLETED' ? 100 : 0,
             type: item.type,
             topics: [{ name: item.description || 'Assessment', color: item.type === 'TEST' ? 'bg-[#FF3B30]' : 'bg-[#34C759]' }],
             subtopics: [{
               id: `sub-${item.type.toLowerCase()}-${dayPlan.day}-${idx}`,
-              name: item.title || item.type,
+              name: (item.title || item.type).replace('_', ' '),
               description: item.description || 'Scheduled activity',
-              timeSpent: status === 'COMPLETED' ? item.minutes : 0,
-              totalTime: item.minutes,
-              status: (status === 'COMPLETED' ? 'completed' : status === 'IN_PROGRESS' ? 'continue' : 'start') as any,
+              timeSpent: timeSpent,
+              totalTime: totalTime,
+              status: (statusStr === 'COMPLETED' ? 'completed' : statusStr === 'IN_PROGRESS' ? 'continue' : 'start') as any,
               isTest: item.type === 'TEST',
               weeklyTestId: item.weekly_test_id, // Ensure this exists in your roadmap data
-              weekNo: weekNo
+              weekNo: item.identifier?.startsWith('MONTH_') ? parseInt(item.identifier.split('_')[1], 10) : weekNo
             }],
           };
         }
@@ -1146,7 +1187,7 @@ const StudyPlan = () => {
     return {
       day: dayNo,
       status,
-      label: hasTest ? (testItem?.title || "Assessment") : hasRevision ? (revisionItem?.title || "Revision") : `Day ${dayNo}`,
+      label: (hasTest ? (testItem?.title || "Assessment") : hasRevision ? (revisionItem?.title || "Revision") : `Day ${dayNo}`).replace('_', ' '),
       date: planDateStr,
       isAssessment: hasTest,
       isRevision: hasRevision
@@ -1244,10 +1285,12 @@ const StudyPlan = () => {
         } catch (error: any) {
           if (error.response?.status === 403) {
             const detail = error.response?.data?.detail;
-            const wId = typeof detail === 'object' ? detail.weekly_test_id : null;
-            if (wId) {
-              const weekNo = Math.ceil(activeDay / 7);
-              navigate(`/test-series/weekly/test/${wId}/analytics?week=${weekNo}`);
+            const detailStr = typeof detail === 'string' ? detail : JSON.stringify(detail);
+
+            if (detailStr.includes("already completed")) {
+              const weekNo = subtopic.weekNo || Math.ceil(activeDay / 7);
+              // Provide a dummy test ID "0" since analytics will resolve via weekNo
+              navigate(`/test-series/weekly/test/0/analytics?week=${weekNo}`);
               setIsDialogOpen(false);
             } else {
               toast.error(getErrorMessage(error, "Failed to fetch test questions"));
@@ -1963,7 +2006,7 @@ const StudyPlan = () => {
                           }}
                           className="bg-card hover:bg-card/90 text-foreground px-6 rounded-xl font-medium shrink-0"
                         >
-                          {subtopic.status === "continue" ? "Continue" : subtopic.status === "completed" ? "Review" : "Start Now"}
+                          {subtopic.status === "continue" ? "Continue" : subtopic.status === "completed" ? "View Analytics" : "Start Now"}
                         </Button>
                       </div>
                       <div>
