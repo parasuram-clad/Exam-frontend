@@ -123,7 +123,7 @@ export function StreakWidget({ streakDays, onToggle, isExpanded = false, calenda
                       <Lottie
                         animationData={fireAnimation}
                         loop={true}
-                        className="w-7 h-7 -mt-1 scale-150"
+                        className="w-5 h-5 -mt-1 scale-150"
                       />
                     </div>
                   ) : (

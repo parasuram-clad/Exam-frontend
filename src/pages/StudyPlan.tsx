@@ -998,7 +998,7 @@ const StudyPlan = () => {
               id: t.id.toString(),
               name: t.name,
               description: t.description,
-              timeSpent: Math.round((timingMap[t.id] || 0) / 60),
+              timeSpent: Math.round(timingMap[t.id] || 0),
               totalTime: t.minutes,
               status: (statusMap[t.id] === 'COMPLETED' ? 'completed' : statusMap[t.id] === 'IN_PROGRESS' ? 'continue' : 'start') as any,
             })),
@@ -1060,12 +1060,17 @@ const StudyPlan = () => {
           topicCount: items.length,
           progress,
           topics: Array.from(new Set(items.map(i => i.chapter))).map(ch => ({ name: ch, color: 'bg-[#7C79EC]' })),
-          subtopics: items.map(i => ({
-            id: i.id.toString(), name: i.topic, description: `Chapter: ${i.chapter}`,
-            timeSpent: Math.round((topicTimings.find(t => t.syllabus_id === i.syllabus_id)?.total_estimate) || (i.plan_status === 'COMPLETED' ? i.minutes : 0)),
-            totalTime: i.minutes,
-            status: i.plan_status === 'COMPLETED' ? 'completed' as const : i.plan_status === 'IN_PROGRESS' ? 'continue' as const : 'start' as const,
-          })),
+          subtopics: items.map(i => {
+            const sumTimings = topicTimings
+              .filter(t => t.syllabus_id === i.syllabus_id)
+              .reduce((acc, curr) => acc + (curr.total_estimate || 0), 0);
+            return {
+              id: i.id.toString(), name: i.topic, description: `Chapter: ${i.chapter}`,
+              timeSpent: Math.round(sumTimings || (i.plan_status === 'COMPLETED' ? i.minutes : 0)),
+              totalTime: i.minutes,
+              status: i.plan_status === 'COMPLETED' ? 'completed' as const : i.plan_status === 'IN_PROGRESS' ? 'continue' as const : 'start' as const,
+            };
+          }),
         };
       });
     });
@@ -1854,31 +1859,8 @@ const StudyPlan = () => {
                             const finalIsUnlocked = !((isFuture && activeDay > currentProgressDay) || isPrevAssessmentMissing);
 
                             return (
-                              <Button
-                                disabled={!finalIsUnlocked}
-                                onClick={() => handleViewDetails(topic)}
-                                onMouseEnter={() => {
-                                  if (finalIsUnlocked && user?.id) {
-                                    topic.subtopics.forEach(st => prefetchTopic(queryClient, st.id, user.id));
-                                  }
-                                }}
-                                className={cn(
-                                  "w-full h-11 rounded-xl text-sm font-medium transition-all",
-                                  !finalIsUnlocked
-                                    ? "bg-secondary text-muted-foreground cursor-not-allowed opacity-80"
-                                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                                )}
-                              >
-                                {!finalIsUnlocked ? (
-                                  <div className="flex items-center gap-2">
-                                    <Lock className="w-4 h-4" />
-                                    <span>Locked</span>
-                                  </div>
-                                ) : "View Details"}
-                              </Button>
-
                               // <Button
-
+                              //   disabled={!finalIsUnlocked}
                               //   onClick={() => handleViewDetails(topic)}
                               //   onMouseEnter={() => {
                               //     if (finalIsUnlocked && user?.id) {
@@ -1887,12 +1869,35 @@ const StudyPlan = () => {
                               //   }}
                               //   className={cn(
                               //     "w-full h-11 rounded-xl text-sm font-medium transition-all",
-
-                              //     "bg-primary hover:bg-primary/90 text-primary-foreground"
+                              //     !finalIsUnlocked
+                              //       ? "bg-secondary text-muted-foreground cursor-not-allowed opacity-80"
+                              //       : "bg-primary hover:bg-primary/90 text-primary-foreground"
                               //   )}
                               // >
-                              //   "View Details"
+                              //   {!finalIsUnlocked ? (
+                              //     <div className="flex items-center gap-2">
+                              //       <Lock className="w-4 h-4" />
+                              //       <span>Locked</span>
+                              //     </div>
+                              //   ) : "View Details"}
                               // </Button>
+
+                              <Button
+
+                                onClick={() => handleViewDetails(topic)}
+                                onMouseEnter={() => {
+                                  if (finalIsUnlocked && user?.id) {
+                                    topic.subtopics.forEach(st => prefetchTopic(queryClient, st.id, user.id));
+                                  }
+                                }}
+                                className={cn(
+                                  "w-full h-11 rounded-xl text-sm font-medium transition-all",
+
+                                  "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                )}
+                              >
+                                View Details
+                              </Button>
                             );
                           })()}
                         </div>
@@ -1922,7 +1927,7 @@ const StudyPlan = () => {
                 <img
                   src={selectedTopic.image}
                   alt={selectedTopic.title}
-                  className="w-32 h-32 object-contain opacity-30"
+                  className="w-32 h-32 object-contain "
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = getSubjectIconFallback(selectedTopic.title);
                   }}
@@ -1930,34 +1935,49 @@ const StudyPlan = () => {
               </div>
 
               <div className="space-y-4">
-                {selectedTopic.subtopics.map((subtopic) => (
-                  <div key={subtopic.id} className="bg-primary rounded-2xl p-5">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-                      <div className="flex-1">
-                        <h3 className="text-primary-foreground text-lg font-medium mb-1">{subtopic.name}</h3>
-                        <p className="text-primary-foreground/70 text-sm">{subtopic.description}</p>
+                {selectedTopic.subtopics.map((subtopic) => {
+                  // Re-calculate live timeSpent directly from real-time fetched topicTimings so returning instantly adjusts
+                  const matchingTimings = topicTimings.filter(t => t.syllabus_id.toString() === subtopic.id);
+                  const activeTiming = matchingTimings.find(t => !t.end_time);
+
+                  let liveTimeSpent = subtopic.timeSpent; // defaults to backend DB summed minute total
+
+                  // if there is currently an active timing that hasn't closed yet, add real-time difference in minutes
+                  if (activeTiming && activeTiming.start_time) {
+                    const startTimeStr = activeTiming.start_time.endsWith('Z') ? activeTiming.start_time : `${activeTiming.start_time}Z`;
+                    const ongoingMinutes = Math.floor((new Date().getTime() - new Date(startTimeStr).getTime()) / (1000 * 60));
+                    liveTimeSpent += ongoingMinutes;
+                  }
+
+                  return (
+                    <div key={subtopic.id} className="bg-primary rounded-2xl p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-primary-foreground text-lg font-medium mb-1">{subtopic.name}</h3>
+                          <p className="text-primary-foreground/70 text-sm">{subtopic.description}</p>
+                        </div>
+                        <Button
+                          onClick={() => handleSubtopicClick(selectedTopic.id, subtopic.id)}
+                          onMouseEnter={() => {
+                            if (user?.id) prefetchTopic(queryClient, subtopic.id, user.id);
+                          }}
+                          className="bg-card hover:bg-card/90 text-foreground px-6 rounded-xl font-medium shrink-0"
+                        >
+                          {subtopic.status === "continue" ? "Continue" : subtopic.status === "completed" ? "Review" : "Start Now"}
+                        </Button>
                       </div>
-                      <Button
-                        onClick={() => handleSubtopicClick(selectedTopic.id, subtopic.id)}
-                        onMouseEnter={() => {
-                          if (user?.id) prefetchTopic(queryClient, subtopic.id, user.id);
-                        }}
-                        className="bg-card hover:bg-card/90 text-foreground px-6 rounded-xl font-medium shrink-0"
-                      >
-                        {subtopic.status === "continue" ? "Continue" : subtopic.status === "completed" ? "Review" : "Start Now"}
-                      </Button>
+                      <div>
+                        <div className="flex items-center justify-between text-primary-foreground/80 text-sm mb-2">
+                          <span>Time Spent</span>
+                          <span className="font-medium text-primary-foreground">{liveTimeSpent}m / {subtopic.totalTime}m</span>
+                        </div>
+                        <div className="h-2 bg-primary-foreground/10 rounded-full overflow-hidden">
+                          <div className="h-full bg-accent rounded-full transition-all duration-1000 ease-linear" style={{ width: `${Math.min((liveTimeSpent / subtopic.totalTime) * 100, 100)}%` }} />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="flex items-center justify-between text-primary-foreground/80 text-sm mb-2">
-                        <span>Time Spent</span>
-                        <span className="font-medium text-primary-foreground">{subtopic.timeSpent}m / {subtopic.totalTime}m</span>
-                      </div>
-                      <div className="h-2 bg-primary-foreground/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${(subtopic.timeSpent / subtopic.totalTime) * 100}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

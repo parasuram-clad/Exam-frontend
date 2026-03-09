@@ -559,6 +559,10 @@ const StudyContent = () => {
   const [showResultsOnly, setShowResultsOnly] = useState(false);
   const [resultsQuestions, setResultsQuestions] = useState<any[] | undefined>(undefined);
 
+  // New state for reading time calculation
+  const [activeReadingSessionId, setActiveReadingSessionId] = useState<number | null>(null);
+  const [elapsedReadingSeconds, setElapsedReadingSeconds] = useState(0);
+
   const readingPanelRef = useRef<HTMLDivElement>(null);
   const notesPanelRef = useRef<HTMLDivElement>(null);
 
@@ -592,6 +596,13 @@ const StudyContent = () => {
   const { data: assessmentHistory } = useQuery({
     queryKey: ['assessment-history', user?.id, parsedSubtopicId],
     queryFn: () => studyService.getAssessmentHistory(user!.id, parsedSubtopicId),
+    enabled: !!user?.id && !isNaN(parsedSubtopicId),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: timingHistory = [] } = useQuery({
+    queryKey: ['topic-timings', user?.id, parsedSubtopicId],
+    queryFn: () => studyService.getUserTopicTimings(user!.id, parsedSubtopicId),
     enabled: !!user?.id && !isNaN(parsedSubtopicId),
     staleTime: 5 * 60 * 1000,
   });
@@ -683,13 +694,14 @@ const StudyContent = () => {
 
   // Handle topic timing
   useEffect(() => {
+    let isActive = true;
     if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
       const startTiming = async () => {
         try {
-          await studyService.startTopicTiming(user.id, parsedSubtopicId);
+          const timing = await studyService.startTopicTiming(user.id, parsedSubtopicId);
+          if (isActive) setActiveReadingSessionId(timing.id);
           console.log("Topic timing started");
         } catch (err: any) {
-          // If 400, session already active, which is fine
           if (err.response?.status !== 400) {
             console.error("Failed to start topic timing", err);
           }
@@ -697,6 +709,13 @@ const StudyContent = () => {
       };
       startTiming();
     }
+
+    return () => {
+      isActive = false;
+      if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
+        studyService.stopTopicTiming(user.id, parsedSubtopicId).catch(() => { });
+      }
+    };
   }, [user?.id, parsedSubtopicId]);
 
   // When keyword changes, reset editing state
@@ -706,6 +725,28 @@ const StudyContent = () => {
       setIsEditingNote(!keywordNotes[selectedKeyword]);
     }
   }, [selectedKeyword, keywordNotes]);
+
+  // Track real-time elapsed reading time
+  useEffect(() => {
+    let readingTimer: NodeJS.Timeout;
+    if (activeReadingSessionId) {
+      // Find the active session start time if available
+      const activeTiming = timingHistory.find(t => t.id === activeReadingSessionId);
+      if (activeTiming && activeTiming.start_time) {
+        // Append Z to enforce UTC parsing if backend gives naive UTC time
+        const startTimeStr = activeTiming.start_time.endsWith('Z') ? activeTiming.start_time : `${activeTiming.start_time}Z`;
+        const elapsed = Math.max(0, Math.floor((new Date().getTime() - new Date(startTimeStr).getTime()) / 1000));
+        setElapsedReadingSeconds(elapsed);
+      }
+
+      readingTimer = setInterval(() => {
+        setElapsedReadingSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedReadingSeconds(0);
+    }
+    return () => clearInterval(readingTimer);
+  }, [activeReadingSessionId, timingHistory]);
 
   useEffect(() => {
     if (isAssessmentStarted && !isAssessmentFinished && timeLeft > 0) {
@@ -821,6 +862,13 @@ const StudyContent = () => {
   };
 
   const startAssessment = () => {
+    // End reading session explicitly
+    if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
+      studyService.stopTopicTiming(user.id, parsedSubtopicId)
+        .then(() => queryClient.invalidateQueries({ queryKey: ['topic-timings'] }))
+        .catch(() => { });
+    }
+
     setIsAssessmentStarted(true);
     setIsAssessmentFinished(false);
     setTimeLeft(600);
@@ -889,13 +937,8 @@ const StudyContent = () => {
 
       toast.success("Assessment submitted successfully!");
 
-      // Stop topic timing
-      try {
-        await studyService.stopTopicTiming(user.id, parsedSubtopicId);
-        console.log("Topic timing stopped");
-      } catch (err) {
-        console.error("Failed to stop topic timing", err);
-      }
+      // Invalidate query to refresh timing stats
+      queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id, parsedSubtopicId] });
 
       // Invalidate queries to refresh progress and history
       queryClient.invalidateQueries({ queryKey: ['study-plans', user.id] });

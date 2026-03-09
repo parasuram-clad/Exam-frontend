@@ -324,7 +324,11 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                                         key={i}
                                         className={cn(
                                             "h-1.5 w-8 rounded-full transition-colors",
-                                            i === currentQuestionIndex ? "bg-foreground" : "bg-muted"
+                                            i === currentQuestionIndex
+                                                ? "bg-foreground"
+                                                : selectedAnswers[i] !== null
+                                                    ? "bg-foreground/50"
+                                                    : "bg-muted"
                                         )}
                                     />
                                 ))}
