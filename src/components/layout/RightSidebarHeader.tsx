@@ -129,7 +129,7 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-sm font-medium text-[#0F172A]">Notifications</h3>
                                     {unreadCount > 0 && (
-                                        <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 text-[10px] font-medium border border-rose-100">
+                                        <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium border border-primary/20">
                                             {unreadCount} New
                                         </span>
                                     )}
@@ -175,13 +175,13 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
                                                 key={n.id}
                                                 className={cn(
                                                     "flex gap-3 px-4 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer relative",
-                                                    !n.read_status && "bg-rose-50/30"
+                                                    !n.read_status && "bg-primary/[0.03]"
                                                 )}
                                                 onClick={() => handleMarkAsRead(n.id)}
                                             >
                                                 {/* Unread accent stripe */}
                                                 {!n.read_status && (
-                                                    <div className="absolute left-0 top-3 bottom-3 w-1 bg-rose-500 rounded-r-full" />
+                                                    <div className="absolute left-0 top-3 bottom-3 w-1 bg-primary rounded-r-full" />
                                                 )}
                                                 <div className={cn("w-10 h-10 rounded-full flex items-center justify-center shrink-0 border border-transparent", bg)}>
                                                     <Icon className={cn("w-5 h-5", color)} />
@@ -200,7 +200,7 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
                                                     </p>
                                                 </div>
                                                 {!n.read_status && (
-                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white shrink-0" />
+                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full ring-2 ring-white shrink-0" />
                                                 )}
                                             </div>
                                         );

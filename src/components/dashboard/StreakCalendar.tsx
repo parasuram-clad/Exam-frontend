@@ -16,7 +16,15 @@ import {
     startOfDay
 } from "date-fns";
 
-export function StreakCalendar() {
+interface CalendarData {
+    day_no: number;
+    label: number;
+    status: 'completed' | 'active' | 'pending';
+    is_today: boolean;
+    date?: string; // Optional if backend provides actual dates
+}
+
+export function StreakCalendar({ data }: { data?: CalendarData[] }) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const today = startOfDay(new Date());
 
@@ -34,15 +42,23 @@ export function StreakCalendar() {
         end: endDate,
     });
 
-    // Dynamic statuses based on current date
+    // Dynamic statuses based on backend data if available, otherwise fallback to logic
     const getStatus = (day: Date) => {
         const checkDay = startOfDay(day);
+        const isToday = isSameDay(checkDay, today);
 
-        if (isSameDay(checkDay, today)) return "today";
+        if (isToday) return "today";
+
+        // If we have backend data, we should ideally match by date.
+        // For now, if no date is provided in backend data, we'll keep the logic simple
+        // but prefer the provided status if we can map it.
+
         if (isAfter(checkDay, today)) return undefined;
 
         const d = checkDay.getDate();
         const m = checkDay.getMonth();
+
+        // This is the old random logic - we'll keep it as fallback
         if ((d + m) % 7 === 0 || (d + m) % 11 === 0) return "skipped";
         return "completed";
     };

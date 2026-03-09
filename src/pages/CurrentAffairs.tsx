@@ -16,6 +16,7 @@ import {
   Clock,
   AlertCircle,
   Bell,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import authService, { UserMe } from "@/services/auth.service";
+import currentAffairsService, { Article as ApiArticle } from "@/services/currentAffairs.service";
 import pic from "@/assets/pic.png";
 
 import polityIcon from "@/assets/current-affairs/polity-icon.png";
@@ -46,63 +48,44 @@ import tamilnaduIcon from "@/assets/current-affairs/tamilnadu-icon.png";
 import economyIcon from "@/assets/current-affairs/economy-icon.png";
 import dailyQuizIcon from "@/assets/daily-quize-icon.png";
 
-interface Article {
-  id: string;
-  title: string;
-  summary: string;
-  category: string;
-  date: string;
-  readTime: string;
-  important: boolean;
-  bookmarked: boolean;
-  tags: string[];
-  full_content?: {
-    introduction: string;
-    sections: {
-      title: string;
-      content: string;
-      is_list?: boolean;
-      list_items?: string[];
-      is_key_value?: boolean;
-    }[];
-    possible_question: {
-      question: string;
-      answer: string;
-    };
-  };
-}
+// We now use ApiArticle imported from the service instead, but defining locally just in case for old props.
+interface Article extends ApiArticle { }
 
 const categories = [
   { id: "all", label: "All" },
   { id: "polity", label: "Polity" },
   { id: "economy", label: "Economy" },
   { id: "science", label: "Science & Tech" },
-  { id: "tamilnadu", label: "Tamil Nadu" },
+  { id: "tamil-nadu", label: "Tamil Nadu" },
   { id: "international", label: "International" },
+  { id: "awards", label: "Awards" },
 ];
 
 const categoryIcons: Record<string, string> = {
   polity: polityIcon,
   economy: economyIcon,
-  tamilnadu: tamilnaduIcon,
+  "tamil-nadu": tamilnaduIcon,
   international: internationalIcon,
   science: internationalIcon,
+  awards: dailyQuizIcon,
 };
 
 const categoryColors: Record<string, string> = {
   polity: "text-purple-600 bg-purple-50 border-purple-100",
   economy: "text-amber-600 bg-amber-50 border-amber-100",
-  tamilnadu: "text-emerald-600 bg-emerald-50 border-emerald-100",
+  "tamil-nadu": "text-emerald-600 bg-emerald-50 border-emerald-100",
   international: "text-blue-600 bg-blue-50 border-blue-100",
   science: "text-indigo-600 bg-indigo-50 border-indigo-100",
+  awards: "text-rose-600 bg-rose-50 border-rose-100",
 };
 
 const categoryDotColors: Record<string, string> = {
   polity: "bg-purple-500",
   economy: "bg-amber-500",
-  tamilnadu: "bg-emerald-500",
+  "tamil-nadu": "bg-emerald-500",
   international: "bg-blue-500",
   science: "bg-indigo-500",
+  awards: "bg-rose-500",
 };
 
 const mockArticles: Article[] = [
@@ -113,6 +96,7 @@ const mockArticles: Article[] = [
       "India hosted the 9th International Solar Alliance (ISA) Summit in New Delhi, focusing on green energy transitions and solar technology sharing for developing nations.",
     category: "international",
     date: "Feb 20, 2026",
+    date_raw: "2026-02-20",
     readTime: "5 min",
     important: true,
     bookmarked: false,
@@ -161,8 +145,9 @@ const mockArticles: Article[] = [
     title: "Tamil Nadu Launches New Skill Development Scheme",
     summary:
       "The Tamil Nadu Government has introduced a new skill development scheme aimed at improving employability among rural youth through industry-based training programs.",
-    category: "tamilnadu",
+    category: "tamil-nadu",
     date: "Feb 19, 2026",
+    date_raw: "2026-02-19",
     readTime: "3 min",
     important: true,
     bookmarked: false,
@@ -215,8 +200,9 @@ const mockArticles: Article[] = [
     title: "Tamil Nadu Water Management Policy 2026",
     summary:
       "Tamil Nadu approved a new policy focusing on Cauvery conservation, irrigation reforms, and groundwater sustainability. The policy aims to ensure long-term water security for the state.",
-    category: "tamilnadu",
+    category: "tamil-nadu",
     date: "Feb 17, 2026",
+    date_raw: "2026-02-17",
     readTime: "3 min",
     important: false,
     bookmarked: true,
@@ -242,6 +228,7 @@ const mockArticles: Article[] = [
       "The Indian government has approved Phase II of the National Semiconductor Mission to establish a robust domestic ecosystem for electronics manufacturing.",
     category: "science",
     date: "Dec 26, 2026",
+    date_raw: "2026-12-26",
     readTime: "5 min",
     important: true,
     bookmarked: true,
@@ -267,6 +254,7 @@ const mockArticles: Article[] = [
       "RBI expanded the digital rupee pilot to promote secure retail transactions and strengthen digital payment systems across more cities.",
     category: "economy",
     date: "Dec 24, 2026",
+    date_raw: "2026-12-24",
     readTime: "4 min",
     important: false,
     bookmarked: true,
@@ -344,9 +332,8 @@ const CurrentAffairsRightSidebar = ({
     }
   }, [isArticleSelected]);
 
-  const bookmarkedArticles = articles.filter(a => a.bookmarked);
-
-  const filteredSavedNews = bookmarkedArticles.filter(item => {
+  // articles prop now contains ONLY bookmarked articles fetched from the dedicated endpoint
+  const filteredSavedNews = articles.filter(item => {
     // Search filter
     const matchesSearch = item.title.toLowerCase().includes(savedNewsSearch.toLowerCase()) ||
       item.category.toLowerCase().includes(savedNewsSearch.toLowerCase());
@@ -627,28 +614,100 @@ const CurrentAffairs = () => {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [articles, setArticles] = useState(mockArticles);
+  const [articles, setArticles] = useState<Article[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
+  const [isQuizLoading, setIsQuizLoading] = useState(false);
+  const [bookmarkedArticles, setBookmarkedArticles] = useState<Article[]>([]);
 
   const isDesktop = useMediaQuery("(min-width: 1280px)");
+
+  const handleDateChange = (date: Date) => {
+    setLoading(true);
+    setArticles([]);
+    setSelectedDate(date);
+    setIsCalendarOpen(false);
+  };
+
+  const loadArticles = async (date: Date) => {
+    try {
+      setLoading(true);
+      // Use YYYY-MM-DD format in local time to avoid timezone shifts
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
+      const loadedArticles = await currentAffairsService.getArticles(dateStr);
+      setArticles(loadedArticles);
+    } catch (err) {
+      console.error("Failed to load articles", err);
+      if (date.toDateString() === new Date().toDateString()) {
+        setArticles(mockArticles);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadBookmarks = async () => {
+    try {
+      const saved = await currentAffairsService.getBookmarks();
+      setBookmarkedArticles(saved);
+    } catch (err) {
+      console.error("Failed to load bookmarks", err);
+    }
+  };
 
   useEffect(() => {
     const initData = async () => {
       try {
         const u = await authService.getCurrentUser();
-        setUser(u);
+        if (u) setUser(u);
       } catch (err) {
-        console.error("Failed to load user data", err);
-        // Fallback for demo if needed, otherwise toast
-      } finally {
-        setLoading(false);
+        console.error("Failed to load user", err);
       }
+      loadBookmarks();
     };
     initData();
   }, []);
+
+  useEffect(() => {
+    loadArticles(selectedDate);
+  }, [selectedDate]);
+
+  const handleStartQuiz = async () => {
+    try {
+      setIsQuizLoading(true);
+      setIsQuizOpen(true);
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      const mcqs = await currentAffairsService.getMCQs(dateStr);
+
+      if (mcqs && mcqs.length > 0) {
+        const formattedQuestions = mcqs.map((m: any) => ({
+          id: m.id,
+          question: m.question_text,
+          options: [m.option_a, m.option_b, m.option_c, m.option_d],
+          correctAnswer: ["A", "B", "C", "D"].indexOf(m.correct_option),
+          explanation: m.explanation,
+          subject: "Current Affairs",
+          difficulty: "Medium"
+        }));
+        setQuizQuestions(formattedQuestions);
+      } else {
+        toast.info("No quiz available for the selected date.");
+        setQuizQuestions([]);
+      }
+    } catch (err) {
+      console.error("Failed to load quiz", err);
+      toast.error("Error loading quiz questions");
+    } finally {
+      setIsQuizLoading(false);
+    }
+  };
 
   const userName = user?.full_name || user?.username || "Aspirant";
   const initials = userName
@@ -674,17 +733,47 @@ const CurrentAffairs = () => {
       a.tags.some((t) =>
         t.toLowerCase().includes(searchQuery.toLowerCase())
       );
-    // Date filter
-    const formattedSelected = formatArticleDate(selectedDate);
-    const matchDate = a.date === formattedSelected;
+    // Date filter - Backend already filters by date if dateStr is passed,
+    // but we filter again here to be safe and handle mock/search data.
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const formattedSelected = `${year}-${month}-${day}`;
+
+    // a.date is now provided as the raw YYYY-MM-DD string from backend if used in comparison
+    const matchDate = a.date_raw ? a.date_raw === formattedSelected : true;
 
     return matchCategory && matchSearch && matchDate;
   });
 
-  const toggleBookmark = (id: string) => {
+  const toggleBookmark = async (id: string) => {
+    // Optimistic UI update
     setArticles((prev) =>
       prev.map((a) => (a.id === id ? { ...a, bookmarked: !a.bookmarked } : a))
     );
+    if (selectedArticle && selectedArticle.id === id) {
+      setSelectedArticle(prev => prev ? { ...prev, bookmarked: !prev.bookmarked } : prev);
+    }
+
+    try {
+      const isBookmarked = await currentAffairsService.toggleBookmark(id);
+      loadBookmarks(); // Refresh the bookmarks list
+      if (isBookmarked) {
+        toast.success("News saved to bookmarks");
+      } else {
+        toast.success("News removed from bookmarks");
+      }
+    } catch (err) {
+      console.error("Failed to toggle bookmark", err);
+      // Revert optimism if failed
+      toast.error("Failed to update bookmark status");
+      setArticles((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, bookmarked: !a.bookmarked } : a))
+      );
+      if (selectedArticle && selectedArticle.id === id) {
+        setSelectedArticle(prev => prev ? { ...prev, bookmarked: !prev.bookmarked } : prev);
+      }
+    }
   };
 
   return (
@@ -696,10 +785,10 @@ const CurrentAffairs = () => {
           avatarUrl={avatarUrl}
           initials={initials}
           selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
+          onSelectDate={handleDateChange}
           isArticleSelected={!!selectedArticle}
           onSelectArticle={setSelectedArticle}
-          articles={articles}
+          articles={bookmarkedArticles}
         />
       }
     >
@@ -756,7 +845,7 @@ const CurrentAffairs = () => {
             </p>
           </div>
           <Button
-            onClick={() => setIsQuizOpen(true)}
+            onClick={handleStartQuiz}
             className="w-full sm:w-auto rounded-xl font-semibold px-6 flex-shrink-0 bg-white text-[#1e293b] hover:bg-slate-50 shadow-sm transition-all border border-[#F1F5F9] text-sm h-11"
           >
             Start Quiz
@@ -945,10 +1034,7 @@ const CurrentAffairs = () => {
                           <div className="bg-white p-2">
                             <QuizCalendar
                               selectedDate={selectedDate}
-                              onSelectDate={(date) => {
-                                setSelectedDate(date);
-                                setIsCalendarOpen(false);
-                              }}
+                              onSelectDate={handleDateChange}
                             />
                           </div>
                         </PopoverContent>
@@ -975,102 +1061,109 @@ const CurrentAffairs = () => {
                   </motion.div>
 
                   {/* Articles List */}
-                  <motion.div
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="visible"
-                    className="space-y-4"
-                  >
-                    <AnimatePresence mode="popLayout">
-                      {filtered.length === 0 ? (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-center py-16 text-[#94A3B8]"
-                        >
-                          <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                          <p className="font-semibold">No articles found</p>
-                          <p className="text-sm mt-1">
-                            Try a different category or search term
-                          </p>
-                        </motion.div>
-                      ) : (
-                        filtered.map((article) => (
+                  {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20 gap-3">
+                      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                      <p className="text-sm font-medium text-[#64748B]">Fetching latest updates...</p>
+                    </div>
+                  ) : (
+                    <motion.div
+                      variants={containerVariants}
+                      initial="hidden"
+                      animate="visible"
+                      className="space-y-4"
+                    >
+                      <AnimatePresence mode="popLayout">
+                        {filtered.length === 0 ? (
                           <motion.div
-                            key={article.id}
-                            variants={itemVariants}
-                            layout
-                            onClick={() => setSelectedArticle(article)}
-                            className="flex items-start gap-4 sm:gap-5 py-4 px-3 -mx-3 cursor-pointer group hover:bg-slate-50 transition-all rounded-2xl border border-transparent hover:border-slate-100"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-center py-16 text-[#94A3B8]"
                           >
-                            {/* Category Icon - Clean rounded square */}
-                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0 overflow-hidden group-hover:bg-white transition-colors">
-                              <img
-                                src={categoryIcons[article.category] || internationalIcon}
-                                alt={article.category}
-                                className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
-                              />
-                            </div>
+                            <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                            <p className="font-semibold">No articles found</p>
+                            <p className="text-sm mt-1">
+                              Try a different category or search term
+                            </p>
+                          </motion.div>
+                        ) : (
+                          filtered.map((article) => (
+                            <motion.div
+                              key={article.id}
 
-                            {/* Content */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex justify-between items-start gap-2">
-                                <h3 className="font-semibold text-[#1e293b] group-hover:text-primary transition-colors text-base sm:text-[17px] leading-tight mb-1.5">
-                                  {article.title}
-                                </h3>
-                                <ChevronRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-primary transition-all duration-300 mt-1 flex-shrink-0" />
+                              layout
+                              onClick={() => setSelectedArticle(article)}
+                              className="flex items-start gap-4 sm:gap-5 py-4 px-3 -mx-3 cursor-pointer group hover:bg-slate-50 transition-all rounded-2xl border border-transparent hover:border-slate-100"
+                            >
+                              {/* Category Icon - Clean rounded square */}
+                              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0 overflow-hidden group-hover:bg-white transition-colors">
+                                <img
+                                  src={categoryIcons[article.category] || internationalIcon}
+                                  alt={article.category}
+                                  className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                                />
                               </div>
-                              <p className="text-[13px] sm:text-[14px] text-[#64748B] line-clamp-2 leading-relaxed mb-3">
-                                {article.summary}
-                              </p>
 
-                              <div className="flex items-center gap-3 flex-wrap">
-                                {/* Category Tag */}
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className={cn(
-                                      "text-[8px] sm:text-[11px] font-semibold px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-full border flex items-center gap-1.5 transition-colors",
-                                      categoryColors[article.category] || "text-[#64748B] bg-slate-50 border-slate-100"
-                                    )}
-                                  >
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-start gap-2">
+                                  <h3 className="font-semibold text-[#1e293b] group-hover:text-primary transition-colors text-base sm:text-[17px] leading-tight mb-1.5">
+                                    {article.title}
+                                  </h3>
+                                  <ChevronRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-primary transition-all duration-300 mt-1 flex-shrink-0" />
+                                </div>
+                                <p className="text-[13px] sm:text-[14px] text-[#64748B] line-clamp-2 leading-relaxed mb-3">
+                                  {article.summary}
+                                </p>
+
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  {/* Category Tag */}
+                                  <div className="flex items-center gap-2">
                                     <span
                                       className={cn(
-                                        "w-1.5 h-1.5 rounded-full",
-                                        categoryDotColors[article.category] || "bg-[#94A3B8]"
+                                        "text-[8px] sm:text-[11px] font-semibold px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-full border flex items-center gap-1.5 transition-colors",
+                                        categoryColors[article.category] || "text-[#64748B] bg-slate-50 border-slate-100"
                                       )}
-                                    />
-                                    {categories.find((c) => c.id === article.category)?.label || article.category}
-                                  </span>
-                                  {article.important && (
-                                    <span className="text-[8px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-600 flex items-center gap-1.5">
-                                      <AlertCircle className="w-3.5 h-3.5" />
-                                      High Impact
+                                    >
+                                      <span
+                                        className={cn(
+                                          "w-1.5 h-1.5 rounded-full",
+                                          categoryDotColors[article.category] || "bg-[#94A3B8]"
+                                        )}
+                                      />
+                                      {categories.find((c) => c.id === article.category)?.label || article.category}
                                     </span>
-                                  )}
-                                  {/* Bookmark Action */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleBookmark(article.id);
-                                    }}
-                                    className="p-1 rounded-md hover:bg-white border border-transparent hover:border-slate-100 transition-colors"
-                                  >
-                                    {article.bookmarked ? (
-                                      <BookmarkCheck className="w-4 h-4 text-primary" />
-                                    ) : (
-                                      <Bookmark className="w-4 h-4 text-[#94A3B8]" />
+                                    {article.important && (
+                                      <span className="text-[8px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-600 flex items-center gap-1.5">
+                                        <AlertCircle className="w-3.5 h-3.5" />
+                                        High Impact
+                                      </span>
                                     )}
-                                  </button>
+                                    {/* Bookmark Action */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleBookmark(article.id);
+                                      }}
+                                      className="p-1 rounded-md hover:bg-white border border-transparent hover:border-slate-100 transition-colors"
+                                    >
+                                      {article.bookmarked ? (
+                                        <BookmarkCheck className="w-4 h-4 text-primary" />
+                                      ) : (
+                                        <Bookmark className="w-4 h-4 text-[#94A3B8]" />
+                                      )}
+                                    </button>
+                                  </div>
+
+
                                 </div>
-
-
                               </div>
-                            </div>
-                          </motion.div>
-                        ))
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
+                            </motion.div>
+                          ))
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -1083,6 +1176,8 @@ const CurrentAffairs = () => {
         onClose={() => setIsQuizOpen(false)}
         title={`Daily Quiz - ${formatArticleDate(selectedDate)}`}
         subtitle="Test your knowledge on today's current affairs"
+        questions={quizQuestions}
+        isLoading={isQuizLoading}
       />
     </DashboardLayout>
   );

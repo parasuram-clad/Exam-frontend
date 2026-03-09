@@ -7,6 +7,8 @@ import { Eye, EyeOff } from "lucide-react";
 import authService from "@/services/auth.service";
 import { toast } from "sonner";
 
+import { getErrorMessage } from "@/lib/utils";
+
 const Signup = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -43,7 +45,7 @@ const Signup = () => {
       toast.success(`Account created! Your username is ${response.username}`);
       navigate("/login");
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || "Registration failed. Please try again.");
+      toast.error(getErrorMessage(error, "Registration failed. Please try again."));
     } finally {
       setIsLoading(false);
     }

@@ -15,85 +15,15 @@ export interface QuizQuestion {
     correctAnswer?: number | string;
     correct_answer_index?: number | string;
     explanation: string;
+    is_correct?: boolean;
 }
 
-export const QUIZ_QUESTIONS: QuizQuestion[] = [
-    {
-        id: 1,
-        question: 'The Sangam Age in Tamil Nadu history is primarily known for which of the following?',
-        subject: 'History',
-        difficulty: 'Easy',
-        options: [
-            'Trade and commerce with Roman Empire',
-            'Development of Dravidian architecture',
-            'Tamil literature and poetry',
-            'Formation of first democratic assembly'
-        ],
-        correctAnswer: 2,
-        explanation: 'The Sangam Age (300 BCE - 300 CE) is primarily known for its rich Tamil literature and poetry. Sangam literature consists of the earliest known Tamil literary works.'
-    },
-    {
-        id: 2,
-        question: 'Which river is known as the "Sorrow of Tamil Nadu" due to frequent floods?',
-        subject: 'Geography',
-        difficulty: 'Medium',
-        options: [
-            'Cauvery River',
-            'Vaigai River',
-            'Thamirabarani River',
-            'Palar River'
-        ],
-        correctAnswer: 1,
-        explanation: 'The Vaigai River has historically caused devastating floods in the Madurai region, earning it the nickname "Sorrow of Tamil Nadu". However, the river also provides essential irrigation.'
-    },
-    {
-        id: 3,
-        question: 'The concept of "Separation of Powers" in the Indian Constitution is borrowed from which country?',
-        subject: 'Polity',
-        difficulty: 'Medium',
-        options: [
-            'United Kingdom',
-            'United States of America',
-            'France',
-            'Ireland'
-        ],
-        correctAnswer: 1,
-        explanation: 'The principle of Separation of Powers, dividing government into Legislative, Executive, and Judicial branches, was borrowed from the USA. Montesquieu\'s theory influenced the American system, which in turn influenced India.'
-    },
-    {
-        id: 4,
-        question: 'What is the full form of NITI Aayog?',
-        subject: 'Economy',
-        difficulty: 'Easy',
-        options: [
-            'National Institution for Transforming India',
-            'National Institute for Trade and Industry',
-            'National Integration and Technological Innovation',
-            'National Investment and Trade Initiative'
-        ],
-        correctAnswer: 0,
-        explanation: 'NITI Aayog stands for National Institution for Transforming India. It was formed in 2015, replacing the Planning Commission, to serve as a think tank of the Government of India.'
-    },
-    {
-        id: 5,
-        question: 'If 5 workers can complete a task in 12 days, how many days will 3 workers take to complete the same task?',
-        subject: 'Aptitude',
-        difficulty: 'Hard',
-        options: [
-            '15 days',
-            '18 days',
-            '20 days',
-            '24 days'
-        ],
-        correctAnswer: 2,
-        explanation: 'Using inverse proportion: If workers decrease, days increase proportionally. (5 × 12) / 3 = 60 / 3 = 20 days. This is a classic work-time problem solved using the formula: M1 × D1 = M2 × D2.'
-    }
-];
+export const QUIZ_QUESTIONS: QuizQuestion[] = [];
 
 interface DailyQuizModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onComplete?: (results: { score: number, answers: (number | null)[], questions: QuizQuestion[] }) => void;
+    onComplete?: (results: { answers: (number | null)[], questions: QuizQuestion[] }) => void;
     questions?: QuizQuestion[];
     title?: string;
     subtitle?: string;
@@ -152,7 +82,7 @@ function TrophyIllustration() {
 
 export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, subtitle, initialAnswers, initialShowEvaluation, initialShowDetails, timeTaken, isSubmitted, isLoading, score }: DailyQuizModalProps) {
     console.log("DailyQuizModal Props - questions:", questions);
-    const activeQuestions = questions && questions.length > 0 ? questions : QUIZ_QUESTIONS;
+    const activeQuestions = questions && questions.length > 0 ? questions : [];
     console.log("DailyQuizModal activeQuestions:", activeQuestions);
 
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -161,14 +91,22 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
     const [showDetails, setShowDetails] = useState(initialShowDetails || false);
     const [frozenQuestions, setFrozenQuestions] = useState<QuizQuestion[]>([]);
 
-    // Freeze questions when the quiz starts or review mode opens
+    // Freeze questions when the quiz starts, but allow updates if results/history are provided
     useEffect(() => {
-        if (isOpen && activeQuestions.length > 0 && frozenQuestions.length === 0) {
-            setFrozenQuestions(activeQuestions);
+        if (isOpen && activeQuestions.length > 0) {
+            // Case 1: Starting a fresh quiz
+            if (frozenQuestions.length === 0 && !initialShowEvaluation) {
+                setFrozenQuestions(activeQuestions);
+            }
+            // Case 2: We just submitted and got results, or we are viewing history
+            // We should update frozenQuestions to the ones containing results (is_correct, explanation)
+            else if (initialShowEvaluation || isSubmitted) {
+                setFrozenQuestions(activeQuestions);
+            }
         }
-    }, [isOpen, activeQuestions, frozenQuestions.length]);
+    }, [isOpen, activeQuestions, frozenQuestions.length, initialShowEvaluation, isSubmitted]);
 
-    // Clear frozen state when modal is fully closed
+    // Clear frozen state only when modal is closed
     useEffect(() => {
         if (!isOpen) {
             setFrozenQuestions([]);
@@ -259,10 +197,8 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
     };
 
     const handleEvaluate = () => {
-        // Just notify parent to start submission
         // Parent will set isLoading=true, and later initialShowEvaluation=true
         onComplete?.({
-            score: calculateScore(),
             answers: selectedAnswers,
             questions: displayQuestions
         });
@@ -278,25 +214,6 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
         onClose();
     };
 
-    const calculateScore = () => {
-        let correct = 0;
-        displayQuestions.forEach((question, index) => {
-            const rawCorrect = question.correctAnswer !== undefined ? question.correctAnswer : question.correct_answer_index;
-            // Handle both number and letter "A" if it comes as string
-            let correctIdx: number;
-            if (typeof rawCorrect === 'string') {
-                const letterMap: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
-                correctIdx = isNaN(Number(rawCorrect)) ? (letterMap[rawCorrect.toUpperCase()] ?? 0) : Number(rawCorrect);
-            } else {
-                correctIdx = Number(rawCorrect);
-            }
-
-            if (selectedAnswers[index] !== null && Number(selectedAnswers[index]) === correctIdx) {
-                correct++;
-            }
-        });
-        return correct;
-    };
 
     const getDifficultyColor = (difficulty?: string) => {
         if (!difficulty) return '#64748b';
@@ -312,8 +229,8 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
         }
     };
 
-    const displayScore = score !== undefined && score !== null ? score : calculateScore();
-    const accuracy = Math.round((displayScore / (displayQuestions.length || 1)) * 100);
+    const displayScore = score !== undefined && score !== null ? score : 0;
+    const accuracy = displayQuestions.length > 0 ? Math.round((displayScore / displayQuestions.length) * 100) : 0;
 
     const formatTime = (seconds?: number) => {
         if (seconds === undefined) return null;
@@ -347,7 +264,7 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                                 Question {currentQuestionIndex + 1}
                             </p>
                             <div className="flex gap-2 items-center">
-                                <span className="font-sans font-normal text-muted-foreground text-xs">
+                                {/*  <span className="font-sans font-normal text-muted-foreground text-xs">
                                     {currentQuestion?.subject}
                                 </span>
                                 <div className="size-1 bg-border rounded-full" />
@@ -356,7 +273,7 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                                     style={{ color: getDifficultyColor(currentQuestion?.difficulty) }}
                                 >
                                     {currentQuestion?.difficulty}
-                                </span>
+                                </span>*/}
                             </div>
                         </div>
 
@@ -537,18 +454,8 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                                         <p className="font-semibold text-foreground text-base mb-4">Detailed Review</p>
                                         <div className="flex flex-col gap-4">
                                             {displayQuestions.map((question, index) => {
-                                                const rawCorrect = question.correctAnswer !== undefined ? question.correctAnswer : question.correct_answer_index;
-                                                let correctIdx: number;
+                                                const isCorrect = question.is_correct || false;
                                                 const letterMap: Record<string, string> = { "0": "A", "1": "B", "2": "C", "3": "D" };
-
-                                                if (typeof rawCorrect === 'string') {
-                                                    const charMap: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
-                                                    correctIdx = isNaN(Number(rawCorrect)) ? (charMap[rawCorrect.toUpperCase()] ?? 0) : Number(rawCorrect);
-                                                } else {
-                                                    correctIdx = Number(rawCorrect);
-                                                }
-
-                                                const isCorrect = selectedAnswers[index] !== null && Number(selectedAnswers[index]) === correctIdx;
                                                 const userAnswer = selectedAnswers[index];
 
                                                 return (
@@ -567,28 +474,30 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                                                             </div>
                                                         </div>
                                                         <p className="text-foreground text-sm leading-relaxed">{question.question}</p>
-                                                        <div className="flex flex-col gap-2 mt-1">
+                                                        <div className="flex flex-col gap-2.5 mt-1">
                                                             {userAnswer !== null && (
                                                                 <div className="flex gap-2 items-start">
-                                                                    <p className="text-muted-foreground text-sm shrink-0 w-24">Your answer:</p>
-                                                                    <p className={cn('text-sm font-medium', isCorrect ? 'text-green-600' : 'text-red-600')}>
+                                                                    <p className="text-muted-foreground text-sm shrink-0 w-28">Your answer:</p>
+                                                                    <p className={cn('text-sm font-medium', isCorrect ? 'text-green-600' : 'text-red-500')}>
                                                                         <span className="font-bold mr-1">{letterMap[String(userAnswer)]}.</span> {question.options?.[userAnswer] || "N/A"}
                                                                     </p>
                                                                 </div>
                                                             )}
                                                             {!isCorrect && (
                                                                 <div className="flex gap-2 items-start">
-                                                                    <p className="text-muted-foreground text-sm shrink-0 w-24">Correct answer:</p>
+                                                                    <p className="text-muted-foreground text-sm shrink-0 w-28">Correct answer:</p>
                                                                     <p className="text-green-600 text-sm font-medium">
-                                                                        <span className="font-bold mr-1">{letterMap[String(correctIdx)]}.</span> {question.options?.[correctIdx] || "N/A"}
+                                                                        <span className="font-bold mr-1">{letterMap[String(question.correct_answer_index)]}.</span> {question.options?.[Number(question.correct_answer_index)] || "N/A"}
                                                                     </p>
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <div className="bg-muted/50 border border-border rounded-lg p-3 mt-1">
-                                                            <p className="text-muted-foreground text-xs font-medium mb-1">Explanation:</p>
-                                                            <p className="text-foreground text-sm leading-relaxed">{question?.explanation}</p>
-                                                        </div>
+                                                        {question.explanation && (
+                                                            <div className="bg-muted/50 border border-border rounded-lg p-3 mt-1">
+                                                                <p className="text-muted-foreground text-xs font-medium mb-1">Explanation:</p>
+                                                                <p className="text-foreground text-sm leading-relaxed">{question.explanation}</p>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}

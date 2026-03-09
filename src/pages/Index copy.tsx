@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout";
 import {
@@ -5,7 +6,7 @@ import {
 } from "@/components/dashboard";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import authService, { UserMe } from "@/services/auth.service";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { prefetchAllUserData } from "@/services/prefetch";
@@ -62,7 +63,7 @@ interface StudyPlanItem {
   buttonLabel: string;
 }
 
-const fallbackTodaysPlan: StudyPlanItem[] = [
+const todaysPlan: StudyPlanItem[] = [
   {
     icon: historyIcon,
     title: "History",
@@ -100,28 +101,20 @@ const Index = () => {
     queryFn: () => authService.getCurrentUser(),
     enabled: authService.isAuthenticated(),
   });
-  const queryClient = useQueryClient();
 
-  const { data: userPlans = [] } = useQuery({
-    queryKey: ['study-plans', user?.id],
-    queryFn: async () => {
-      try {
-        return await studyService.getUserStudyPlans(user!.id);
-      } catch {
-        return [];
-      }
-    },
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: roadmapData } = useQuery({
+  const { data: roadmapData, isLoading: roadmapLoading } = useQuery({
     queryKey: ['roadmap', user?.id],
     queryFn: () => studyService.getUserRoadmap(user!.id),
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
   });
 
+  const { data: userPlans } = useQuery({
+    queryKey: ['study-plans', user?.id],
+    queryFn: () => studyService.getUserStudyPlans(user!.id),
+    enabled: !!user?.id,
+  });
+
+  const queryClient = useQueryClient();
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   // useMediaQuery to detect desktop (xl breakpoint)
@@ -165,85 +158,6 @@ const Index = () => {
       });
     }
   };
-
-  const calculateCurrentProgressDay = (plans: any[]) => {
-    if (plans.length > 0) {
-      const sortedDays = Array.from(new Set(plans.map(p => p.day_no))).sort((a, b) => a - b);
-      const firstIncomplete = sortedDays.find(day => {
-        const dayPlans = plans.filter(p => p.day_no === day);
-        return !dayPlans.every(p => p.plan_status === 'COMPLETED');
-      });
-      return firstIncomplete || sortedDays[0] || 1;
-    }
-    return 1;
-  };
-
-  const getSubjectIconFallback = (subject: string) => {
-    const s = subject.toLowerCase();
-    if (s.includes("history") || s.includes("kural")) return historyIcon;
-    if (s.includes("geography") || s.includes("admin")) return economyIcon;
-    if (s.includes("science") || s.includes("polity")) return economyIcon;
-    if (s.includes("current") || s.includes("affairs")) return currentAffairsIcon;
-    return historyIcon;
-  };
-
-  const currentProgressDay = calculateCurrentProgressDay(userPlans);
-
-  const todaysPlan = useMemo(() => {
-    if (!roadmapData?.plan || roadmapData.plan.length === 0) return fallbackTodaysPlan;
-
-    // Status map to calculate progress
-    const statusMap: Record<number, string> = {};
-    if (userPlans) {
-      userPlans.forEach((p: any) => {
-        if (p.syllabus_id) statusMap[p.syllabus_id] = p.plan_status;
-      });
-    }
-
-    const activeRoadmapDay = roadmapData.plan.find((p: any) => p.day === currentProgressDay) || roadmapData.plan[0];
-    if (!activeRoadmapDay || !activeRoadmapDay.items) return fallbackTodaysPlan;
-
-    return activeRoadmapDay.items.map((item: any) => {
-      let title = item.subject || item.title || item.type;
-      let subtitle = "";
-      let tag = "";
-      let topics: string[] = [];
-      let progress = 0;
-      let buttonLabel = "Start Now";
-      let icon = item.image_url || getSubjectIconFallback(title);
-
-      if (item.type === 'TOPIC') {
-        const totalTopics = item.topic?.length || 1;
-        const completedCount = item.topic?.filter((t: any) => statusMap[t.id] === 'COMPLETED').length || 0;
-        const startCount = item.topic?.filter((t: any) => statusMap[t.id] === 'IN_PROGRESS').length || 0;
-
-        progress = Math.round((completedCount / totalTopics) * 100);
-        subtitle = `${totalTopics} Topic${totalTopics > 1 ? 's' : ''}`;
-        tag = title.includes("History") || title.includes("Economy") ? "General studies" : "Topic";
-        topics = item.topic?.map((t: any) => t.name) || [];
-
-        buttonLabel = progress === 100 ? "Review" : (completedCount > 0 || startCount > 0) ? "Continue Learning" : "Start Now";
-      } else if (item.type === 'TEST') {
-        subtitle = "Test available";
-        topics = [item.description || "Weekly Revision Test"];
-        buttonLabel = "Take Test";
-      } else {
-        subtitle = "Revision";
-        topics = [item.description || "Review topics"];
-        buttonLabel = "Start Revision";
-      }
-
-      return {
-        icon,
-        title: title.length > 20 ? title.substring(0, 17) + "..." : title,
-        subtitle,
-        tag,
-        progress,
-        topics: topics.slice(0, 2), // only show up to 2 topics on this card
-        buttonLabel
-      };
-    });
-  }, [roadmapData, userPlans, currentProgressDay]);
 
   const handleLogout = async () => {
     try {
@@ -549,71 +463,142 @@ const Index = () => {
             onScroll={checkScroll}
             className="grid grid-flow-col auto-cols-[280px] gap-4  -mx-4 px-4 lg:mx-0 lg:px-0 overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
-            {todaysPlan.map((item) => (
-              <motion.div
-                key={item.title}
-                variants={itemVariants}
-                whileHover={{ scale: 1.01 }}
-                className="bg-card rounded-2xl p-4 border border-border shadow-sm flex flex-col h-[230px] snap-center relative"
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-2 gap-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={item.icon}
-                      alt={item.title}
-                      className="w-10 h-10 object-contain flex-shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-foreground text-sm truncate">
-                        {item.title}
-                      </h3>
-                      <p className="text-[10px] text-muted-foreground">
-                        {item.subtitle}
-                      </p>
+            {roadmapLoading ? (
+              // Loading placeholders
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="bg-card rounded-2xl p-4 border border-border shadow-sm flex flex-col h-[230px] animate-pulse">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-muted rounded-xl" />
+                    <div className="space-y-2 flex-1">
+                      <div className="h-4 bg-muted rounded w-3/4" />
+                      <div className="h-3 bg-muted rounded w-1/2" />
                     </div>
                   </div>
-                  {item.tag && (
-                    <span className="text-[9px] font-medium bg-yellow-100   text-yellow-600 px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1 flex-shrink-0 mt-1">
-                      <span className="w-1 h-1 bg-yellow-600 rounded-full" />
-                      {item.tag}
-                    </span>
-                  )}
+                  <div className="h-2 bg-muted rounded w-full mb-4" />
+                  <div className="space-y-2 mb-4">
+                    <div className="h-3 bg-muted rounded w-full" />
+                    <div className="h-3 bg-muted rounded w-5/6" />
+                  </div>
+                  <div className="mt-auto h-10 bg-muted rounded-xl w-full" />
                 </div>
+              ))
+            ) : (() => {
+              // Find Today's day in roadmap
+              const todayStr = format(new Date(), 'yyyy-MM-dd');
+              const todayData = roadmapData?.plan?.find((p: any) => p.date === todayStr);
 
-                {/* Progress bar */}
-                <div className="mb-3">
-                  <Progress
-                    value={item.progress}
-                    className="h-1.5 bg-muted"
-                  />
+              // If no day matches today, fallback to day 1 or show nothing
+              const activeDayData = todayData || roadmapData?.plan?.[0];
+
+              if (!activeDayData) return (
+                <div className="bg-card rounded-2xl p-8 border border-border shadow-sm flex flex-col items-center justify-center h-[230px] w-full text-center">
+                  <Calendar className="w-8 h-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground font-medium">No topics scheduled for today.</p>
                 </div>
+              );
 
-                {/* Topics */}
-                <ul className="space-y-1 mb-2 flex-1">
-                  {item.topics.map((topic) => (
-                    <li
-                      key={topic}
-                      className="flex items-center gap-2 text-[13px] text-foreground"
+              // Headers status map from userPlans
+              const statusMap: Record<number, string> = {};
+              userPlans?.forEach((p: any) => {
+                if (p.syllabus_id) statusMap[p.syllabus_id] = p.plan_status;
+              });
+
+              // Extract all subtopics from the items of the active day
+              const allSubtopics: any[] = [];
+              activeDayData.items?.forEach((item: any) => {
+                if (item.type === 'TOPIC' && item.topic) {
+                  item.topic.forEach((t: any) => {
+                    allSubtopics.push({
+                      ...t,
+                      subject: item.subject,
+                      image_url: item.image_url
+                    });
+                  });
+                } else if (item.type === 'TEST' || item.type === 'REVISION') {
+                  allSubtopics.push({
+                    id: `special-${activeDayData.day}`,
+                    topic: item.title || (item.type === 'TEST' ? 'Weekly Test' : 'Revision'),
+                    subject: item.type,
+                    description: item.description || (item.type === 'TEST' ? 'Assessment for the week' : 'Review previous content'),
+                    status: statusMap[activeDayData.day] || 'start',
+                    type: item.type
+                  });
+                }
+              });
+
+              return allSubtopics.slice(0, 3).map((topic: any) => {
+                const subjectLower = topic.subject?.toLowerCase() || "";
+                let icon = currentAffairsIcon;
+                // Try to use provided image_url or fallback
+                if (topic.image_url) icon = topic.image_url;
+                else if (subjectLower.includes('history')) icon = historyIcon;
+                else if (subjectLower.includes('economy') || subjectLower.includes('polity')) icon = economyIcon;
+                else if (topic.type === 'TEST') icon = mockTestGirl;
+
+                const currentStatus = statusMap[topic.id] || topic.status || 'start';
+                const isCompleted = currentStatus === 'COMPLETED' || currentStatus === 'completed';
+                const isInProgress = currentStatus === 'IN_PROGRESS' || currentStatus === 'continue';
+
+                return (
+                  <motion.div
+                    key={`${topic.id}-${topic.type}-${topic.topic || topic.name}`}
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.01 }}
+                    className="bg-card rounded-2xl p-4 border border-border shadow-sm flex flex-col h-[230px] snap-center relative"
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-2 gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={icon}
+                          alt={topic.topic || topic.name}
+                          className="w-10 h-10 object-contain flex-shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-foreground text-sm truncate">
+                            {topic.topic || topic.name}
+                          </h3>
+                          <p className="text-[10px] text-muted-foreground font-medium">
+                            {topic.subject}
+                          </p>
+                        </div>
+                      </div>
+                      {topic.type && (
+                        <span className="text-[9px] font-medium bg-red-100 text-red-600 px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1 flex-shrink-0 mt-1">
+                          {topic.type}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="mb-3">
+                      <Progress
+                        value={isCompleted ? 100 : (isInProgress ? 50 : 0)}
+                        className="h-1.5 bg-muted"
+                      />
+                    </div>
+
+                    {/* Description */}
+                    <div className="mb-2 flex-1 overflow-hidden">
+                      <p className="text-[11px] text-muted-foreground line-clamp-3 font-medium">
+                        {topic.description || "Start studying this topic to improve your score."}
+                      </p>
+                    </div>
+
+                    {/* Action */}
+                    <Button
+                      onClick={() => navigate("/study-plan")}
+                      className={cn(
+                        "w-full rounded-xl font-medium h-10 mt-auto text-sm",
+                        isCompleted ? "bg-green-100 text-green-700 hover:bg-green-200 shadow-none border-none" : "bg-foreground text-background hover:bg-foreground/90"
+                      )}
                     >
-                      <span className="w-1 h-1 bg-foreground/40 rounded-full flex-shrink-0" />
-                      {topic}
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Action */}
-                <Button
-                  onClick={() => navigate("/study-plan")}
-                  onMouseEnter={() => {
-                    if (user?.id) prefetchAllUserData(queryClient, user);
-                  }}
-                  className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-xl font-medium h-10 mt-auto text-sm"
-                >
-                  {item.buttonLabel}
-                </Button>
-              </motion.div>
-            ))}
+                      {isCompleted ? "Completed" : (isInProgress ? "Continue Learning" : "Start Now")}
+                    </Button>
+                  </motion.div>
+                );
+              });
+            })()}
           </div>
         </motion.section>
 

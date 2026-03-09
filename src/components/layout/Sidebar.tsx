@@ -27,14 +27,15 @@ interface NavItem {
 interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
+  activePath?: string;
 }
 
 
-export function Sidebar({ isOpen, onToggle }: SidebarProps) {
+export function Sidebar({ isOpen, onToggle, activePath }: SidebarProps) {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  const currentPath = location.pathname;
+  const currentPath = activePath || location.pathname;
 
   const navItems: NavItem[] = [
     { icon: Home, label: t('nav.home', 'Home'), href: "/dashboard" },

@@ -17,10 +17,10 @@ const navItems = [
     { icon: TrendingUp, label: "Progress", href: "/progress" },
 ];
 
-export function MobileBottomNav() {
+export function MobileBottomNav({ activePath }: { activePath?: string }) {
     const navigate = useNavigate();
     const location = useLocation();
-    const currentPath = location.pathname;
+    const currentPath = activePath || location.pathname;
 
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden pointer-events-none">

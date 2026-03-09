@@ -13,6 +13,10 @@ import studyHoursIcon from "@/assets/dashboard/study-hours-icon.png";
 import accuracyIcon from "@/assets/dashboard/accuracy-icon.png";
 import mcqsIcon from "@/assets/dashboard/mcqs-icon.png";
 import rankIcon from "@/assets/dashboard/rank.png";
+import { useQuery } from "@tanstack/react-query";
+import studyService from "@/services/study.service";
+import authService from "@/services/auth.service";
+import { Loader2 } from "lucide-react";
 
 interface RightSidebarWidgetsProps {
     initialView?: 'streak' | 'leaderboard' | 'all';
@@ -21,13 +25,60 @@ interface RightSidebarWidgetsProps {
 export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgetsProps) {
     const navigate = useNavigate();
     const [isStreakInfoExpanded, setIsStreakInfoExpanded] = useState(false);
-    // If 'streak' view is requested, default the calendar to open
     const [isCalendarOpen, setIsCalendarOpen] = useState(initialView === 'streak');
+
+    const { data: userData } = useQuery({
+        queryKey: ['user-me'],
+        queryFn: () => authService.getCurrentUser(),
+    });
+
+    const { data: dashboardData, isLoading, error } = useQuery({
+        queryKey: ['dashboard-data', userData?.id],
+        queryFn: () => studyService.getDashboardData(userData!.id),
+        enabled: !!userData?.id,
+    });
 
     // Helper to determine visibility
     const showDailyPerformance = initialView === 'all';
     const showStreak = initialView === 'all' || initialView === 'streak';
     const showLeaderboard = initialView === 'all' || initialView === 'leaderboard';
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                <p className="text-sm text-muted-foreground animate-pulse font-medium">Loading dashboard...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="p-4 bg-destructive/10 text-destructive rounded-xl text-xs font-medium">
+                Unable to load dashboard data.
+            </div>
+        );
+    }
+
+    const dailyPerformance = dashboardData?.daily_performance || {
+        study_hours: 0,
+        accuracy: 0,
+        mcqs_solved: 0,
+        current_rank: 0
+    };
+
+    const streakCount = dashboardData?.streak?.current_streak || 0;
+
+    // Map backend leaderboard to LeaderboardEntry format
+    const leaderboardData = dashboardData?.leaderboard?.leaderboard?.map((l: any) => ({
+        rank: l.rank,
+        name: l.name,
+        initials: l.initials,
+        marks: l.total_marks,
+        accuracy: `${l.accuracy}%`,
+        isYou: l.is_current_user,
+        color: l.is_current_user ? "bg-slate-500" : (l.rank === 1 ? "bg-amber-500" : "bg-blue-600")
+    })) || [];
 
     return (
         <div className="space-y-8">
@@ -47,29 +98,29 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
                     <div className="bg-muted/50 rounded-xl p-3 h-20  flex items-center gap-2">
                         <img src={studyHoursIcon} alt="Study Hours" className="w-6 h-6" />
                         <div>
-                            <p className="text-xl font-semibold text-foreground">2.5</p>
-                            <p className="text-[10px] text-muted-foreground">Study Hours</p>
+                            <p className="text-xl font-semibold text-foreground">{dailyPerformance.study_hours}</p>
+                            <p className="text-[10px] text-muted-foreground font-medium">Study Hours</p>
                         </div>
                     </div>
                     <div className="bg-muted/50 rounded-xl p-3 h-20  flex items-center gap-2">
                         <img src={accuracyIcon} alt="Accuracy" className="w-6 h-6" />
                         <div>
-                            <p className="text-xl font-semibold text-foreground">65%</p>
-                            <p className="text-[10px] text-muted-foreground">Accuracy</p>
+                            <p className="text-xl font-semibold text-foreground">{dailyPerformance.accuracy}%</p>
+                            <p className="text-[10px] text-muted-foreground font-medium">Accuracy</p>
                         </div>
                     </div>
                     <div className="bg-muted/50 rounded-xl p-3 h-20  flex items-center gap-2">
                         <img src={mcqsIcon} alt="MCQs" className="w-6 h-6" />
                         <div>
-                            <p className="text-xl font-semibold  text-foreground">--</p>
-                            <p className="text-[10px] text-muted-foreground">MCQs Solved</p>
+                            <p className="text-xl font-semibold  text-foreground">{dailyPerformance.mcqs_solved}</p>
+                            <p className="text-[10px] text-muted-foreground font-medium">MCQs Solved</p>
                         </div>
                     </div>
                     <div className="bg-muted/50 rounded-xl p-3 h-20 flex items-center gap-2">
                         <img src={rankIcon} alt="Current Rank" className="w-6 h-6" />
                         <div>
-                            <p className="text-xl font-semibold text-foreground">--</p>
-                            <p className="text-[10px] text-muted-foreground">Current Rank</p>
+                            <p className="text-xl font-semibold text-foreground">{dailyPerformance.current_rank}</p>
+                            <p className="text-[10px] text-muted-foreground font-medium">Current Rank</p>
                         </div>
                     </div>
                 </div>
@@ -79,7 +130,8 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
             {showStreak && (
                 <>
                     <StreakWidget
-                        streakDays={3}
+                        streakDays={streakCount}
+                        calendar={dashboardData?.streak?.weekly_calendar}
                         onToggle={() => setIsCalendarOpen(!isCalendarOpen)}
                         isExpanded={isCalendarOpen}
                     />
@@ -93,7 +145,7 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
                                 transition={{ duration: 0.3 }}
                                 className="space-y-8 overflow-hidden"
                             >
-                                <StreakCalendar />
+                                <StreakCalendar data={dashboardData?.streak?.weekly_calendar} />
 
                                 {/* How Streak Works Collapsible */}
                                 <div className="bg-white rounded-xl border border-border/50 shadow-sm overflow-hidden transition-all duration-300">
@@ -150,7 +202,7 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
                 </>
             )}
 
-            {showLeaderboard && <LeaderboardWidget />}
+            {showLeaderboard && <LeaderboardWidget data={leaderboardData} />}
         </div>
     );
 }

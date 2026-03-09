@@ -10,9 +10,15 @@ interface StreakWidgetProps {
   streakDays: number;
   onToggle?: () => void;
   isExpanded?: boolean;
+  calendar?: {
+    day_no: number;
+    label: number;
+    status: 'completed' | 'active' | 'pending';
+    is_today: boolean;
+  }[];
 }
 
-export function StreakWidget({ streakDays, onToggle, isExpanded = false }: StreakWidgetProps) {
+export function StreakWidget({ streakDays, onToggle, isExpanded = false, calendar }: StreakWidgetProps) {
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }); // Monday start
 
   const weekDays = useMemo(() => {
@@ -21,16 +27,19 @@ export function StreakWidget({ streakDays, onToggle, isExpanded = false }: Strea
     return Array.from({ length: 7 }).map((_, i) => {
       const date = addDays(weekStart, i);
       const isToday = isSameDay(date, today);
-      const isCompleted = isBefore(date, today);
+
+      // If we have backend calendar info, use it. Otherwise fallback to calculation.
+      const backendDay = calendar?.find(c => c.day_no === (i + 1));
+      const completed = backendDay ? backendDay.status === 'completed' : isBefore(date, today);
 
       return {
         day: format(date, "EEEEE"),
         dateNum: format(date, "d"),
-        completed: isCompleted,
+        completed,
         isToday
       };
     });
-  }, [weekStart]);
+  }, [weekStart, calendar]);
 
   const lastCompletedIndex = weekDays
     .map((day, idx) => ({ completed: day.completed, idx }))

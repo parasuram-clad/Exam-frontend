@@ -25,7 +25,7 @@ import {
   Calendar,
   Layers,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import { DailyQuizModal, QUIZ_QUESTIONS } from "@/components/dashboard/DailyQuizModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -681,6 +681,24 @@ const StudyContent = () => {
     }
   }, [allNotes, subtopicId]);
 
+  // Handle topic timing
+  useEffect(() => {
+    if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
+      const startTiming = async () => {
+        try {
+          await studyService.startTopicTiming(user.id, parsedSubtopicId);
+          console.log("Topic timing started");
+        } catch (err: any) {
+          // If 400, session already active, which is fine
+          if (err.response?.status !== 400) {
+            console.error("Failed to start topic timing", err);
+          }
+        }
+      };
+      startTiming();
+    }
+  }, [user?.id, parsedSubtopicId]);
+
   // When keyword changes, reset editing state
   useEffect(() => {
     if (selectedKeyword) {
@@ -810,7 +828,7 @@ const StudyContent = () => {
     setAssessmentStartTime(new Date().toISOString());
   };
 
-  const handleAssessmentComplete = async (results: { score: number, answers: (number | null)[], questions: any[] }) => {
+  const handleAssessmentComplete = async (results: { answers: (number | null)[], questions: any[] }) => {
     if (!user?.id || !subtopicId || isNaN(parsedSubtopicId) || !assessmentStartTime) return;
 
     setIsSubmittingAssessment(true);
@@ -846,6 +864,7 @@ const StudyContent = () => {
 
       // Map backend results back to frontend format
       const letterToIdx: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
+
       const ans = response.results.map((r: any) => letterToIdx[r.selected_option] ?? null);
       const ques = response.results.map((r: any) => ({
         id: r.mcq_id,
@@ -854,14 +873,15 @@ const StudyContent = () => {
         subject: results.questions[0]?.subject || "General Science",
         difficulty: results.questions[0]?.difficulty || "Medium",
         options: r.options,
-        correctAnswer: r.correct_answer_index,
-        explanation: r.explanation
+        correct_answer_index: r.correct_answer_index,
+        explanation: r.explanation,
+        is_correct: r.is_correct
       }));
 
+      setQuizScore(response.correct_answers);
       setViewHistoryAnswers(ans);
       setResultsQuestions(ques);
       setViewHistoryTimeTaken(response.time_taken_seconds || (600 - timeLeft));
-      setQuizScore(response.correct_answers);
 
       setIsAssessmentFinished(true);
       setIsAssessmentSubmitted(true);
@@ -869,11 +889,20 @@ const StudyContent = () => {
 
       toast.success("Assessment submitted successfully!");
 
+      // Stop topic timing
+      try {
+        await studyService.stopTopicTiming(user.id, parsedSubtopicId);
+        console.log("Topic timing stopped");
+      } catch (err) {
+        console.error("Failed to stop topic timing", err);
+      }
+
       // Invalidate queries to refresh progress and history
       queryClient.invalidateQueries({ queryKey: ['study-plans', user.id] });
       queryClient.invalidateQueries({ queryKey: ['roadmap', user.id] });
       queryClient.invalidateQueries({ queryKey: ['topic-content', parsedSubtopicId, user.id] });
       queryClient.invalidateQueries({ queryKey: ['assessment-history', user.id, parsedSubtopicId] });
+      queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id] });
 
     } catch (error) {
       setIsSubmittingAssessment(false);
@@ -948,7 +977,7 @@ const StudyContent = () => {
       if (err.response) {
         console.error('Server error details:', err.response.data);
       }
-      toast.error(`Failed to save note: ${err.response?.data?.detail || err.message}`);
+      toast.error(getErrorMessage(err, "Failed to save note"));
     }
   };
 
@@ -1010,7 +1039,7 @@ const StudyContent = () => {
                   <div key={block.block_id} id={`block-${block.block_id}`} className="space-y-4">
                     <div className="relative group">
                       {block.sub_heading && (
-                        <h4 className="font-bold mb-2">{block.sub_heading}</h4>
+                        <h4 className="font-medium mb-2">{block.sub_heading}</h4>
                       )}
 
                       {block.type === 'paragraph' && (
@@ -1310,7 +1339,7 @@ const StudyContent = () => {
                   {focusedNoteKeyword && (
                     <button
                       onClick={() => (document.activeElement as HTMLElement)?.blur()}
-                      className="text-[12px] font-bold text-blue-500 uppercase tracking-wider py-1 px-3 bg-blue-50 rounded-lg"
+                      className="text-[12px] font-medium text-blue-500 uppercase tracking-wider py-1 px-3 bg-blue-50 rounded-lg"
                     >
                       Done
                     </button>
@@ -1484,7 +1513,7 @@ const StudyContent = () => {
         onComplete={handleAssessmentComplete}
         title={topicData?.task?.topic || "Study Assessment"}
         subtitle={`${topicAssessment?.total_questions || topicAssessment?.questions?.length || 0} Questions • 10 Minutes`}
-        questions={(showResultsOnly || isAssessmentFinished) && resultsQuestions?.length ? resultsQuestions : (topicAssessment?.questions || [])}
+        questions={(showResultsOnly || isAssessmentFinished) && resultsQuestions ? resultsQuestions : (topicAssessment?.questions || [])}
         initialAnswers={(showResultsOnly || isAssessmentFinished) ? viewHistoryAnswers : undefined}
         initialShowEvaluation={showResultsOnly || isAssessmentFinished}
         initialShowDetails={showResultsOnly}

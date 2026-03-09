@@ -16,6 +16,7 @@ import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchAllUserData } from "@/services/prefetch";
+import { getErrorMessage } from "@/lib/utils";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -45,7 +46,7 @@ const Login = () => {
       setShowOtp(true);
       toast.success("OTP sent successfully to your mobile");
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to send OTP. Please try again.");
+      toast.error(getErrorMessage(err, "Failed to send OTP. Please try again."));
     } finally {
       setIsLoading(false);
     }
@@ -70,7 +71,7 @@ const Login = () => {
       const from = (location.state as any)?.from?.pathname || "/dashboard";
       navigate(from, { replace: true });
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Invalid OTP. Please try again.");
+      toast.error(getErrorMessage(err, "Invalid OTP. Please try again."));
     } finally {
       setIsLoading(false);
     }

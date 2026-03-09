@@ -12,9 +12,10 @@ interface DashboardLayoutProps {
     children: React.ReactNode;
     rightSidebar?: React.ReactNode | ((props: { mobileView?: 'streak' | 'leaderboard' | 'all' }) => React.ReactNode);
     hideHeader?: boolean;
+    activePath?: string;
 }
 
-export function DashboardLayout({ children, rightSidebar, hideHeader = false }: DashboardLayoutProps) {
+export function DashboardLayout({ children, rightSidebar, hideHeader = false, activePath }: DashboardLayoutProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [mobileRightSidebarOpen, setMobileRightSidebarOpen] = useState(false);
     const [mobileRightSidebarView, setMobileRightSidebarView] = useState<'streak' | 'leaderboard' | 'all'>('all');
@@ -56,7 +57,7 @@ export function DashboardLayout({ children, rightSidebar, hideHeader = false }: 
     return (
         <div className="flex h-screen bg-background overflow-hidden ">
             {/* Sidebar - Direct child for flex layout */}
-            <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+            <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} activePath={activePath} />
 
             {/* Main Content Wrapper */}
             <div className="flex-1 flex min-w-0 overflow-hidden">
@@ -130,7 +131,7 @@ export function DashboardLayout({ children, rightSidebar, hideHeader = false }: 
             </div>
 
             {/* Mobile Bottom Navigation */}
-            <MobileBottomNav />
+            <MobileBottomNav activePath={activePath} />
 
         </div>
     );

@@ -124,13 +124,16 @@ const MyProgress = () => {
     if (entry.status === "completed") completedDays.add(entry.label);
   });
 
-  // Areas to improve — use backend data directly
-  const areasToImprove = (dashboardData?.areas_to_improve?.areas || []).map((area: any) => ({
-    title: area.subject,
-    subtitle: area.topic,
-    accuracy: `${Math.round(area.accuracy)}% Acc`,
-    color: area.badge_color === "red" ? "text-red-500" : "text-orange-500",
-  }));
+  // Areas to improve — derived from subjects with lowest progress
+  const areasToImprove = [...subjectWiseData]
+    .sort((a, b) => a.progress - b.progress)
+    .slice(0, 3)
+    .map((s) => ({
+      title: s.name,
+      subtitle: s.progress < 40 ? "Low Accuracy" : "Needs Practice",
+      accuracy: `${s.progress}% Done`,
+      color: s.progress < 40 ? "text-red-500" : "text-orange-500",
+    }));
 
   // Overall percentage
   const overallPct = Math.round(overallPerf?.overall_percentage ?? 0);

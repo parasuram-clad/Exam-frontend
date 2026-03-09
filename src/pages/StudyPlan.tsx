@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import authService, { UserMe } from "@/services/auth.service";
-import studyService, { StudyPlanResponse, StudyNote } from "@/services/study.service";
+import studyService, { StudyPlanResponse, StudyNote, TopicTiming } from "@/services/study.service";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,10 +20,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { prefetchTopic } from "@/services/prefetch";
+import TestEngine, { Question as TestQuestion, Answer as TestAnswer } from "@/components/TestEngine";
 
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -78,6 +79,9 @@ interface Subtopic {
   timeSpent: number;
   totalTime: number;
   status: "continue" | "start" | "completed";
+  isTest?: boolean;
+  weeklyTestId?: number;
+  weekNo?: number;
 }
 
 interface StudyTopicCard {
@@ -88,6 +92,7 @@ interface StudyTopicCard {
   progress: number;
   topics: { name: string; color: string }[];
   subtopics: Subtopic[];
+  type?: 'TEST' | 'REVISION' | 'TOPIC';
 }
 
 // --- Static Data ---
@@ -225,11 +230,11 @@ const dayCycleRotation: Record<number, StudyTopicCard[]> = {
 const dayWiseStudyPlans: Record<number, StudyTopicCard[]> = dayCycleRotation;
 
 const notesData = [
-  { month: "Dec", day: 26, title: "Geography", subtitle: "Disaster management", fullDate: "2025-12-26", content: "Focus on early warning systems and community-based disaster risk reduction strategies. Studied the role of NGOs in disaster response." },
-  { month: "Dec", day: 28, title: "Indian Economy", subtitle: "Rural Welfare oriented programmes", fullDate: "2025-12-28", content: "Analyzed the impact of MGNREGA on rural employment and the recent changes in the Pradhan Mantri Awas Yojana guidelines." },
-  { month: "Jan", day: 5, title: "History", subtitle: "Mughal Architecture", fullDate: "2026-01-05", content: "Reviewed the architectural highlights of the Taj Mahal and Red Fort. Noted the blend of Persian, Islamic, and Indian styles." },
-  { month: "Jan", day: 12, title: "Polity", subtitle: "Fundamental Rights", fullDate: "2026-01-12", content: "Deep dive into Articles 14-18 (Right to Equality) and Articles 19-22 (Right to Freedom). Memorized key judicial interpretations." },
-  { month: "Jan", day: 15, title: "Science", subtitle: "Human Anatomy", fullDate: "2026-01-15", content: "Studied the cardiovascular system, heart structure, and the mechanics of blood circulation. Revised the names of major arteries and veins." },
+  { id: 1001, month: "Dec", day: 26, title: "Geography", subtitle: "Disaster management", fullDate: "2025-12-26", content: "Focus on early warning systems and community-based disaster risk reduction strategies. Studied the role of NGOs in disaster response." },
+  { id: 1002, month: "Dec", day: 28, title: "Indian Economy", subtitle: "Rural Welfare oriented programmes", fullDate: "2025-12-28", content: "Analyzed the impact of MGNREGA on rural employment and the recent changes in the Pradhan Mantri Awas Yojana guidelines." },
+  { id: 1003, month: "Jan", day: 5, title: "History", subtitle: "Mughal Architecture", fullDate: "2026-01-05", content: "Reviewed the architectural highlights of the Taj Mahal and Red Fort. Noted the blend of Persian, Islamic, and Indian styles." },
+  { id: 1004, month: "Jan", day: 12, title: "Polity", subtitle: "Fundamental Rights", fullDate: "2026-01-12", content: "Deep dive into Articles 14-18 (Right to Equality) and Articles 19-22 (Right to Freedom). Memorized key judicial interpretations." },
+  { id: 1005, month: "Jan", day: 15, title: "Science", subtitle: "Human Anatomy", fullDate: "2026-01-15", content: "Studied the cardiovascular system, heart structure, and the mechanics of blood circulation. Revised the names of major arteries and veins." },
 ];
 
 const areasToImprove = [
@@ -286,6 +291,7 @@ const StudyPlanRightSidebar = ({
   selectedDate,
   planDays,
   notes = [],
+  areasToImprove = [],
   mobileView = 'all'
 }: {
   user: UserMe | null,
@@ -295,6 +301,7 @@ const StudyPlanRightSidebar = ({
   selectedDate?: Date,
   planDays: DayCycleItem[],
   notes?: StudyNote[],
+  areasToImprove?: any[],
   mobileView?: 'streak' | 'leaderboard' | 'all'
 }) => {
   const [noteSearch, setNoteSearch] = useState("");
@@ -333,7 +340,7 @@ const StudyPlanRightSidebar = ({
   const [filterView, setFilterView] = useState<"options" | "months">("options");
   const [selectedYear, setSelectedYear] = useState(2026);
   const [activeFilter, setActiveFilter] = useState<string>("all");
-  const [editBuffer, setEditBuffer] = useState<typeof notesData[0] | null>(null);
+  const [editBuffer, setEditBuffer] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
 
@@ -657,33 +664,42 @@ const StudyPlanRightSidebar = ({
               </button>
             </div>
             <div className="space-y-4 sm:space-y-6">
-              {areasToImprove.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between group cursor-pointer"
-                  onClick={() => navigate("/progress")}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-secondary/30 flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105">
-                      <img src={item.icon} alt={item.title} className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
+              {(!areasToImprove || areasToImprove.length === 0) ? (
+                <p className="text-xs text-muted-foreground text-center py-4">Great job! No weak areas found.</p>
+              ) : (
+                areasToImprove.slice(0, 3).map((item: any) => (
+                  <div
+                    key={item.syllabus_id}
+                    className="flex items-center justify-between group cursor-pointer"
+                    onClick={() => navigate("/progress")}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-secondary/30 flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105">
+                        <Target className="w-5 h-5 text-primary/70" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-[11px] sm:text-[12px] text-foreground leading-tight group-hover:text-primary transition-colors">
+                          {item.subject}
+                        </h4>
+                        <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 sm:mt-1 font-medium">{item.topic}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-medium text-[11px] sm:text-[12px] text-foreground leading-tight group-hover:text-primary transition-colors">
-                        {item.title}
-                      </h4>
-                      <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 sm:mt-1 font-medium">{item.subtitle}</p>
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "p-1 rounded-xl border flex items-center justify-center shrink-0",
+                        item.badge_color === "red" ? "bg-destructive/5 border-destructive/10" : "bg-orange-500/5 border-orange-500/10"
+                      )}>
+                        <span className={cn(
+                          "text-[9px] font-medium whitespace-nowrap",
+                          item.badge_color === "red" ? "text-destructive" : "text-orange-600"
+                        )}>
+                          {Math.round(item.accuracy)}% Acc
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className=" p-1 rounded-xl bg-destructive/5 border border-destructive/10 flex items-center justify-center shrink-0">
-                      <span className="text-[9px] font-medium text-destructive whitespace-nowrap">
-                        {item.accuracy}% Acc
-                      </span>
-                    </div>
-                    {/* <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary transition-colors" /> */}
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </>
@@ -801,6 +817,7 @@ const StudyPlanRightSidebar = ({
             </div>
           )}
         </DialogContent>
+
       </Dialog>
     </div >
   );
@@ -841,6 +858,13 @@ const StudyPlan = () => {
     retry: false,
   });
 
+  const { data: topicTimings = [] } = useQuery({
+    queryKey: ['topic-timings', user?.id],
+    queryFn: () => studyService.getUserTopicTimings(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: allNotes = [] } = useQuery({
     queryKey: ['user-notes', user?.id],
     queryFn: () => studyService.getUserNotes(user!.id),
@@ -848,7 +872,14 @@ const StudyPlan = () => {
     staleTime: 1 * 60 * 1000,
   });
 
-  const loading = plansLoading || roadmapLoading;
+  const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
+    queryKey: ['dashboard', user?.id],
+    queryFn: () => studyService.getDashboardData(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const loading = plansLoading || roadmapLoading || dashboardLoading;
 
   const [dynamicDayWisePlans, setDynamicDayWisePlans] = useState<Record<number, StudyTopicCard[]>>({});
   const [selectedTopic, setSelectedTopic] = useState<StudyTopicCard | null>(null);
@@ -867,16 +898,37 @@ const StudyPlan = () => {
   });
   const [viewMode, setViewMode] = useState<'overall' | 'subject'>('overall');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+
+  // Weekly Test State
+  const [isWeeklyTestModalOpen, setIsWeeklyTestModalOpen] = useState(false);
+  const [weeklyTestQuestions, setWeeklyTestQuestions] = useState<TestQuestion[]>([]);
+  const [currentWeeklyTestId, setCurrentWeeklyTestId] = useState<number | null>(null);
+  const [currentWeekNo, setCurrentWeekNo] = useState<number | null>(null);
+  const [isFetchingQuestions, setIsFetchingQuestions] = useState(false);
+  const [testStartTime, setTestStartTime] = useState<number | null>(null);
+
+  const weeklyTestSubmitMutation = useMutation({
+    mutationFn: (data: any) => studyService.submitWeeklyTest(data),
+    onSuccess: (data) => {
+      toast.success("Weekly test submitted successfully!");
+      setIsWeeklyTestModalOpen(false);
+      // Navigate to analytics
+      navigate(`/test-series/weekly/test/${currentWeeklyTestId}/analytics?week=${currentWeekNo}`);
+    },
+    onError: (error: any) => {
+      toast.error(getErrorMessage(error, "Failed to submit weekly test"));
+    }
+  });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Synchronize dynamic plans when data changes
   useEffect(() => {
     if (roadmapData?.plan && userPlans) {
-      setDynamicDayWisePlans(mapRoadmapToFrontend(roadmapData.plan, userPlans));
+      setDynamicDayWisePlans(mapRoadmapToFrontend(roadmapData.plan, userPlans, topicTimings));
       const currentDay = calculateCurrentProgressDay(userPlans);
       setActiveDay(currentDay);
     }
-  }, [roadmapData, userPlans]);
+  }, [roadmapData, userPlans, topicTimings]);
 
   // Modal open logic: check after loading is done
   useEffect(() => {
@@ -915,12 +967,17 @@ const StudyPlan = () => {
     }
   }, [user]);
 
-  const mapRoadmapToFrontend = (roadmapPlan: any[], backendPlans: StudyPlanResponse[]): Record<number, StudyTopicCard[]> => {
+  const mapRoadmapToFrontend = (roadmapPlan: any[], backendPlans: StudyPlanResponse[], timings: TopicTiming[]): Record<number, StudyTopicCard[]> => {
     // Create a status map for quick lookup
     const statusMap: Record<number, string> = {};
     backendPlans.forEach(p => {
-      // Use day_no + syllabus_id to be unique if there are duplicates (though syllabus_id should be unique in a day)
       if (p.syllabus_id) statusMap[p.syllabus_id] = p.plan_status;
+    });
+
+    // Create a timing map (sum of total_estimate per syllabus_id)
+    const timingMap: Record<number, number> = {};
+    timings.forEach(t => {
+      timingMap[t.syllabus_id] = (timingMap[t.syllabus_id] || 0) + (t.total_estimate || 0);
     });
 
     const result: Record<number, StudyTopicCard[]> = {};
@@ -941,7 +998,7 @@ const StudyPlan = () => {
               id: t.id.toString(),
               name: t.name,
               description: t.description,
-              timeSpent: statusMap[t.id] === 'COMPLETED' ? t.minutes : 0,
+              timeSpent: Math.round((timingMap[t.id] || 0) / 60),
               totalTime: t.minutes,
               status: (statusMap[t.id] === 'COMPLETED' ? 'completed' : statusMap[t.id] === 'IN_PROGRESS' ? 'continue' : 'start') as any,
             })),
@@ -949,12 +1006,15 @@ const StudyPlan = () => {
         } else {
           // Handle TEST/REVISION
           const status = statusMap[dayPlan.day] || 'start'; // This is simplified for tests
+          const weekNo = Math.ceil(dayPlan.day / 7);
+
           return {
             id: `${item.type.toLowerCase()}-${dayPlan.day}-${idx}`,
             image: item.type === 'TEST' ? studyPlan4 : studyPlan2,
             title: item.title || (item.type === 'TEST' ? 'Weekly Test' : 'Revision'),
             topicCount: 1,
             progress: status === 'COMPLETED' ? 100 : 0,
+            type: item.type,
             topics: [{ name: item.description || 'Assessment', color: item.type === 'TEST' ? 'bg-[#FF3B30]' : 'bg-[#34C759]' }],
             subtopics: [{
               id: `sub-${item.type.toLowerCase()}-${dayPlan.day}-${idx}`,
@@ -963,6 +1023,9 @@ const StudyPlan = () => {
               timeSpent: status === 'COMPLETED' ? item.minutes : 0,
               totalTime: item.minutes,
               status: (status === 'COMPLETED' ? 'completed' : status === 'IN_PROGRESS' ? 'continue' : 'start') as any,
+              isTest: item.type === 'TEST',
+              weeklyTestId: item.weekly_test_id, // Ensure this exists in your roadmap data
+              weekNo: weekNo
             }],
           };
         }
@@ -999,7 +1062,8 @@ const StudyPlan = () => {
           topics: Array.from(new Set(items.map(i => i.chapter))).map(ch => ({ name: ch, color: 'bg-[#7C79EC]' })),
           subtopics: items.map(i => ({
             id: i.id.toString(), name: i.topic, description: `Chapter: ${i.chapter}`,
-            timeSpent: i.plan_status === 'COMPLETED' ? i.minutes : 0, totalTime: i.minutes,
+            timeSpent: Math.round((topicTimings.find(t => t.syllabus_id === i.syllabus_id)?.total_estimate) || (i.plan_status === 'COMPLETED' ? i.minutes : 0)),
+            totalTime: i.minutes,
             status: i.plan_status === 'COMPLETED' ? 'completed' as const : i.plan_status === 'IN_PROGRESS' ? 'continue' as const : 'start' as const,
           })),
         };
@@ -1100,27 +1164,20 @@ const StudyPlan = () => {
     const todayDayNo = roadmapData?.plan?.find((p: any) => p.date === todayStr)?.day || 0;
     const isFuture = day.date && day.date > todayStr;
 
-    // Rule: If accessing future days
-    if (isFuture && day.status !== 'completed') {
-      // Allow access specifically if they finished today's actual goals
-      if (day.day === currentProgressDay) {
-        toast.info(`Great job! You've finished today's goals. Accessing Day ${day.day} earlier than scheduled.`);
-      } else {
-        toast.warning(`Day ${day.day} is scheduled for ${day.date ? format(new Date(day.date), 'MMM dd, yyyy') : 'the future'}. Please focus on your current tasks!`);
-        return;
-      }
-    }
-
-    // Rule: Check if previous assessment is completed
     const previousAssessmentDay = Math.floor((day.day - 1) / 7) * 7;
+    let isPrevAssessmentMissing = false;
     if (previousAssessmentDay > 0 && day.day > previousAssessmentDay) {
       const assessmentRows = userPlans.filter(p => p.day_no === previousAssessmentDay);
-      const isAssessmentDone = assessmentRows.length > 0 && assessmentRows.every(p => p.plan_status === 'COMPLETED');
+      isPrevAssessmentMissing = assessmentRows.length > 0 && !assessmentRows.every(p => p.plan_status === 'COMPLETED');
+    }
 
-      if (!isAssessmentDone) {
-        toast.warning(`Please complete the Assessment on Day ${previousAssessmentDay} before proceeding to Day ${day.day}.`);
-        return;
-      }
+    // Rule warnings
+    if (isFuture && day.day > currentProgressDay) {
+      toast.warning(`Day ${day.day} is scheduled for ${day.date ? format(new Date(day.date), 'MMM dd, yyyy') : 'the future'}. Topics are locked!`);
+    } else if (isPrevAssessmentMissing) {
+      toast.warning(`Please complete the Assessment on Day ${previousAssessmentDay} before proceeding to Day ${day.day}. Topics are locked!`);
+    } else if (isFuture && day.day === currentProgressDay) {
+      toast.info(`Great job! You've finished previous goals. Accessing Day ${day.day} earlier than scheduled.`);
     }
 
     setActiveDay(day.day);
@@ -1140,6 +1197,66 @@ const StudyPlan = () => {
   };
 
   const handleSubtopicClick = async (topicId: string, subtopicId: string) => {
+    // Check if it's a weekly test
+    if (selectedTopic && selectedTopic.subtopics) {
+      const subtopic = selectedTopic.subtopics.find(st => st.id === subtopicId);
+      if (subtopic?.isTest) {
+        setIsFetchingQuestions(true);
+        try {
+          // You might need to adjust how you get userId and weekNo
+          const userId = user?.id;
+          const weekNo = subtopic.weekNo || Math.ceil(activeDay / 7);
+
+          if (!userId) {
+            toast.error("User not logged in");
+            return;
+          }
+
+          // If test is already completed, go straight to analytics
+          if (subtopic.status === 'completed') {
+            setIsFetchingQuestions(false);
+            navigate(`/test-series/weekly/test/0/analytics?week=${weekNo}`);
+            setIsDialogOpen(false);
+            return;
+          }
+
+          const response = await studyService.getWeeklyTestQuestions(userId, weekNo);
+          const transformedQuestions: TestQuestion[] = response.questions.map((q: any) => ({
+            id: q.mcq_id,
+            question: q.question,
+            options: Object.values(q.options),
+            correctAnswer: 0, // Backend handles evaluation, this is just for UI if needed
+            category: "Weekly Test",
+            difficulty: "Medium"
+          }));
+
+          setWeeklyTestQuestions(transformedQuestions);
+          setCurrentWeeklyTestId(response.weekly_test_id);
+          setCurrentWeekNo(response.week_no);
+          setTestStartTime(Date.now()); // Record start time
+          setIsWeeklyTestModalOpen(true);
+          setIsDialogOpen(false); // Close the subtopic dialog
+        } catch (error: any) {
+          if (error.response?.status === 403) {
+            const detail = error.response?.data?.detail;
+            const wId = typeof detail === 'object' ? detail.weekly_test_id : null;
+            if (wId) {
+              const weekNo = Math.ceil(activeDay / 7);
+              navigate(`/test-series/weekly/test/${wId}/analytics?week=${weekNo}`);
+              setIsDialogOpen(false);
+            } else {
+              toast.error(getErrorMessage(error, "Failed to fetch test questions"));
+            }
+          } else {
+            toast.error(getErrorMessage(error, "Failed to fetch test questions"));
+          }
+        } finally {
+          setIsFetchingQuestions(false);
+        }
+        return;
+      }
+    }
+
     // If it's a subtopic from backend, we might want to update status to IN_PROGRESS
     const subIdNum = parseInt(subtopicId);
     if (!isNaN(subIdNum)) {
@@ -1150,7 +1267,7 @@ const StudyPlan = () => {
           queryClient.invalidateQueries({ queryKey: ['study-plans', user?.id] });
           queryClient.invalidateQueries({ queryKey: ['roadmap', user?.id] });
         } catch (err) {
-          console.error("Failed to update plan status", err);
+          console.error("Failed to update status", err);
         }
       }
     }
@@ -1370,6 +1487,7 @@ const StudyPlan = () => {
           })()}
           planDays={dynamicDayCycle}
           notes={allNotes}
+          areasToImprove={dashboardData?.areas_to_improve?.areas || []}
         />
       )}
     >
@@ -1609,8 +1727,8 @@ const StudyPlan = () => {
                     <div key={index} data-day={item.day} className="flex items-start shrink-0">
                       <div className="flex flex-col items-center w-[60px] md:w-[72px] shrink-0">
                         <motion.button
-                          whileHover={item.status !== "locked" ? { scale: 0.95, y: -2 } : {}}
-                          whileTap={item.status !== "locked" ? { scale: 0.95 } : {}}
+                          whileHover={{ scale: 1.05, y: -2 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => handleDayClick(item)}
                           title={item.date ? `Scheduled for: ${format(new Date(item.date), 'MMM dd, yyyy')}` : undefined}
                           className={cn(
@@ -1722,9 +1840,18 @@ const StudyPlan = () => {
 
                         <div className="px-5 pb-5 mt-auto">
                           {(() => {
-                            // Sequential Unlock Logic removed as per user request:
-                            // All topics in the current day should be unlocked.
-                            const finalIsUnlocked = (activeDay <= currentProgressDay);
+                            const todayStr = format(new Date(), 'yyyy-MM-dd');
+                            const roadmapDay = roadmapData?.plan?.find((p: any) => p.day === activeDay);
+                            const isFuture = roadmapDay?.date && roadmapDay.date > todayStr;
+
+                            const previousAssessmentDay = Math.floor((activeDay - 1) / 7) * 7;
+                            let isPrevAssessmentMissing = false;
+                            if (previousAssessmentDay > 0 && activeDay > previousAssessmentDay) {
+                              const assessmentRows = userPlans.filter(p => p.day_no === previousAssessmentDay);
+                              isPrevAssessmentMissing = assessmentRows.length > 0 && !assessmentRows.every(p => p.plan_status === 'COMPLETED');
+                            }
+
+                            const finalIsUnlocked = !((isFuture && activeDay > currentProgressDay) || isPrevAssessmentMissing);
 
                             return (
                               <Button
@@ -1749,6 +1876,23 @@ const StudyPlan = () => {
                                   </div>
                                 ) : "View Details"}
                               </Button>
+
+                              // <Button
+
+                              //   onClick={() => handleViewDetails(topic)}
+                              //   onMouseEnter={() => {
+                              //     if (finalIsUnlocked && user?.id) {
+                              //       topic.subtopics.forEach(st => prefetchTopic(queryClient, st.id, user.id));
+                              //     }
+                              //   }}
+                              //   className={cn(
+                              //     "w-full h-11 rounded-xl text-sm font-medium transition-all",
+
+                              //     "bg-primary hover:bg-primary/90 text-primary-foreground"
+                              //   )}
+                              // >
+                              //   "View Details"
+                              // </Button>
                             );
                           })()}
                         </div>
@@ -2047,6 +2191,61 @@ const StudyPlan = () => {
                 ) : "Create My Smart Plan"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Weekly Test Modal */}
+      <Dialog open={isWeeklyTestModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          if (window.confirm("Are you sure you want to exit? Your progress will not be saved.")) {
+            setIsWeeklyTestModalOpen(false);
+          }
+        } else {
+          setIsWeeklyTestModalOpen(true);
+        }
+      }}>
+        <DialogContent className="max-w-[100vw] w-screen h-screen p-0 m-0 border-none rounded-none overflow-hidden bg-[#F5F5F7]">
+          <div className="w-full h-full">
+            <TestEngine
+              questions={weeklyTestQuestions}
+              title={`Week ${currentWeekNo} Test`}
+              subtitle="Weekly Assessment"
+              onComplete={(answersRecord) => {
+                const userId = user?.id;
+                if (!userId || !currentWeeklyTestId) return;
+
+                const answers = Object.entries(answersRecord).map(([idx, ans]) => {
+                  const q = weeklyTestQuestions[parseInt(idx)];
+                  const optionLetters = ['A', 'B', 'C', 'D', 'E'];
+                  return {
+                    mcq_id: q.id,
+                    selected_option: ans.selectedOption !== null ? optionLetters[ans.selectedOption] : ''
+                  };
+                });
+
+                const startTime = testStartTime ? new Date(testStartTime).toISOString() : new Date().toISOString();
+                const endTime = new Date().toISOString();
+
+                weeklyTestSubmitMutation.mutate({
+                  weekly_test_id: currentWeeklyTestId,
+                  answers: answers,
+                  started_at: startTime,
+                  submitted_at: endTime
+                });
+              }}
+              onExit={() => {
+                if (window.confirm("Are you sure you want to exit? Your progress will not be saved.")) {
+                  setIsWeeklyTestModalOpen(false);
+                }
+              }}
+              initialTime={120 * 60}
+            />
+            {weeklyTestSubmitMutation.isPending && (
+              <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-[100] flex flex-col items-center justify-center">
+                <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+                <p className="text-lg font-medium text-foreground">Submitting your test...</p>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

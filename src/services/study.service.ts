@@ -114,7 +114,41 @@ export interface SubmitMCQRequest {
     submitted_at: string;
 }
 
+export interface TopicTiming {
+    id: number;
+    user_id: number;
+    syllabus_id: number;
+    start_time: string;
+    end_time?: string;
+    total_estimate?: number;
+}
+
 const studyService = {
+    /**
+     * Start topic timing session
+     */
+    startTopicTiming: async (userId: number, syllabusId: number): Promise<TopicTiming> => {
+        const response = await apiClient.post('/topic-timing/start', { user_id: userId, syllabus_id: syllabusId });
+        return response.data;
+    },
+
+    /**
+     * Stop topic timing session
+     */
+    stopTopicTiming: async (userId: number, syllabusId: number): Promise<TopicTiming> => {
+        const response = await apiClient.post('/topic-timing/stop', { user_id: userId, syllabus_id: syllabusId });
+        return response.data;
+    },
+
+    /**
+     * Get all topic timing records for a user
+     */
+    getUserTopicTimings: async (userId: number, syllabusId?: number): Promise<TopicTiming[]> => {
+        const params = syllabusId ? { user_id: userId, syllabus_id: syllabusId } : { user_id: userId };
+        const response = await apiClient.get('/topic-timing', { params });
+        return response.data;
+    },
+
     /**
      * Generate a personalized study plan
      */
@@ -225,6 +259,58 @@ const studyService = {
      */
     submitMCQAttempt: async (payload: SubmitMCQRequest) => {
         const response = await apiClient.post('/mcq/submit', payload);
+        return response.data;
+    },
+    /**
+     * Get weekly test questions
+     */
+    getWeeklyTestQuestions: async (userId: number, weekNo: number) => {
+        const response = await apiClient.get('/weekly-test/questions', {
+            params: { user_id: userId, week_no: weekNo }
+        });
+        return response.data;
+    },
+
+    /**
+     * Submit weekly test
+     */
+    submitWeeklyTest: async (payload: {
+        weekly_test_id: number;
+        answers: { mcq_id: number; selected_option: string }[];
+        started_at: string;
+        submitted_at: string;
+    }) => {
+        const response = await apiClient.post('/weekly-test/submit', payload);
+        return response.data;
+    },
+
+    /**
+     * Get weekly test result
+     */
+    getWeeklyTestResult: async (userId: number, weekNo: number) => {
+        const response = await apiClient.get('/weekly-test/result', {
+            params: { user_id: userId, week_no: weekNo }
+        });
+        return response.data;
+    },
+
+    /**
+     * Get weekly test history
+     */
+    getWeeklyTestHistory: async (userId: number) => {
+        const response = await apiClient.get('/weekly-test/history', {
+            params: { user_id: userId }
+        });
+        return response.data;
+    },
+
+    /**
+     * Get dashboard data
+     */
+    getDashboardData: async (userId: number) => {
+        const response = await apiClient.get('/dashboard', {
+            params: { user_id: userId }
+        });
         return response.data;
     }
 };
