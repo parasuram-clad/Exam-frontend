@@ -71,6 +71,7 @@ const Profile = () => {
     phone: "",
     bio: "",
     address: "",
+    addressLine2: "",
     district: "",
     taluk: "",
     city: "",
@@ -82,12 +83,14 @@ const Profile = () => {
     qualification: "",
     backgroundType: "",
     preferredLanguage: "en",
+    studyMedium: "en",
     fieldOfStudy: "",
     gender: "",
     targetExamYear: "",
     examType: "",
     subDivision: "",
     learnerType: "",
+    preparationType: "",
     notifyTransactionEmail: true,
     notifyTransactionWhatsapp: false,
     notifyContentEmail: true,
@@ -115,6 +118,7 @@ const Profile = () => {
             phone: user.phone || "",
             bio: user.bio || "",
             address: user.address || "",
+            addressLine2: user.address_line_2 || "",
             district: user.district || "",
             taluk: user.taluk || "",
             city: user.city || "",
@@ -126,12 +130,14 @@ const Profile = () => {
             qualification: user.qualification || "",
             backgroundType: user.background_type || "other",
             preferredLanguage: user.preferred_language || "en",
+            studyMedium: user.study_medium || "en",
             fieldOfStudy: user.field_of_study || "",
             gender: user.gender || "Male",
             targetExamYear: user.target_exam_year || "2025",
             examType: user.exam_type || "",
             subDivision: user.sub_division || "",
             learnerType: user.learner_type || "",
+            preparationType: user.preparation_type || "",
             notifyTransactionEmail: user.notify_transaction_email ?? true,
             notifyTransactionWhatsapp: user.notify_transaction_whatsapp ?? false,
             notifyContentEmail: user.notify_content_email ?? true,
@@ -285,6 +291,7 @@ const Profile = () => {
         phone: profileData.phone,
         bio: profileData.bio,
         address: profileData.address,
+        address_line_2: profileData.addressLine2,
         district: profileData.district,
         taluk: profileData.taluk,
         city: profileData.city,
@@ -293,6 +300,7 @@ const Profile = () => {
         country: profileData.country,
         study_goal: profileData.studyGoal,
         preferred_language: profileData.preferredLanguage,
+        study_medium: profileData.studyMedium,
         qualification: profileData.qualification,
         background_type: profileData.backgroundType,
         gender: profileData.gender,
@@ -301,6 +309,7 @@ const Profile = () => {
         exam_type: profileData.examType,
         sub_division: profileData.subDivision,
         learner_type: profileData.learnerType,
+        preparation_type: profileData.preparationType,
         notify_transaction_email: profileData.notifyTransactionEmail,
         notify_transaction_whatsapp: profileData.notifyTransactionWhatsapp,
         notify_content_email: profileData.notifyContentEmail,
@@ -820,8 +829,8 @@ const Profile = () => {
                             </div>
                             <Select
                               disabled={!isEditing}
-                              value={profileData.preferredLanguage}
-                              onValueChange={(value) => setProfileData({ ...profileData, preferredLanguage: value })}
+                              value={profileData.studyMedium}
+                              onValueChange={(value) => setProfileData({ ...profileData, studyMedium: value })}
                             >
                               <SelectTrigger className="w-full bg-muted/30 border-none h-12 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background text-foreground/80 shadow-none">
                                 <SelectValue placeholder="Select Medium" />
@@ -829,6 +838,29 @@ const Profile = () => {
                               <SelectContent className="rounded-xl border-border/50 shadow-xl">
                                 <SelectItem value="en">English Medium</SelectItem>
                                 <SelectItem value="ta">Tamil Medium</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* Preparation Type */}
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Preparation Type</Label>
+                          <div className="relative group">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                              <BookOpen className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                            </div>
+                            <Select
+                              disabled={!isEditing}
+                              value={profileData.preparationType}
+                              onValueChange={(value) => setProfileData({ ...profileData, preparationType: value })}
+                            >
+                              <SelectTrigger className="w-full bg-muted/30 border-none h-12 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background text-foreground/80 shadow-none">
+                                <SelectValue placeholder="Select Type" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl border-border/50 shadow-xl">
+                                <SelectItem value="Full Time">Full Time</SelectItem>
+                                <SelectItem value="Part Time">Part Time</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -869,8 +901,8 @@ const Profile = () => {
                             </div>
                             <Input
                               disabled={!isEditing}
-                              value={profileData.taluk}
-                              onChange={(e) => setProfileData({ ...profileData, taluk: e.target.value })}
+                              value={profileData.addressLine2}
+                              onChange={(e) => setProfileData({ ...profileData, addressLine2: e.target.value })}
                               placeholder="Area / Taluk / Landmark"
                               className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus-visible:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background"
                             />

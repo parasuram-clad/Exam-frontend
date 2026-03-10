@@ -32,6 +32,8 @@ export interface UserMe {
     exam_type: string | null;
     sub_division: string | null;
     learner_type: string | null;
+    past_attempts: string | null;
+    is_onboarded: boolean;
     notify_transaction_email: boolean;
     notify_transaction_whatsapp: boolean;
     notify_content_email: boolean;

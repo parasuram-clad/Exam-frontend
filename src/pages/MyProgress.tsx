@@ -54,6 +54,41 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
+const WrappedTick = (props: any) => {
+  const { x, y, payload } = props;
+  const text = payload.value;
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+
+  words.forEach((word: string) => {
+    if ((currentLine + word).length > 15) {
+      lines.push(currentLine.trim());
+      currentLine = word + " ";
+    } else {
+      currentLine += word + " ";
+    }
+  });
+  lines.push(currentLine.trim());
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {lines.map((line, i) => (
+        <text
+          key={i}
+          x={0}
+          y={12 + i * 14}
+          textAnchor="middle"
+          fill="#6b7280"
+          className="text-[11px] font-medium"
+        >
+          {line}
+        </text>
+      ))}
+    </g>
+  );
+};
+
 const MyProgress = () => {
   const [viewDate, setViewDate] = useState(new Date());
   const today = new Date();
@@ -81,16 +116,16 @@ const MyProgress = () => {
   // Map subject_progress to chart data
   const subjectWiseData = (subjectProgress?.subjects || []).map(
     (s: any, i: number) => ({
-      name: s.subject_name || s.name || `Subject ${i + 1}`,
-      progress: Math.round(s.completion_percentage ?? s.progress ?? 0),
+      name: s.subject || s.subject_name || s.name || `Subject ${i + 1}`,
+      progress: Math.round(s.progress ?? s.completion_percentage ?? 0),
       color: SUBJECT_COLORS[i % SUBJECT_COLORS.length],
     })
   );
 
   // Map test_wise_progress to bar chart data
   const testWiseData = (testWiseProgress?.parts || []).map((p: any) => ({
-    name: p.part_name || p.name || "Part",
-    score: Math.round(p.average_score ?? p.score ?? 0),
+    name: p.part || p.part_name || p.name || "Part",
+    score: Math.round(p.progress ?? p.average_score ?? p.score ?? 0),
     color: BAR_COLOR,
   }));
 
@@ -420,19 +455,21 @@ const MyProgress = () => {
                   </div>
 
                   {/* Legend */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-8 lg:gap-x-12 gap-y-3 sm:gap-y-4 max-w-sm mx-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4 max-w-2xl mx-auto">
                     {subjectWiseData.map((subject) => (
-                      <div key={subject.name} className="flex items-center gap-3">
+                      <div key={subject.name} className="flex items-start gap-2.5">
                         <div
-                          className="w-3.5 h-3.5 rounded-full shrink-0"
+                          className="w-2.5 h-2.5 rounded-full shrink-0 mt-1.5"
                           style={{ backgroundColor: subject.color }}
                         />
-                        <span className="text-sm font-medium text-[#4b5563]">
-                          {subject.name}
-                        </span>
-                        <span className="text-sm font-semibold text-[#1a2b4b] ml-auto">
-                          {subject.progress}%
-                        </span>
+                        <div className="flex-1 flex justify-between items-start gap-2">
+                          <span className="text-[13px] font-medium text-[#4b5563] leading-tight">
+                            {subject.name}
+                          </span>
+                          <span className="text-[13px] font-semibold text-[#1a2b4b] shrink-0">
+                            {subject.progress}%
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -443,9 +480,9 @@ const MyProgress = () => {
 
           {/* Test Wise Progress */}
           <motion.div variants={itemVariants}>
-            <Card className="p-4 sm:p-6 lg:p-8 h-full bg-white shadow-sm border-gray-100">
+            <Card className="p-4 sm:p-6 lg:p-8 h-full bg-white shadow-sm border-gray-100 flex flex-col">
               <h3 className="text-xl font-semibold text-[#1a2b4b] mb-8 lg:mb-12">
-                Test Wise Progress
+                Unit Wise Progress
               </h3>
 
               {testWiseData.length === 0 ? (
@@ -454,20 +491,20 @@ const MyProgress = () => {
                   <p className="text-xs">Complete some tests to see your scores here.</p>
                 </div>
               ) : (
-                <div className="h-64 sm:h-80 lg:h-96">
+                <div className="flex-1 min-h-[300px] sm:min-h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={testWiseData}
-                      margin={{ top: 30, right: 30, left: 0, bottom: 20 }}
+                      margin={{ top: 30, right: 30, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                       <XAxis
                         dataKey="name"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "#6b7280", fontSize: 12 }}
-                        dy={10}
+                        tick={<WrappedTick />}
                         interval={0}
+                        height={80}
                       />
                       <YAxis
                         axisLine={false}
