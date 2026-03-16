@@ -13,6 +13,8 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import authService, { UserMe } from "@/services/auth.service";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/context/AuthContext";
+import { BASE_URL } from "@/config/env";
 import pic from "@/assets/pic.png";
 
 interface SavedNewsItem {
@@ -32,17 +34,9 @@ const mockSavedNews: SavedNewsItem[] = [
 
 const SavedNews = () => {
     const navigate = useNavigate();
-    const [user, setUser] = useState<UserMe | null>(null);
+    const { user } = useAuth();
     const [searchQuery, setSearchQuery] = useState("");
     const isDesktop = useMediaQuery("(min-width: 1280px)");
-
-    useEffect(() => {
-        const fetchUser = async () => {
-            const u = await authService.getCurrentUser();
-            setUser(u);
-        };
-        fetchUser();
-    }, []);
 
     const userName = user?.full_name || user?.username || "Aspirant";
     const initials = userName
@@ -52,11 +46,8 @@ const SavedNews = () => {
         .substring(0, 2)
         .toUpperCase();
 
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
     const avatarUrl = user?.photo_url
-        ? user.photo_url.startsWith("http")
-            ? user.photo_url
-            : `${baseUrl}${user.photo_url}`
+        ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
         : pic;
 
     const filteredNews = mockSavedNews.filter(item =>

@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useAuth } from "@/context/AuthContext";
+import { BASE_URL } from "@/config/env";
 import { SubjectWiseView, TestSubject } from "@/components/test-series/SubjectWiseView";
 import { TestSetsView, TestSet } from "@/components/test-series/TestSetsView";
 import testImage from "../assets/test-1.png";
@@ -163,9 +165,8 @@ const TestSeriesSidebar = ({ user }: { user: UserMe | null }) => {
     : user?.username?.substring(0, 2).toUpperCase() || "A";
 
   // Handle relative avatar URL
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
   const avatarUrl = user?.photo_url
-    ? (user.photo_url.startsWith('http') ? user.photo_url : `${baseUrl}${user.photo_url}`)
+    ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
     : undefined;
 
   return (
@@ -207,19 +208,7 @@ const TestSeriesSidebar = ({ user }: { user: UserMe | null }) => {
 const TestSeries = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"subject" | "sets">("subject");
-  const [user, setUser] = useState<UserMe | null>(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const u = await authService.getCurrentUser();
-        setUser(u);
-      } catch (err) {
-        console.error("Failed to fetch user", err);
-      }
-    };
-    fetchUser();
-  }, []);
+  const { user } = useAuth();
 
   const isDesktop = useMediaQuery("(min-width: 1280px)");
   const userName = user?.full_name || user?.username || "Student";

@@ -35,8 +35,6 @@ const TestAttempt = () => {
     });
 
     const questions: Question[] = testData?.questions?.map((q: any) => {
-        // Requirement: console log each question correct option for testing
-        console.log(`TESTING: Question ID ${q.mcq_id} correct option is: ${q.correct_option || q.correct_answer || "N/A"}`);
         return {
             id: q.mcq_id,
             text: q.question,

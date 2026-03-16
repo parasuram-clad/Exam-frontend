@@ -30,6 +30,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import authService, { UserMe } from "@/services/auth.service";
 import studyService from "@/services/study.service";
+import { useAuth } from "@/context/AuthContext";
 
 // Color palette for subject arcs
 const SUBJECT_COLORS = [
@@ -92,13 +93,7 @@ const WrappedTick = (props: any) => {
 const MyProgress = () => {
   const [viewDate, setViewDate] = useState(new Date());
   const today = new Date();
-
-  // Fetch user
-  const { data: user } = useQuery<UserMe>({
-    queryKey: ["user-me"],
-    queryFn: () => authService.getCurrentUser(),
-    enabled: authService.isAuthenticated(),
-  });
+  const { user } = useAuth();
 
   // Fetch dashboard data
   const { data: dashboardData, isLoading, isError } = useQuery({
@@ -128,6 +123,8 @@ const MyProgress = () => {
     score: Math.round(p.progress ?? p.average_score ?? p.score ?? 0),
     color: BAR_COLOR,
   }));
+
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Calendar helpers
   const handlePrevMonth = () =>
@@ -166,6 +163,9 @@ const MyProgress = () => {
     accuracy: `${Math.round(area.accuracy)}% Acc`,
     color: area.badge_color === "red" ? "text-red-500" : "text-orange-500",
   }));
+
+  // Limit to 4 if not expanded
+  const displayedAreas = isExpanded ? areasToImprove : areasToImprove.slice(0, 4);
 
   // Overall percentage
   const overallPct = Math.round(overallPerf?.overall_percentage ?? 0);
@@ -652,7 +652,7 @@ const MyProgress = () => {
 
           {/* Areas to Improve */}
           <motion.div variants={itemVariants}>
-            <Card className="p-4 sm:p-6 lg:p-8 lg:h-full bg-white shadow-sm border-gray-100 flex flex-col">
+            <Card className="p-4 sm:p-6 lg:p-8 h-full bg-white shadow-sm border-gray-100 flex flex-col">
               <h3 className="text-xl font-semibold text-[#1a2b4b] mb-8 lg:mb-12">
                 Areas to Improve
               </h3>
@@ -663,8 +663,8 @@ const MyProgress = () => {
                   <p className="text-xs">Great job staying on top of everything.</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {areasToImprove.map((area, index) => (
+                <div className="space-y-4 flex-1">
+                  {displayedAreas.map((area, index) => (
                     <motion.div
                       key={index}
                       initial={{ opacity: 0, x: -20 }}
@@ -696,9 +696,14 @@ const MyProgress = () => {
                 </div>
               )}
 
-              <button className="w-full mt-8 py-4 bg-[#f8faff] text-[#4f46e5] font-semibold rounded-2xl border border-[#e8efff] hover:bg-[#f0f4ff] hover:border-[#ced9ff] transition-all duration-300 shadow-sm text-sm">
-                View Study Plan
-              </button>
+              {areasToImprove.length > 4 && (
+                <button 
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="w-full mt-8 py-4 bg-[#f8faff] text-[#4f46e5] font-semibold rounded-2xl border border-[#e8efff] hover:bg-[#f0f4ff] hover:border-[#ced9ff] transition-all duration-300 shadow-sm text-sm"
+                >
+                  {isExpanded ? "Collapse View" : "View Study Plan"}
+                </button>
+              )}
             </Card>
           </motion.div>
         </div>

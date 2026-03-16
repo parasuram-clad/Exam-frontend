@@ -28,7 +28,6 @@ export const prefetchAllUserData = async (queryClient: QueryClient, user?: UserM
         const userId = currentUser.id;
 
         // 2. Parallel pre-fetching of essential data for all main pages
-        console.log(`🚀 Preloading app data for user ${userId}...`);
 
         await Promise.allSettled([
             // Study Plan data
@@ -87,7 +86,6 @@ export const prefetchAllUserData = async (queryClient: QueryClient, user?: UserM
                     .slice(0, 10); // Prefetch more topics
 
                 if (activePlans.length > 0) {
-                    console.log(`🧠 Prefetching content for ${activePlans.length} active topics...`);
                     await Promise.allSettled(
                         activePlans.map(plan => prefetchTopic(queryClient, plan.syllabus_id!, userId))
                     );
@@ -97,7 +95,6 @@ export const prefetchAllUserData = async (queryClient: QueryClient, user?: UserM
             console.warn("Could not prefetch specific topics:", planError);
         }
 
-        console.log("✅ App data preloaded successfully");
     } catch (error) {
         console.error("❌ Failed to preload app data:", error);
     }

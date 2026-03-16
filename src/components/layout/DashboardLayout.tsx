@@ -5,6 +5,8 @@ import { RightSidebarWidgets } from "@/components/dashboard";
 import authService, { UserMe } from "@/services/auth.service";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { RightSidebarHeader } from "./RightSidebarHeader";
+import { useAuth } from "@/context/AuthContext";
+import { BASE_URL } from "@/config/env";
 
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
@@ -19,27 +21,14 @@ export function DashboardLayout({ children, rightSidebar, hideHeader = false, ac
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [mobileRightSidebarOpen, setMobileRightSidebarOpen] = useState(false);
     const [mobileRightSidebarView, setMobileRightSidebarView] = useState<'streak' | 'leaderboard' | 'all'>('all');
-    const [user, setUser] = useState<UserMe | null>(null);
-
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const u = await authService.getCurrentUser();
-                setUser(u);
-            } catch (err) {
-                console.error("Failed to fetch user", err);
-            }
-        };
-        fetchUser();
-    }, []);
+    const { user } = useAuth();
 
     const userName = user?.full_name || user?.username || "Aspirant";
     const userTitle = user?.qualification || "TNPSC Aspirant";
 
     // Handle relative avatar URL
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
     const avatarUrl = user?.photo_url
-        ? (user.photo_url.startsWith('http') ? user.photo_url : `${baseUrl}${user.photo_url}`)
+        ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
         : undefined;
 
     const initials = userName.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();

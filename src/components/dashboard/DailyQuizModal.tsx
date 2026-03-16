@@ -81,9 +81,7 @@ function TrophyIllustration() {
 }
 
 export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, subtitle, initialAnswers, initialShowEvaluation, initialShowDetails, timeTaken, isSubmitted, isLoading, score }: DailyQuizModalProps) {
-    console.log("DailyQuizModal Props - questions:", questions);
     const activeQuestions = questions && questions.length > 0 ? questions : [];
-    console.log("DailyQuizModal activeQuestions:", activeQuestions);
 
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(initialAnswers || []);

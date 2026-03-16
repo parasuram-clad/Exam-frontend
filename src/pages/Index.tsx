@@ -9,6 +9,8 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import authService, { UserMe } from "@/services/auth.service";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { prefetchAllUserData } from "@/services/prefetch";
+import { useAuth } from "@/context/AuthContext";
+import { BASE_URL } from "@/config/env";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Bell, ChevronLeft, ChevronRight, Calendar, FileText, Trophy } from "lucide-react";
@@ -95,11 +97,7 @@ const fallbackTodaysPlan: StudyPlanItem[] = [
 const Index = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: user } = useQuery<UserMe>({
-    queryKey: ['user-me'],
-    queryFn: () => authService.getCurrentUser(),
-    enabled: authService.isAuthenticated(),
-  });
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: userPlans = [] } = useQuery({
@@ -374,11 +372,8 @@ const Index = () => {
     .substring(0, 2)
     .toUpperCase();
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
   const avatarUrl = user?.photo_url
-    ? user.photo_url.startsWith("http")
-      ? user.photo_url
-      : `${baseUrl}${user.photo_url}`
+    ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
     : pic;
 
 

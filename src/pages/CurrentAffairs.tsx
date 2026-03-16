@@ -41,6 +41,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import authService, { UserMe } from "@/services/auth.service";
 import currentAffairsService, { Article as ApiArticle } from "@/services/currentAffairs.service";
 import pic from "@/assets/pic.png";
+import { BASE_URL } from "@/config/env";
 
 import polityIcon from "@/assets/current-affairs/polity-icon.png";
 import internationalIcon from "@/assets/current-affairs/international-icon.png";
@@ -717,11 +718,8 @@ const CurrentAffairs = () => {
     .substring(0, 2)
     .toUpperCase();
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
   const avatarUrl = user?.photo_url
-    ? user.photo_url.startsWith("http")
-      ? user.photo_url
-      : `${baseUrl}${user.photo_url}`
+    ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
     : pic;
 
   const filtered = articles.filter((a) => {

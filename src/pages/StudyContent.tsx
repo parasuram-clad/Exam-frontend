@@ -595,6 +595,15 @@ const StudyContent = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: userPlans = [], isLoading: isPlansLoading } = useQuery({
+    queryKey: ['study-plans', user?.id],
+    queryFn: () => studyService.getUserStudyPlans(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isTopicCompleted = userPlans.some((p: any) => p.syllabus_id === parsedSubtopicId && p.plan_status === 'COMPLETED');
+
   const { data: assessmentHistory, isLoading: isLoadingHistory } = useQuery({
     queryKey: ['assessment-history', user?.id, parsedSubtopicId],
     queryFn: () => studyService.getAssessmentHistory(user!.id, parsedSubtopicId),
@@ -699,8 +708,8 @@ const StudyContent = () => {
     let isActive = true;
     let started = false;
 
-    if (!user?.id || isNaN(parsedSubtopicId) || isLoadingHistory) return;
-    if (assessmentHistory?.attempts?.length > 0) return;
+    if (!user?.id || isNaN(parsedSubtopicId) || isLoadingHistory || isPlansLoading) return;
+    if (assessmentHistory?.attempts?.length > 0 || isTopicCompleted) return;
 
     const startTiming = async () => {
       try {
@@ -708,7 +717,6 @@ const StudyContent = () => {
         if (isActive) {
           setActiveReadingSessionId(timing.id);
           started = true;
-          console.log("Topic timing started");
         }
       } catch (err: any) {
         if (err.response?.status !== 400) {
@@ -725,7 +733,7 @@ const StudyContent = () => {
         queryClient.invalidateQueries({ queryKey: ['topic-timings'] });
       }
     };
-  }, [user?.id, parsedSubtopicId, assessmentHistory, isLoadingHistory]);
+  }, [user?.id, parsedSubtopicId, assessmentHistory, isLoadingHistory, isPlansLoading, isTopicCompleted]);
 
   // When keyword changes, reset editing state
   useEffect(() => {
@@ -782,14 +790,12 @@ const StudyContent = () => {
 
       if (intersecting.length > 0) {
         const targetId = intersecting[0].target.id;
-        console.log("IntersectionObserver: Active Section:", targetId);
 
         if (targetId.startsWith('section-')) {
           const sectionId = targetId.replace('section-', '');
           const section = sections.find(s => s.id === sectionId);
           if (section) {
             const allKeywords = Array.from(new Set(section.content_blocks?.flatMap(b => b.keywords) || []));
-            console.log("Updating visible keywords for section:", sectionId, allKeywords);
             if (allKeywords.length > 0) {
               setVisibleKeywords(allKeywords);
             }

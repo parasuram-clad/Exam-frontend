@@ -16,6 +16,7 @@ import rankIcon from "@/assets/dashboard/rank.png";
 import { useQuery } from "@tanstack/react-query";
 import studyService from "@/services/study.service";
 import authService from "@/services/auth.service";
+import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
 
 interface RightSidebarWidgetsProps {
@@ -27,15 +28,12 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
     const [isStreakInfoExpanded, setIsStreakInfoExpanded] = useState(false);
     const [isCalendarOpen, setIsCalendarOpen] = useState(initialView === 'streak');
 
-    const { data: userData } = useQuery({
-        queryKey: ['user-me'],
-        queryFn: () => authService.getCurrentUser(),
-    });
+    const { user } = useAuth();
 
     const { data: dashboardData, isLoading, error } = useQuery({
-        queryKey: ['dashboard-data', userData?.id],
-        queryFn: () => studyService.getDashboardData(userData!.id),
-        enabled: !!userData?.id,
+        queryKey: ['dashboard-data', user?.id],
+        queryFn: () => studyService.getDashboardData(user!.id),
+        enabled: !!user?.id,
     });
 
     // Helper to determine visibility

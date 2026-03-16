@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import chatbotService from "@/services/chatbot.service";
 import authService, { UserMe } from "@/services/auth.service";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/AuthContext";
 
 interface Message {
   id: string;
@@ -142,12 +143,7 @@ const AskYourDoubt = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const queryClient = useQueryClient();
-
-  const { data: user } = useQuery({
-    queryKey: ['user-me'],
-    queryFn: () => authService.getCurrentUser(),
-    staleTime: Infinity,
-  });
+  const { user } = useAuth();
 
   const { data: remoteSessions = [], isLoading: sessionsLoading } = useQuery({
     queryKey: ['chatbot-conversations', user?.id],

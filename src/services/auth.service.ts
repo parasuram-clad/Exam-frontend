@@ -24,26 +24,26 @@ export interface UserMe {
     pincode: string | null;
     country: string | null;
     address: string | null;
+    address_line_2: string | null;
     bio: string | null;
     study_goal: string | null;
     gender: string | null;
     field_of_study: string | null;
-    target_exam_year: string | null;
+    target_exam_year: number | string | null;
     exam_type: string | null;
     sub_division: string | null;
     learner_type: string | null;
+    preparation_type: string | null;
     past_attempts: string | null;
     is_onboarded: boolean;
-    notify_transaction_email: boolean;
-    notify_transaction_whatsapp: boolean;
-    notify_content_email: boolean;
-    notify_content_whatsapp: boolean;
-    notify_announcement_email: boolean;
-    notify_announcement_whatsapp: boolean;
-    notify_news_email: boolean;
-    notify_news_whatsapp: boolean;
+    notify_push: boolean;
+    notify_exam_reminders: boolean;
+    notify_daily_quiz: boolean;
+    notify_current_affairs: boolean;
+    notify_personalized_insights: boolean;
     background_type: string;
     preferred_language: string;
+    study_medium: string | null;
     is_superuser: boolean;
     is_staff: boolean;
 }
@@ -109,10 +109,42 @@ const authService = {
     },
 
     /**
-     * Check if user is authenticated
+     * Check if user is authenticated and session is refreshable
      */
     isAuthenticated: () => {
-        return !!localStorage.getItem('auth_tokens');
+        const tokensString = localStorage.getItem('auth_tokens');
+        if (!tokensString) return false;
+
+        try {
+            const tokens = JSON.parse(tokensString);
+            const { access, refresh } = tokens;
+            if (!access && !refresh) return false;
+
+            const isTokenExpired = (token: string) => {
+                try {
+                    const parts = token.split('.');
+                    if (parts.length !== 3) return false;
+                    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+                    if (payload && typeof payload.exp === 'number') {
+                        const now = Math.floor(Date.now() / 1000);
+                        return payload.exp < (now + 10); // 10s grace
+                    }
+                    return false;
+                } catch {
+                    return true;
+                }
+            };
+
+            // Session is valid if access token is active
+            if (access && !isTokenExpired(access)) return true;
+
+            // Session is valid if it can be refreshed
+            if (refresh && !isTokenExpired(refresh)) return true;
+
+            return false;
+        } catch (error) {
+            return false;
+        }
     }
 };
 
