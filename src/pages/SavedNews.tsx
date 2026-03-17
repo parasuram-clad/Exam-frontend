@@ -8,7 +8,7 @@ import {
     Bell
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import authService, { UserMe } from "@/services/auth.service";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
@@ -46,9 +46,7 @@ const SavedNews = () => {
         .substring(0, 2)
         .toUpperCase();
 
-    const avatarUrl = user?.photo_url
-        ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
-        : pic;
+    const avatarUrl = getMediaUrl(user?.photo_url, pic);
 
     const filteredNews = mockSavedNews.filter(item =>
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/popover";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { QuizCalendar, DailyQuizModal } from "@/components/dashboard";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -718,9 +718,7 @@ const CurrentAffairs = () => {
     .substring(0, 2)
     .toUpperCase();
 
-  const avatarUrl = user?.photo_url
-    ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
-    : pic;
+  const avatarUrl = getMediaUrl(user?.photo_url, pic);
 
   const filtered = articles.filter((a) => {
     const matchCategory =

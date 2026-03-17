@@ -7,6 +7,7 @@ import { MobileBottomNav } from "./MobileBottomNav";
 import { RightSidebarHeader } from "./RightSidebarHeader";
 import { useAuth } from "@/context/AuthContext";
 import { BASE_URL } from "@/config/env";
+import { getMediaUrl } from "@/lib/utils";
 
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
@@ -26,10 +27,7 @@ export function DashboardLayout({ children, rightSidebar, hideHeader = false, ac
     const userName = user?.full_name || user?.username || "Aspirant";
     const userTitle = user?.qualification || "TNPSC Aspirant";
 
-    // Handle relative avatar URL
-    const avatarUrl = user?.photo_url
-        ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
-        : undefined;
+    const avatarUrl = getMediaUrl(user?.photo_url);
 
     const initials = userName.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
 

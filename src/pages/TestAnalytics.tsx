@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import {
     ArrowLeft,
     ArrowRight,
@@ -283,9 +283,7 @@ const TestAnalytics = () => {
         .substring(0, 2)
         .toUpperCase();
 
-    const avatarUrl = user?.photo_url
-        ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
-        : pic;
+    const avatarUrl = getMediaUrl(user?.photo_url, pic);
 
     const completedDate = resultData?.submitted_at
         ? new Date(resultData.submitted_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })

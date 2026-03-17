@@ -26,7 +26,7 @@ import {
   Layers,
   Loader2
 } from "lucide-react";
-import { cn, getErrorMessage } from "@/lib/utils";
+import { cn, getErrorMessage, getMediaUrl } from "@/lib/utils";
 import { DailyQuizModal, QUIZ_QUESTIONS } from "@/components/dashboard/DailyQuizModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1153,7 +1153,7 @@ const StudyContent = () => {
                       {block.type === 'image' && block.image && (
                         <div className="my-6">
                           <img
-                            src={block.image}
+                            src={getMediaUrl(block.image)}
                             alt={block.sub_heading || "Topic Image"}
                             className="rounded-2xl border shadow-lg max-w-full h-auto mx-auto"
                             loading="eager"

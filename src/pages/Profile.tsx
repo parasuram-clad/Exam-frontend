@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import authService from "@/services/auth.service";
 import apiClient from "@/services/apiClient";
 import { useAuth } from "@/context/AuthContext";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -193,8 +193,7 @@ const Profile = () => {
       setIsPhoneVerified(true);
 
       if (user.photo_url) {
-        const fullUrl = user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`;
-        setProfileImage(fullUrl);
+        setProfileImage(getMediaUrl(user.photo_url));
       }
       setLoading(false);
     } else if (!isAuthLoading) {

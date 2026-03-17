@@ -78,7 +78,7 @@ export const StudyTopicCard = ({
       ? 'Continue'
       : isLocked
         ? 'Locked'
-        : 'Start Now';
+        : 'Start';
 
   return (
     <motion.div
@@ -91,14 +91,14 @@ export const StudyTopicCard = ({
       className="bg-card rounded-2xl p-4 border border-border shadow-sm flex flex-col h-[230px] snap-center relative"
     >
       {/* Locked overlay */}
-      {/* {isLocked && (
+      {isLocked && (
         <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] rounded-2xl z-10 flex items-center justify-center">
           <div className="flex flex-col items-center gap-2">
             <Lock className="w-6 h-6 text-muted-foreground" />
             <span className="text-xs text-muted-foreground font-medium">Locked</span>
           </div>
         </div>
-      )} */}
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-2 gap-2">
@@ -156,15 +156,22 @@ export const StudyTopicCard = ({
 
       {/* Action */}
       <Button
-        onClick={() => handleViewDetails(topic)}
-
-        // disabled={isLocked}
+        onClick={() => !isLocked && handleViewDetails(topic)}
+        onMouseEnter={() => {
+          if (finalIsUnlocked && user?.id) {
+            topic.subtopics.forEach(st => prefetchTopic(queryClient, st.id, user.id));
+          }
+        }}
+        disabled={isLocked}
         className={cn(
-          "w-full rounded-xl font-medium h-10 mt-auto text-sm bg-foreground text-background hover:bg-foreground/90"
+          "w-full rounded-xl font-medium h-10 mt-auto text-sm",
+          isLocked
+            ? "bg-muted text-muted-foreground cursor-not-allowed"
+            : "bg-foreground text-background hover:bg-foreground/90"
         )}
       >
         {buttonLabel}
       </Button>
-    </motion.div >
+    </motion.div>
   );
 };

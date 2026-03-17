@@ -125,6 +125,7 @@ const MyProgress = () => {
   }));
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isStrongExpanded, setIsStrongExpanded] = useState(false);
 
   // Calendar helpers
   const handlePrevMonth = () =>
@@ -166,6 +167,28 @@ const MyProgress = () => {
 
   // Limit to 4 if not expanded
   const displayedAreas = isExpanded ? areasToImprove : areasToImprove.slice(0, 4);
+
+  // Strong areas (with mock data fallback for now)
+  const mockStrongAreas = [
+    { subject: "Mathematics", topic: "Algebra & Calculus", accuracy: 95 },
+    { subject: "Physics", topic: "Kinematics", accuracy: 92 },
+    { subject: "Chemistry", topic: "Organic Reactions", accuracy: 88 },
+    { subject: "Biology", topic: "Human Anatomy", accuracy: 91 },
+    { subject: "English", topic: "Grammar & Syntax", accuracy: 89 },
+  ];
+
+  const strongAreasData = dashboardData?.strong_areas?.areas?.length
+    ? dashboardData.strong_areas.areas
+    : mockStrongAreas;
+
+  const strongAreas = strongAreasData.map((area: any) => ({
+    title: area.subject,
+    subtitle: area.topic,
+    accuracy: `${Math.round(area.accuracy)}% Acc`,
+    color: "text-green-500",
+  }));
+
+  const displayedStrongAreas = isStrongExpanded ? strongAreas : strongAreas.slice(0, 4);
 
   // Overall percentage
   const overallPct = Math.round(overallPerf?.overall_percentage ?? 0);
@@ -554,8 +577,8 @@ const MyProgress = () => {
           </motion.div>
         </div>
 
-        {/* Bottom Row - Streak Consistency & Areas to Improve */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Performance Insights Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Streak Consistency Calendar */}
           <motion.div variants={itemVariants}>
             <Card className="p-4 sm:p-6 lg:p-8 h-full bg-white shadow-sm border-gray-100">
@@ -650,6 +673,59 @@ const MyProgress = () => {
             </Card>
           </motion.div>
 
+          {/* Strong Areas */}
+          <motion.div variants={itemVariants}>
+            <Card className="p-4 sm:p-6 lg:p-8 h-full bg-white shadow-sm border-gray-100 flex flex-col">
+              <h3 className="text-xl font-semibold text-[#1a2b4b] mb-8 lg:mb-12">
+                Strong Areas
+              </h3>
+
+              {strongAreas.length === 0 ? (
+                <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground gap-2">
+                  <p className="text-sm font-medium">Keep learning to build strong areas!</p>
+                  <p className="text-xs">Your top-performing topics will appear here.</p>
+                </div>
+              ) : (
+                <div className="space-y-4 flex-1">
+                  {displayedStrongAreas.map((area: any, index: number) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-2xl shadow-sm font-semibold text-[#1a2b4b]">
+                          {area.title.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-[#1a2b4b]">{area.title}</p>
+                          <p className="text-xs text-gray-500 font-medium">{area.subtitle}</p>
+                        </div>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className="font-semibold border-green-200 bg-green-50 text-green-600"
+                      >
+                        {area.accuracy}
+                      </Badge>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+
+              {strongAreas.length > 4 && (
+                <button
+                  onClick={() => setIsStrongExpanded(!isStrongExpanded)}
+                  className="w-full mt-8 py-4 bg-[#f8faff] text-[#4f46e5] font-semibold rounded-2xl border border-[#e8efff] hover:bg-[#f0f4ff] hover:border-[#ced9ff] transition-all duration-300 shadow-sm text-sm"
+                >
+                  {isStrongExpanded ? "Collapse View" : "View All"}
+                </button>
+              )}
+            </Card>
+          </motion.div>
+
           {/* Areas to Improve */}
           <motion.div variants={itemVariants}>
             <Card className="p-4 sm:p-6 lg:p-8 h-full bg-white shadow-sm border-gray-100 flex flex-col">
@@ -697,11 +773,11 @@ const MyProgress = () => {
               )}
 
               {areasToImprove.length > 4 && (
-                <button 
+                <button
                   onClick={() => setIsExpanded(!isExpanded)}
                   className="w-full mt-8 py-4 bg-[#f8faff] text-[#4f46e5] font-semibold rounded-2xl border border-[#e8efff] hover:bg-[#f0f4ff] hover:border-[#ced9ff] transition-all duration-300 shadow-sm text-sm"
                 >
-                  {isExpanded ? "Collapse View" : "View Study Plan"}
+                  {isExpanded ? "Collapse View" : "View All"}
                 </button>
               )}
             </Card>

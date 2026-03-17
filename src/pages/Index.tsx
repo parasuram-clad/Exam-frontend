@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout";
 import {
   RightSidebarWidgets,
@@ -208,7 +208,7 @@ const Index = () => {
       let topics: string[] = [];
       let progress = 0;
       let buttonLabel = "Start Now";
-      let icon = item.image_url || getSubjectIconFallback(title);
+      let icon = getMediaUrl(item.image_url, getSubjectIconFallback(title));
 
       if (item.type === 'TOPIC') {
         const totalTopics = item.topic?.length || 1;
@@ -372,9 +372,7 @@ const Index = () => {
     .substring(0, 2)
     .toUpperCase();
 
-  const avatarUrl = user?.photo_url
-    ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
-    : pic;
+  const avatarUrl = getMediaUrl(user?.photo_url, pic);
 
 
 
@@ -542,7 +540,7 @@ const Index = () => {
           <div
             ref={scrollContainerRef}
             onScroll={checkScroll}
-            className="grid grid-flow-col auto-cols-[280px] gap-4  -mx-4 px-4 lg:mx-0 lg:px-0 overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="grid grid-flow-col auto-cols-[250px] gap-4  -mx-4 px-4 lg:mx-0 lg:px-0 overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
             {todaysPlan.map((item) => (
               <motion.div
@@ -557,7 +555,7 @@ const Index = () => {
                     <img
                       src={item.icon}
                       alt={item.title}
-                      className="w-10 h-10 object-contain flex-shrink-0"
+                      className="w-14 h-14 object-contain flex-shrink-0"
                     />
                     <div className="min-w-0">
                       <h3 className="font-semibold text-foreground text-sm truncate">

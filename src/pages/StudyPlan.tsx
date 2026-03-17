@@ -12,15 +12,15 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { prefetchTopic } from "@/services/prefetch";
 import { Question as TestQuestion } from "@/components/TestEngine";
 
-import { cn, getErrorMessage } from "@/lib/utils";
+import { cn, getErrorMessage, getMediaUrl } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SubjectPlanView } from "@/components/dashboard/SubjectPlanView";
 import { startOfDay, format } from "date-fns";
 import pic from "@/assets/pic.png";
-import { 
-  StudySetupModal, 
-  StudyTopicDetailDialog, 
+import {
+  StudySetupModal,
+  StudyTopicDetailDialog,
   StudyBannerCountdown,
   StudyDayCycleNavigation,
   StudyPlanRightSidebar,
@@ -379,7 +379,7 @@ const StudyPlan = () => {
   const overallProgress = userPlans.length > 0 ? Math.round((userPlans.filter(p => p.plan_status === 'COMPLETED').length / userPlans.length) * 100) : Math.round(((currentProgressDay - 1) / totalDays) * 100);
   const userName = user?.full_name || user?.username || "Aspirant";
   const initials = userName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
-  const avatarUrl = user?.photo_url ? (user.photo_url.startsWith("http") ? user.photo_url : `${BASE_URL}${user.photo_url}`) : pic;
+  const avatarUrl = getMediaUrl(user?.photo_url, pic);
 
   if (loading || isGenerating) {
     return (
@@ -433,7 +433,7 @@ const StudyPlan = () => {
             <motion.section variants={itemVariants}>
               <h2 className="text-lg font-medium mb-5">{selectedSubject ? `${selectedSubject} - Day ${activeDay}` : "Today's Study Plan"}</h2>
               <AnimatePresence mode="wait">
-                <motion.div key={activeDay} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <motion.div key={activeDay} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 auto-cols-[250px] gap-5">
                   {currentStudyTopics.length === 0 ? (
                     <div className="col-span-full flex flex-col items-center justify-center py-16 bg-card rounded-2xl border border-dashed border-border"><div className="p-4 bg-secondary rounded-full mb-3"><BookOpen className="w-8 h-8 text-muted-foreground" /></div><h3 className="text-base font-medium">No Schedule Today</h3></div>
                   ) : (

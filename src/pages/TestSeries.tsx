@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, FileText, Trophy, Library, BookOpen, Landmark, Globe, Banknote, Microscope, Newspaper, Brain, Pencil, Timer, Layout, Bell, Star } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -165,9 +165,7 @@ const TestSeriesSidebar = ({ user }: { user: UserMe | null }) => {
     : user?.username?.substring(0, 2).toUpperCase() || "A";
 
   // Handle relative avatar URL
-  const avatarUrl = user?.photo_url
-    ? (user.photo_url.startsWith('http') ? user.photo_url : `${BASE_URL}${user.photo_url}`)
-    : undefined;
+  const avatarUrl = getMediaUrl(user?.photo_url);
 
   return (
     <div className="flex flex-col gap-6">

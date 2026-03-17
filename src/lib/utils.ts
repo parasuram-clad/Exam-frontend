@@ -25,3 +25,18 @@ export function getErrorMessage(error: any, defaultMessage: string = "An error o
 
   return error.message || defaultMessage;
 }
+
+export function getMediaUrl(url: string | null | undefined, fallback?: string): string {
+  if (!url) return fallback || "";
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  
+  // Use the Vite env variable for the API base URL
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002';
+  
+  // If it starts with /media, prefix with the backend URL
+  if (url.startsWith('/media')) {
+    return `${baseUrl}${url}`;
+  }
+  
+  return url;
+}

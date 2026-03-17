@@ -1,3 +1,4 @@
+import { cn, getMediaUrl } from "@/lib/utils";
 import { StudyPlanResponse, TopicTiming } from "@/services/study.service";
 import { StudyTopicCardData, getSubjectIconFallback } from "@/components/dashboard/study-plan";
 
@@ -29,7 +30,7 @@ export const mapRoadmapToFrontend = (
 
         return {
           id: `${item.subject.toLowerCase().replace(/\s+/g, '-')}-${dayPlan.day}-${idx}`,
-          image: item.image_url || getSubjectIconFallback(item.subject),
+          image: getMediaUrl(item.image_url, getSubjectIconFallback(item.subject)),
           title: item.subject,
           topicCount: item.topic.length,
           progress,
