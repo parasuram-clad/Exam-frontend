@@ -1,18 +1,32 @@
 import { motion } from "framer-motion";
+import { differenceInCalendarDays, parseISO, startOfDay, isValid } from "date-fns";
 
 interface StudyBannerCountdownProps {
   daysLeft: number;
   user: any;
   overallProgress: number;
   currentProgressDay: number;
+  examEndDate?: string;
 }
 
 export const StudyBannerCountdown = ({
-  daysLeft,
+  daysLeft: daysLeftProp,
   user,
   overallProgress,
-  currentProgressDay
+  currentProgressDay,
+  examEndDate
 }: StudyBannerCountdownProps) => {
+  const getDaysLeft = () => {
+    if (examEndDate) {
+      const parsedDate = parseISO(examEndDate);
+      if (isValid(parsedDate)) {
+        return Math.max(0, differenceInCalendarDays(parsedDate, startOfDay(new Date())));
+      }
+    }
+    return daysLeftProp || 0;
+  };
+
+  const daysLeft = getDaysLeft();
   const suffix = (d: number) => {
     if (d > 3 && d < 21) return 'th';
     switch (d % 10) {
@@ -51,7 +65,7 @@ export const StudyBannerCountdown = ({
         <div className="flex items-center justify-center gap-2 mb-8 sm:mb-10">
           <span className="text-xl sm:text-2xl md:text-3xl font-medium text-accent">{daysLeft}</span>
           <span className="text-primary-foreground text-sm sm:text-base md:text-xl font-medium">
-            Days Left for {user?.exam_type || "TNPSC"} {user?.sub_division || "Group IV"}
+            Days Left for {user?.exam_type ? `${user.exam_type} ${user.sub_division || ''}`.trim() : "Exam"}
           </span>
         </div>
 

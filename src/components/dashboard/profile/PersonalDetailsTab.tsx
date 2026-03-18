@@ -269,20 +269,26 @@ export const PersonalDetailsTab = ({
                 </div>
               </div>
 
-              {/* Qualification */}
+              {/* Preferred Language */}
               <div className="space-y-2">
-                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Qualification</Label>
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Preferred Language</Label>
                 <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                    <Award className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                    <Globe className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
                   </div>
-                  <Input
+                  <Select
                     disabled={!isEditing}
-                    value={profileData.qualification}
-                    onChange={(e) => setProfileData({ ...profileData, qualification: e.target.value })}
-                    placeholder="e.g. B.E, M.Sc"
-                    className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus-visible:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background"
-                  />
+                    value={profileData.preferredLanguage}
+                    onValueChange={(val) => setProfileData({ ...profileData, preferredLanguage: val })}
+                  >
+                    <SelectTrigger className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus:ring-accent/20 font-medium">
+                      <SelectValue placeholder="Select Language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="ta">Tamil</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
@@ -295,6 +301,56 @@ export const PersonalDetailsTab = ({
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Address Line 1 */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Address Line 1</Label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <MapPin className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                  </div>
+                  <Input
+                    disabled={!isEditing}
+                    value={profileData.address}
+                    onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                    placeholder="House No, Street name"
+                    className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus-visible:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background"
+                  />
+                </div>
+              </div>
+
+              {/* Address Line 2 */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Address Line 2</Label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <MapPin className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                  </div>
+                  <Input
+                    disabled={!isEditing}
+                    value={profileData.addressLine2}
+                    onChange={(e) => setProfileData({ ...profileData, addressLine2: e.target.value })}
+                    placeholder="Area, Locality"
+                    className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus-visible:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background"
+                  />
+                </div>
+              </div>
+
+              {/* City */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">City</Label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <Globe className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                  </div>
+                  <Input
+                    disabled={!isEditing}
+                    value={profileData.city}
+                    onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
+                    className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus-visible:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background"
+                  />
+                </div>
+              </div>
+
               {/* Pincode */}
               <div className="space-y-2">
                 <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Pincode</Label>
@@ -321,22 +377,6 @@ export const PersonalDetailsTab = ({
                 </div>
               </div>
 
-              {/* City/Taluk */}
-              <div className="space-y-2">
-                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">City / Taluk</Label>
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                    <Globe className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
-                  </div>
-                  <Input
-                    disabled={!isEditing}
-                    value={profileData.city || profileData.taluk}
-                    onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
-                    className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus-visible:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background"
-                  />
-                </div>
-              </div>
-
               {/* District */}
               <div className="space-y-2">
                 <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">District</Label>
@@ -345,32 +385,137 @@ export const PersonalDetailsTab = ({
                     <MapPin className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
                   </div>
                   <Input
-                    disabled={!isEditing}
+                    disabled={true} // Disabled like mobile app (filled by pincode)
                     value={profileData.district}
-                    onChange={(e) => setProfileData({ ...profileData, district: e.target.value })}
-                    className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus-visible:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background"
+                    className="bg-muted/10 border-none h-12 pl-12 rounded-xl focus-visible:ring-accent/20 font-medium transition-all text-muted-foreground/70"
+                  />
+                </div>
+              </div>
+
+              {/* State */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">State</Label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <Globe className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                  </div>
+                  <Input
+                    disabled={true} // Disabled like mobile app (filled by pincode)
+                    value={profileData.state}
+                    className="bg-muted/10 border-none h-12 pl-12 rounded-xl focus-visible:ring-accent/20 font-medium transition-all text-muted-foreground/70"
                   />
                 </div>
               </div>
             </div>
+          </section>
 
-            {/* Address */}
-            <div className="space-y-2">
-              <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Full Address</Label>
-              <Textarea
-                disabled={!isEditing}
-                value={profileData.address}
-                onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
-                className="bg-muted/30 border-none rounded-2xl p-4 min-h-[100px] focus-visible:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background"
-                placeholder="Enter your complete address"
-              />
+          {/* Education & Professional Details Section */}
+          <section className="space-y-6">
+            <h3 className="text-[15px] font-medium text-foreground/80 flex items-center gap-2">
+              Education & Professional Details
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Qualification */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Highest Qualification</Label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                    <Award className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                  </div>
+                  <Select
+                    disabled={!isEditing}
+                    value={profileData.qualification}
+                    onValueChange={(val) => setProfileData({ ...profileData, qualification: val })}
+                  >
+                    <SelectTrigger className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus:ring-accent/20 font-medium">
+                      <SelectValue placeholder="Select Qualification" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[
+                        "SSLC (10th Standard)", "HSC (12th Standard)", "ITI", "Diploma",
+                        "B.A.", "B.Sc.", "B.Com.", "B.E. (Engineering)", "B.Tech. (Engineering)",
+                        "M.A.", "M.Sc.", "M.Com.", "M.E. (Engineering)", "M.Tech. (Engineering)",
+                        "M.Phil", "Ph.D"
+                      ].map(opt => (
+                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Field of Study */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Field of Study</Label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <BookOpen className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                  </div>
+                  <Input
+                    disabled={!isEditing}
+                    value={profileData.fieldOfStudy}
+                    onChange={(e) => setProfileData({ ...profileData, fieldOfStudy: e.target.value })}
+                    placeholder="e.g. Computer Science"
+                    className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus-visible:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background"
+                  />
+                </div>
+              </div>
+
+              {/* Learner Type */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Learner Type</Label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                    <UserCheck className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                  </div>
+                  <Select
+                    disabled={!isEditing}
+                    value={profileData.learnerType}
+                    onValueChange={(val) => setProfileData({ ...profileData, learnerType: val })}
+                  >
+                    <SelectTrigger className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus:ring-accent/20 font-medium">
+                      <SelectValue placeholder="Select Learner Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["Student", "Working Professional", "Fresher", "Experienced"].map(opt => (
+                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Preparation Type */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Preparation Type</Label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                    <Target className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                  </div>
+                  <Select
+                    disabled={!isEditing}
+                    value={profileData.preparationType}
+                    onValueChange={(val) => setProfileData({ ...profileData, preparationType: val })}
+                  >
+                    <SelectTrigger className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus:ring-accent/20 font-medium">
+                      <SelectValue placeholder="Select Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["Full Time", "Part Time"].map(opt => (
+                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           </section>
 
           {/* Exam Preferences Section */}
           <section className="space-y-6">
             <h3 className="text-[15px] font-medium text-foreground/80 flex items-center gap-2">
-              Exam Preferences
+              Exam Details
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -489,6 +634,35 @@ export const PersonalDetailsTab = ({
                       <SelectItem value="4 Hours">4 Hours</SelectItem>
                       <SelectItem value="6 Hours">6 Hours</SelectItem>
                       <SelectItem value="8 Hours">8 Hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Past Attempts */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Past Attempts</Label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                    <BookOpen className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
+                  </div>
+                  <Select
+                    disabled={!isEditing}
+                    value={profileData.pastAttempts}
+                    onValueChange={(val) => setProfileData({ ...profileData, pastAttempts: val })}
+                  >
+                    <SelectTrigger className="bg-muted/30 border-none h-12 pl-12 rounded-xl focus:ring-accent/20 font-medium">
+                      <SelectValue placeholder="Select Previous Attempts" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[
+                        "First Attempt",
+                        "1 Previous Attempt",
+                        "2 Previous Attempts",
+                        "3+ Attempts"
+                      ].map(opt => (
+                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

@@ -9,60 +9,97 @@ export const mapRoadmapToFrontend = (
   weeklyHistory: any[],
   monthlyHistory: any[]
 ): Record<number, StudyTopicCardData[]> => {
+  console.log('mapRoadmapToFrontend called with:', {
+    roadmapDaysCount: roadmapPlan?.length,
+    backendPlansCount: backendPlans?.length,
+    timingsCount: timings?.length
+  });
+
   // Create a status map for quick lookup
   const statusMap: Record<number, string> = {};
-  backendPlans.forEach(p => {
-    if (p.syllabus_id) statusMap[p.syllabus_id] = p.plan_status;
-  });
+  const testRevisionStatusMap: Record<string, string> = {};
+  
+  if (Array.isArray(backendPlans)) {
+    backendPlans.forEach(p => {
+      if (p.syllabus_id) {
+        statusMap[p.syllabus_id] = p.plan_status;
+      } else if (p.topic) {
+        testRevisionStatusMap[p.topic] = p.plan_status;
+      }
+    });
+  }
 
   // Create a timing map (sum of total_estimate per syllabus_id)
   const timingMap: Record<number, number> = {};
-  timings.forEach(t => {
-    timingMap[t.syllabus_id] = (timingMap[t.syllabus_id] || 0) + (t.total_estimate || 0);
-  });
+  if (Array.isArray(timings)) {
+    timings.forEach(t => {
+      timingMap[t.syllabus_id] = (timingMap[t.syllabus_id] || 0) + (t.total_estimate || 0);
+    });
+  }
 
   const result: Record<number, StudyTopicCardData[]> = {};
+  
+  if (!Array.isArray(roadmapPlan)) {
+    console.warn('mapRoadmapToFrontend: roadmapPlan is not an array');
+    return result;
+  }
+
   roadmapPlan.forEach(dayPlan => {
+    if (!dayPlan || !Array.isArray(dayPlan.items)) return;
+    
     result[dayPlan.day] = dayPlan.items.map((item: any, idx: number): StudyTopicCardData => {
       if (item.type === 'TOPIC') {
-        const completedCount = item.topic.filter((t: any) => statusMap[t.id] === 'COMPLETED').length;
-        const progress = Math.round((completedCount / (item.topic.length || 1)) * 100);
+        const subtopics = Array.isArray(item.topic) ? item.topic : [];
+        const completedCount = subtopics.filter((t: any) => statusMap[t.id] === 'COMPLETED').length;
+        const inProgressCount = subtopics.filter((t: any) => statusMap[t.id] === 'IN_PROGRESS').length;
+        const progress = Math.round((completedCount / (subtopics.length || 1)) * 100);
+
+        let overallStatus: 'completed' | 'in-progress' | 'start' = 'start';
+        if (subtopics.length > 0 && completedCount === subtopics.length) {
+          overallStatus = 'completed';
+        } else if (completedCount > 0 || inProgressCount > 0) {
+          overallStatus = 'in-progress';
+        }
+
+        const subjectStr = item.subject || 'Untitled Subject';
 
         return {
-          id: `${item.subject.toLowerCase().replace(/\s+/g, '-')}-${dayPlan.day}-${idx}`,
-          image: getMediaUrl(item.image_url, getSubjectIconFallback(item.subject)),
-          title: item.subject,
-          topicCount: item.topic.length,
+          id: `${subjectStr.toLowerCase().replace(/\s+/g, '-')}-${dayPlan.day}-${idx}`,
+          image: getMediaUrl(item.image_url, getSubjectIconFallback(subjectStr)),
+          title: subjectStr,
+          topicCount: subtopics.length,
           progress,
-          topics: item.topic.map((t: any) => ({ name: t.name, color: 'bg-[#7C79EC]' })),
-          subtopics: item.topic.map((t: any) => ({
-            id: t.id.toString(),
-            name: t.name,
-            description: t.description,
+          status: overallStatus,
+          topics: subtopics.map((t: any) => ({ name: t.name || 'Untitled Topic', color: 'bg-[#7C79EC]' })),
+          subtopics: subtopics.map((t: any) => ({
+            id: t.id ? t.id.toString() : `topic-${idx}-${Math.random()}`,
+            name: t.name || 'Untitled Topic',
+            description: t.description || '',
             timeSpent: Math.round(timingMap[t.id] || 0),
-            totalTime: t.minutes,
+            totalTime: t.minutes || 0,
             status: (statusMap[t.id] === 'COMPLETED' ? 'completed' : statusMap[t.id] === 'IN_PROGRESS' ? 'continue' : 'start') as any,
           })),
         };
       } else {
         // Handle TEST/REVISION
-        let statusStr = statusMap[dayPlan.day] || 'start'; // This is simplified for tests
+        const itemIdentifier = item.identifier || item.title || '';
+        let statusStr = testRevisionStatusMap[itemIdentifier] || 'start';
         const weekNo = Math.ceil(dayPlan.day / 7);
 
         let timeSpent = 0;
-        let totalTime = item.minutes;
+        let totalTime = item.minutes || 0;
 
         if (item.type === 'TEST' && item.identifier) {
           if (item.identifier.startsWith('WEEK_')) {
             const testNo = parseInt(item.identifier.split('_')[1], 10);
-            const historyRec = weeklyHistory.find((h: any) => h.week_no === testNo);
+            const historyRec = Array.isArray(weeklyHistory) ? weeklyHistory.find((h: any) => h.week_no === testNo) : null;
             if (historyRec && historyRec.status === 'COMPLETED') {
               statusStr = 'COMPLETED';
               timeSpent = Math.ceil((historyRec.time_spent_seconds || 0) / 60);
             }
           } else if (item.identifier.startsWith('MONTH_')) {
             const testNo = parseInt(item.identifier.split('_')[1], 10);
-            const historyRec = monthlyHistory.find((h: any) => h.month_no === testNo);
+            const historyRec = Array.isArray(monthlyHistory) ? monthlyHistory.find((h: any) => h.month_no === testNo) : null;
             if (historyRec && historyRec.status === 'COMPLETED') {
               statusStr = 'COMPLETED';
               timeSpent = Math.ceil((historyRec.time_spent_seconds || 0) / 60);
@@ -70,17 +107,18 @@ export const mapRoadmapToFrontend = (
           }
         } else {
           if (statusStr === 'COMPLETED') {
-            timeSpent = item.minutes;
+            timeSpent = item.minutes || 0;
           }
         }
 
         return {
           id: `${item.type.toLowerCase()}-${dayPlan.day}-${idx}`,
-          image: item.type === 'TEST' ? '' : '', // Fallback images will be handled by UI
+          image: '', // Fallback images will be handled by UI
           title: (item.title || (item.type === 'TEST' ? 'Weekly Test' : 'Revision')).replace('_', ' '),
           topicCount: 1,
           progress: statusStr === 'COMPLETED' ? 100 : 0,
           type: item.type,
+          status: statusStr === 'COMPLETED' ? 'completed' : statusStr === 'IN_PROGRESS' ? 'in-progress' : 'start',
           topics: [{ name: item.description || 'Assessment', color: item.type === 'TEST' ? 'bg-[#FF3B30]' : 'bg-[#34C759]' }],
           subtopics: [{
             id: `sub-${item.type.toLowerCase()}-${dayPlan.day}-${idx}`,
@@ -97,6 +135,8 @@ export const mapRoadmapToFrontend = (
       }
     });
   });
+  
+  console.log('mapRoadmapToFrontend finished. Result keys:', Object.keys(result));
   return result;
 };
 
@@ -121,13 +161,23 @@ export const mapBackendPlanToFrontend = (
 
     result[dayNo] = Object.entries(groupedBySubject).map(([subject, items]): StudyTopicCardData => {
       const completedCount = items.filter(i => i.plan_status === 'COMPLETED').length;
+      const inProgressCount = items.filter(i => i.plan_status === 'IN_PROGRESS').length;
       const progress = Math.round((completedCount / (items.length || 1)) * 100);
+
+      let overallStatus: 'completed' | 'in-progress' | 'start' = 'start';
+      if (items.length > 0 && completedCount === items.length) {
+        overallStatus = 'completed';
+      } else if (completedCount > 0 || inProgressCount > 0) {
+        overallStatus = 'in-progress';
+      }
+
       return {
         id: `${subject.toLowerCase().replace(/\s+/g, '-')}-${dayNo}`,
         image: getSubjectIconFallback(subject),
         title: subject,
         topicCount: items.length,
         progress,
+        status: overallStatus,
         topics: Array.from(new Set(items.map(i => i.chapter))).map(ch => ({ name: ch, color: 'bg-[#7C79EC]' })),
         subtopics: items.map(i => {
           const sumTimings = topicTimings

@@ -150,11 +150,11 @@ const MyProgress = () => {
   const monthName = viewDate.toLocaleString("default", { month: "long" });
   const displayYear = viewDate.getFullYear();
 
-  // Build a set of "completed" day-of-month from streak weekly_calendar
-  const streakCalendar = dashboardData?.streak?.weekly_calendar || [];
+  // Build a set of "completed" day-of-month from streak monthly_calendar
+  const streakCalendar = dashboardData?.streak?.monthly_calendar || [];
   const completedDays = new Set<number>();
   streakCalendar.forEach((entry: any) => {
-    if (entry.status === "completed") completedDays.add(entry.label);
+    if (entry.status === "completed") completedDays.add(entry.day);
   });
 
   // Areas to improve — use backend data directly
@@ -168,20 +168,8 @@ const MyProgress = () => {
   // Limit to 4 if not expanded
   const displayedAreas = isExpanded ? areasToImprove : areasToImprove.slice(0, 4);
 
-  // Strong areas (with mock data fallback for now)
-  const mockStrongAreas = [
-    { subject: "Mathematics", topic: "Algebra & Calculus", accuracy: 95 },
-    { subject: "Physics", topic: "Kinematics", accuracy: 92 },
-    { subject: "Chemistry", topic: "Organic Reactions", accuracy: 88 },
-    { subject: "Biology", topic: "Human Anatomy", accuracy: 91 },
-    { subject: "English", topic: "Grammar & Syntax", accuracy: 89 },
-  ];
-
-  const strongAreasData = dashboardData?.strong_areas?.areas?.length
-    ? dashboardData.strong_areas.areas
-    : mockStrongAreas;
-
-  const strongAreas = strongAreasData.map((area: any) => ({
+  // Strong areas
+  const strongAreas = (dashboardData?.strong_areas?.areas || []).map((area: any) => ({
     title: area.subject,
     subtitle: area.topic,
     accuracy: `${Math.round(area.accuracy)}% Acc`,

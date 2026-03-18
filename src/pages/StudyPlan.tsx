@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import authService from "@/services/auth.service";
-import studyService, { StudyPlanResponse, TopicTiming } from "@/services/study.service";
+import studyService, { StudyPlanResponse, TopicTiming, RoadmapResponse } from "@/services/study.service";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -68,7 +68,7 @@ const StudyPlan = () => {
     retry: false,
   });
 
-  const { data: roadmapData, isLoading: roadmapLoading } = useQuery({
+  const { data: roadmapData, isLoading: roadmapLoading } = useQuery<RoadmapResponse>({
     queryKey: ['roadmap', user?.id],
     queryFn: () => studyService.getUserRoadmap(user!.id),
     enabled: !!user?.id,
@@ -130,6 +130,34 @@ const StudyPlan = () => {
   });
   const [viewMode, setViewMode] = useState<'overall' | 'subject'>('overall');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const prevSelectedSubject = useRef<string | null>(null);
+  const prevViewMode = useRef<'overall' | 'subject'>('overall');
+
+  useEffect(() => {
+    console.log('StudyPlan State Update:', {
+      viewMode,
+      selectedSubject,
+      activeDay,
+      userId: user?.id,
+      hasRoadmapData: !!roadmapData,
+      roadmapAccess: roadmapData?.access,
+      plansCount: userPlans.length
+    });
+  }, [viewMode, selectedSubject, activeDay, roadmapData, userPlans, user]);
+
+  // Show tab toggle whenever BOTH plan types have data available (regardless of subscription)
+  const hasOverallPlanData = useMemo(() => {
+    if (roadmapData?.access?.overall_plans && roadmapData.access.overall_plans.length > 0) return true;
+    return !!roadmapData?.plan?.find(p => p.plan_type === 'OVERALL');
+  }, [roadmapData]);
+
+  const hasSubjectPlanData = useMemo(() => {
+    if (roadmapData?.access?.subject_plans && roadmapData.access.subject_plans.length > 0) return true;
+    return !!roadmapData?.plan?.find(p => p.plan_type === 'SUBJECT');
+  }, [roadmapData]);
+
+  // Show the tab switch as long as both plan types exist — subscribed or not
+  const showPlanToggle = hasOverallPlanData && hasSubjectPlanData;
 
   // Weekly Test State
   const [isWeeklyTestModalOpen, setIsWeeklyTestModalOpen] = useState(false);
@@ -151,57 +179,91 @@ const StudyPlan = () => {
     }
   });
 
-  // Calculate current progress day
-  const calculateCurrentProgressDay = (plans: StudyPlanResponse[]) => {
-    if (plans.length > 0) {
-      const sortedDays = Array.from(new Set(plans.map(p => p.day_no))).sort((a, b) => a - b);
-      const firstIncomplete = sortedDays.find(day => {
-        const dayPlans = plans.filter(p => p.day_no === day);
-        return !dayPlans.every(p => p.plan_status === 'COMPLETED');
-      });
-      return firstIncomplete || sortedDays[0] || 1;
+  const calculateCurrentProgressDay = (dayWisePlans: Record<number, StudyTopicCardData[]>, totalDays: number) => {
+    const days = Object.keys(dayWisePlans).map(Number).sort((a, b) => a - b);
+    if (days.length > 0) {
+      for (const day of days) {
+        const topics = dayWisePlans[day];
+        if (!topics.every(t => t.status === 'completed')) {
+          return day;
+        }
+      }
+      return days[days.length - 1] < totalDays ? days[days.length - 1] + 1 : totalDays;
     }
     return 1;
   };
 
+  const overallPlanDate = useMemo(() => {
+    const p = roadmapData?.plan?.find(plan => plan.plan_type === 'OVERALL');
+    if (p && p.days && p.days.length > 0) {
+      return p.days[p.days.length - 1].date;
+    }
+    return undefined;
+  }, [roadmapData]);
+
+  const currentPlan = useMemo(() => {
+    const result = (viewMode === 'overall')
+      ? roadmapData?.plan?.find(p => p.plan_type === 'OVERALL')
+      : roadmapData?.plan?.find(p => p.plan_type === 'SUBJECT' && p.subject_name === selectedSubject) || (function () {
+        const overallPlan = roadmapData?.plan?.find(p => p.plan_type === 'OVERALL');
+        if (overallPlan && selectedSubject) {
+          const filteredDays = overallPlan.days.filter(d =>
+            d.items.some(item => item.type === 'TOPIC' && item.subject === selectedSubject)
+          );
+          return {
+            ...overallPlan,
+            plan_type: 'SUBJECT' as const,
+            subject_name: selectedSubject,
+            label: selectedSubject,
+            total_days: filteredDays.length,
+            days: filteredDays,
+            isVirtual: true
+          };
+        }
+        return undefined;
+      })();
+    return result;
+  }, [roadmapData, viewMode, selectedSubject]);
+
   useEffect(() => {
+    console.log("roadmapData", roadmapData);
+    console.log("userPlans", userPlans);
     if (roadmapData?.plan && userPlans) {
+      console.log('Processing Roadmap Data...', {
+        viewMode,
+        selectedSubject,
+        currentPlanLabel: currentPlan?.label,
+        currentPlanDays: currentPlan?.days?.length
+      });
+
       const wHistory = weeklyHistoryData?.history || [];
       const mHistory = monthlyHistoryData?.history || [];
-      setDynamicDayWisePlans(mapRoadmapToFrontend(roadmapData.plan, userPlans, topicTimings, wHistory, mHistory));
-      const currentDay = calculateCurrentProgressDay(userPlans);
-      setActiveDay(currentDay);
-    }
-  }, [roadmapData, userPlans, topicTimings, weeklyHistoryData, monthlyHistoryData]);
+      const relevantDays = currentPlan?.days || [];
+      const totalRoadmapDays = currentPlan?.total_days || (relevantDays.length > 0 ? Math.max(...relevantDays.map(d => d.day)) : 120);
 
-  useEffect(() => {
-    if (loading || isGenerating) return;
-    const hasNoPlan = !userPlans || userPlans.length === 0;
-    const isProfileEmpty = !user?.full_name?.trim() || !user?.exam_type?.trim() || !user?.sub_division?.trim() || !user?.target_exam_year || !user?.learner_type?.trim();
-    if (isProfileEmpty || hasNoPlan) {
-      setIsSetupModalOpen(true);
-    } else {
-      setIsSetupModalOpen(false);
-    }
-  }, [loading, isGenerating, user, userPlans]);
+      if (relevantDays.length > 0) {
+        const mappedPlans = mapRoadmapToFrontend(relevantDays, userPlans, topicTimings, wHistory, mHistory);
+        console.log('Mapped Plans successfully:', Object.keys(mappedPlans).length, 'days');
+        setDynamicDayWisePlans(mappedPlans);
+        const currentDay = calculateCurrentProgressDay(mappedPlans, totalRoadmapDays);
 
-  // Pre-fill setup modal
-  useEffect(() => {
-    if (user) {
-      setSetupData(prev => ({
-        ...prev,
-        name: user.full_name || "",
-        medium: user.preferred_language === 'ta' ? 'tamil' : 'english',
-        examType: (user.exam_type as any) || "TNPSC",
-        subDivision: user.sub_division ? user.sub_division.split(", ") : ["Group IV"],
-        targetYear: user.target_exam_year?.toString() || "2026",
-        learnerType: user.learner_type || "Student"
-      }));
+        if (selectedSubject !== prevSelectedSubject.current || viewMode !== prevViewMode.current) {
+          console.log('Resetting activeDay to:', currentDay);
+          setActiveDay(currentDay);
+          prevSelectedSubject.current = selectedSubject;
+          prevViewMode.current = viewMode;
+        } else if (activeDay > totalRoadmapDays) {
+          setActiveDay(1);
+        }
+      } else {
+        console.warn('No relevant days found for current plan');
+        setDynamicDayWisePlans({});
+      }
     }
-  }, [user]);
+  }, [roadmapData, userPlans, topicTimings, weeklyHistoryData, monthlyHistoryData, viewMode, selectedSubject, currentPlan]);
 
-  const totalDays = roadmapData?.total_days || (roadmapData?.plan && roadmapData.plan.length > 0 ? Math.max(...roadmapData.plan.map((p: any) => p.day)) : 120);
-  const currentProgressDay = calculateCurrentProgressDay(userPlans);
+  const totalDays = currentPlan?.total_days || (currentPlan?.days && currentPlan.days.length > 0 ? Math.max(...currentPlan.days.map(d => d.day)) : 120);
+  const currentProgressDay = calculateCurrentProgressDay(dynamicDayWisePlans, totalDays);
   const daysLeft = Math.max(0, totalDays - currentProgressDay + 1);
 
   // Navigation Logic
@@ -224,7 +286,7 @@ const StudyPlan = () => {
 
   const dynamicDayCycle: DayCycleItem[] = Array.from({ length: totalDays }, (_, i) => {
     const dayNo = i + 1;
-    const roadmapDay = roadmapData?.plan?.find((p: any) => p.day === dayNo);
+    const roadmapDay = currentPlan?.days?.find(d => d.day === dayNo);
     const planDateStr = roadmapDay?.date;
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const testItem = roadmapDay?.items?.find((it: any) => it.type === 'TEST');
@@ -249,16 +311,57 @@ const StudyPlan = () => {
     };
   });
 
-  const availableSubjects = Array.from(new Set(
-    userPlans.length > 0
-      ? userPlans.map(p => p.subject)
-      : Object.values(dayCycleRotation).flatMap(days => days.map(t => t.title))
-  )).sort();
+  const sortedAvailableSubjects = useMemo(() => {
+    console.log('Deriving subjects from roadmapData:', {
+      hasAccess: !!roadmapData?.access,
+      subjectPlansLength: roadmapData?.access?.subject_plans?.length,
+      planLength: roadmapData?.plan?.length
+    });
 
-  const currentStudyTopics = (userPlans.length > 0
+    // 1. Try to get subjects from the access metadata
+    if (roadmapData?.access?.subject_plans && Array.isArray(roadmapData.access.subject_plans)) {
+      const subjectsFromMetadata = roadmapData.access.subject_plans
+        .map((p: any) => p.subject_name)
+        .filter(Boolean)
+        .sort() as string[];
+
+      console.log('Derived subjects from metadata:', subjectsFromMetadata);
+      if (subjectsFromMetadata.length > 0) return subjectsFromMetadata;
+    }
+
+    // 2. Fallback: Get subjects from dedicated SUBJECT plans in the data array
+    if (roadmapData?.plan && Array.isArray(roadmapData.plan)) {
+      const subjectsFromPlanItems = Array.from(new Set(
+        roadmapData.plan
+          .filter(p => p.plan_type === 'SUBJECT' && (p.subject_name || p.label))
+          .map(p => (p.subject_name || p.label)!)
+      )).sort();
+
+      console.log('Derived subjects from plan array fallback:', subjectsFromPlanItems);
+      return subjectsFromPlanItems;
+    }
+
+    console.warn('Could not derive any subjects from roadmapData');
+    return [];
+  }, [roadmapData]);
+
+  const hasDynamicData = Object.keys(dynamicDayWisePlans).length > 0;
+
+  const currentStudyTopics = (hasDynamicData
     ? (dynamicDayWisePlans[activeDay] || [])
     : (dayCycleRotation[activeDay] || dayCycleRotation[activeDay % 7] || []))
-    .filter(t => !selectedSubject || t.title === selectedSubject);
+    .filter(t => {
+      // If we're in a dedicated SUBJECT plan, show everything (it includes subject-specific tests/revisions)
+      if (viewMode === 'subject' && currentPlan?.plan_type === 'SUBJECT' && (!currentPlan.isVirtual)) {
+        return true;
+      }
+      // If we're in fallback mode or overall, filter by chosen subject
+      if (selectedSubject) {
+        // Show the specific subject topics, and all tests/revisions for the day
+        return t.title === selectedSubject || t.type === 'TEST' || t.type === 'REVISION';
+      }
+      return true;
+    });
 
   const handleDayClick = (day: DayCycleItem) => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -396,10 +499,10 @@ const StudyPlan = () => {
         <StudyPlanRightSidebar
           user={user} avatarUrl={avatarUrl} initials={initials} onDateClick={(date) => {
             const dateStr = format(date, 'yyyy-MM-dd');
-            const dayMatch = roadmapData?.plan?.find((p: any) => p.date === dateStr);
+            const dayMatch = currentPlan?.days?.find(d => d.date === dateStr);
             if (dayMatch) setActiveDay(dayMatch.day);
           }}
-          selectedDate={roadmapData?.plan?.find((p: any) => p.day === activeDay)?.date ? new Date(roadmapData.plan.find((p: any) => p.day === activeDay).date) : new Date()}
+          selectedDate={currentPlan?.days?.find(d => d.day === activeDay)?.date ? new Date(currentPlan.days.find(d => d.day === activeDay)!.date) : new Date()}
           planDays={dynamicDayCycle} notes={allNotes} areasToImprove={dashboardData?.areas_to_improve?.areas || []}
         />
       )}
@@ -409,36 +512,66 @@ const StudyPlan = () => {
           <div>
             <div className="flex items-center gap-2">
               {(selectedTopic || selectedSubject) && <button onClick={() => { setSelectedTopic(null); setSelectedSubject(null); }} className="p-1 hover:bg-muted rounded-full mr-1"><ArrowLeft className="w-4 h-4" /></button>}
-              <h1 className="text-xl sm:text-2xl font-medium">{selectedSubject || "Study Plan"}</h1>
+              <h1 className="text-xl sm:text-2xl font-medium">{currentPlan?.label || "Study Plan"}</h1>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{selectedSubject ? "Daily Schedule" : `${user?.exam_type || "TNPSC"} – ${user?.sub_division || "Group IV"}`}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{selectedSubject ? (currentPlan?.plan_type === 'SUBJECT' ? "Subject Roadmap" : "Filtered View") : `${user?.exam_type || "TNPSC"} – ${user?.sub_division || "Group IV"}`}</p>
           </div>
-          <div className="flex bg-muted/30 p-1 rounded-xl sm:ml-auto">
-            <button onClick={() => { setViewMode('overall'); setSelectedSubject(null); }} className={cn("px-4 py-2 text-xs font-medium rounded-lg", viewMode === 'overall' ? "bg-white text-foreground shadow-sm" : "text-muted-foreground")}>Overall Plan</button>
-            <button onClick={() => setViewMode('subject')} className={cn("px-4 py-2 text-xs font-medium rounded-lg", viewMode === 'subject' ? "bg-white text-foreground shadow-sm" : "text-muted-foreground")}>Subject Wise</button>
-          </div>
+          {showPlanToggle && (
+            <div className="flex bg-muted/30 p-1 rounded-xl sm:ml-auto">
+              <button
+                onClick={() => { setViewMode('overall'); setSelectedSubject(null); }}
+                className={cn("px-4 py-2 text-xs font-medium rounded-lg", viewMode === 'overall' ? "bg-white text-foreground shadow-sm" : "text-muted-foreground")}
+              >
+                Overall Plan
+              </button>
+              <button
+                onClick={() => setViewMode('subject')}
+                className={cn("px-4 py-2 text-xs font-medium rounded-lg", viewMode === 'subject' ? "bg-white text-foreground shadow-sm" : "text-muted-foreground")}
+              >
+                Subject Wise
+              </button>
+            </div>
+          )}
         </motion.div>
       </div>
 
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8 pb-10 pt-4" >
         <motion.div variants={itemVariants}>
-          <StudyBannerCountdown daysLeft={daysLeft} user={user} overallProgress={overallProgress} currentProgressDay={currentProgressDay} />
+          <StudyBannerCountdown 
+            daysLeft={daysLeft} 
+            examEndDate={dashboardData?.exam_calendar?.exam_date || overallPlanDate || (currentPlan?.days && currentPlan.days.length > 0 ? currentPlan.days[currentPlan.days.length - 1].date : undefined)} 
+            user={user} 
+            overallProgress={overallProgress} 
+            currentProgressDay={currentProgressDay} 
+          />
         </motion.div>
 
         {viewMode === 'subject' && !selectedSubject ? (
-          <motion.section variants={itemVariants}><h2 className="text-lg font-medium mb-5">Select a Subject</h2><SubjectPlanView subjects={availableSubjects} onSelectSubject={setSelectedSubject} userPlans={userPlans} dayWiseStudyPlans={dayCycleRotation} /></motion.section>
+          <motion.section variants={itemVariants}><h2 className="text-lg font-medium mb-5">Select a Subject</h2><SubjectPlanView subjects={sortedAvailableSubjects || []} onSelectSubject={setSelectedSubject} userPlans={userPlans || []} roadmapData={roadmapData} /></motion.section>
         ) : (
           <>
-            <StudyDayCycleNavigation totalDays={totalDays} dynamicDayCycle={dynamicDayCycle} activeDay={activeDay} showLeftArrow={showLeftArrow} showRightArrow={showRightArrow} scrollContainerRef={scrollContainerRef} handleScroll={handleScroll} scroll={scroll} handleDayClick={handleDayClick} />
+            <StudyDayCycleNavigation totalDays={totalDays || 1} dynamicDayCycle={dynamicDayCycle || []} activeDay={activeDay} showLeftArrow={showLeftArrow} showRightArrow={showRightArrow} scrollContainerRef={scrollContainerRef} handleScroll={handleScroll} scroll={scroll} handleDayClick={handleDayClick} />
             <motion.section variants={itemVariants}>
-              <h2 className="text-lg font-medium mb-5">{selectedSubject ? `${selectedSubject} - Day ${activeDay}` : "Today's Study Plan"}</h2>
+              <h2 className="text-lg font-medium mb-5">{selectedSubject ? `${currentPlan?.label} - Day ${activeDay}` : "Today's Study Plan"}</h2>
               <AnimatePresence mode="wait">
                 <motion.div key={activeDay} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 auto-cols-[250px] gap-5">
                   {currentStudyTopics.length === 0 ? (
                     <div className="col-span-full flex flex-col items-center justify-center py-16 bg-card rounded-2xl border border-dashed border-border"><div className="p-4 bg-secondary rounded-full mb-3"><BookOpen className="w-8 h-8 text-muted-foreground" /></div><h3 className="text-base font-medium">No Schedule Today</h3></div>
                   ) : (
                     currentStudyTopics.map((topic, index) => (
-                      <StudyTopicCard key={topic.id} topic={topic} index={index} activeDay={activeDay} currentProgressDay={currentProgressDay} roadmapData={roadmapData} userPlans={userPlans} user={user} handleViewDetails={(t) => { setSelectedTopic(t); setIsDialogOpen(true); }} prefetchTopic={prefetchTopic} queryClient={queryClient} />
+                      <StudyTopicCard
+                        key={topic.id}
+                        topic={topic}
+                        index={index}
+                        activeDay={activeDay}
+                        currentProgressDay={currentProgressDay}
+                        roadmapData={currentPlan} // Pass currentPlan instead of roadmapData
+                        userPlans={userPlans}
+                        user={user}
+                        handleViewDetails={(t) => { setSelectedTopic(t); setIsDialogOpen(true); }}
+                        prefetchTopic={prefetchTopic}
+                        queryClient={queryClient}
+                      />
                     ))
                   )}
                 </motion.div>

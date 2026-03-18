@@ -26,6 +26,7 @@ export interface StudyTopicCardData {
   topics: { name: string; color: string }[];
   subtopics: Subtopic[];
   type?: 'TEST' | 'REVISION' | 'TOPIC';
+  status?: 'completed' | 'in-progress' | 'start';
 }
 
 export const EXAM_SUB_DIVISIONS: Record<string, string[]> = {

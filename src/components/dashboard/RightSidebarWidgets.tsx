@@ -129,7 +129,7 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
                 <>
                     <StreakWidget
                         streakDays={streakCount}
-                        calendar={dashboardData?.streak?.weekly_calendar}
+                        calendar={dashboardData?.streak?.weekly_strip}
                         onToggle={() => setIsCalendarOpen(!isCalendarOpen)}
                         isExpanded={isCalendarOpen}
                     />
@@ -143,7 +143,7 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
                                 transition={{ duration: 0.3 }}
                                 className="space-y-8 overflow-hidden"
                             >
-                                <StreakCalendar data={dashboardData?.streak?.weekly_calendar} />
+                                <StreakCalendar data={dashboardData?.streak?.monthly_calendar} />
 
                                 {/* How Streak Works Collapsible */}
                                 <div className="bg-white rounded-xl border border-border/50 shadow-sm overflow-hidden transition-all duration-300">

@@ -36,7 +36,7 @@ import imgCard2 from "@/assets/dashboard/img-card2.png";
 import imgCard1 from "@/assets/dashboard/img-card1.png";
 import testBannerImg from "@/assets/test-image.png";
 import mockTestGirl from "@/assets/dashboard/mock-test-girl.png";
-import studyService from "@/services/study.service";
+import studyService, { RoadmapResponse } from "@/services/study.service";
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -113,7 +113,7 @@ const Index = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: roadmapData } = useQuery({
+  const { data: roadmapData } = useQuery<RoadmapResponse>({
     queryKey: ['roadmap', user?.id],
     queryFn: () => studyService.getUserRoadmap(user!.id),
     enabled: !!user?.id,
@@ -198,7 +198,8 @@ const Index = () => {
       });
     }
 
-    const activeRoadmapDay = roadmapData.plan.find((p: any) => p.day === currentProgressDay) || roadmapData.plan[0];
+    const overallPlan = roadmapData.plan.find((p: any) => p.plan_type === 'OVERALL') || roadmapData.plan[0];
+    const activeRoadmapDay = overallPlan.days.find((d: any) => d.day === currentProgressDay) || overallPlan.days[0];
     if (!activeRoadmapDay || !activeRoadmapDay.items) return fallbackTodaysPlan;
 
     return activeRoadmapDay.items.map((item: any) => {

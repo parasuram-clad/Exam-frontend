@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Bell,
   Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -623,6 +624,8 @@ const CurrentAffairs = () => {
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
   const [bookmarkedArticles, setBookmarkedArticles] = useState<Article[]>([]);
+  const [quizResult, setQuizResult] = useState<any>(null);
+  const [quizStartTime, setQuizStartTime] = useState<string | null>(null);
 
   const isDesktop = useMediaQuery("(min-width: 1280px)");
 
@@ -654,6 +657,21 @@ const CurrentAffairs = () => {
     }
   };
 
+  const loadQuizResult = async (date: Date) => {
+    try {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
+      const res = await currentAffairsService.getQuizResult(dateStr);
+      setQuizResult(res);
+    } catch (err) {
+      console.error("Failed to load quiz result", err);
+      setQuizResult(null);
+    }
+  };
+
   const loadBookmarks = async () => {
     try {
       const saved = await currentAffairsService.getBookmarks();
@@ -678,13 +696,26 @@ const CurrentAffairs = () => {
 
   useEffect(() => {
     loadArticles(selectedDate);
+    loadQuizResult(selectedDate);
   }, [selectedDate]);
 
   const handleStartQuiz = async () => {
     try {
+      if (quizResult) {
+        // If already attempted, just open it in evaluation mode
+        setIsQuizOpen(true);
+        return;
+      }
+
       setIsQuizLoading(true);
       setIsQuizOpen(true);
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      setQuizStartTime(new Date().toISOString());
+      
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
       const mcqs = await currentAffairsService.getMCQs(dateStr);
 
       if (mcqs && mcqs.length > 0) {
@@ -692,7 +723,7 @@ const CurrentAffairs = () => {
           id: m.id,
           question: m.question_text,
           options: [m.option_a, m.option_b, m.option_c, m.option_d],
-          correctAnswer: ["A", "B", "C", "D"].indexOf(m.correct_option),
+          correctAnswer: ["A", "B", "C", "D"].indexOf(m.correct_option.toUpperCase()),
           explanation: m.explanation,
           subject: "Current Affairs",
           difficulty: "Medium"
@@ -701,10 +732,42 @@ const CurrentAffairs = () => {
       } else {
         toast.info("No quiz available for the selected date.");
         setQuizQuestions([]);
+        setIsQuizOpen(false);
       }
     } catch (err) {
       console.error("Failed to load quiz", err);
       toast.error("Error loading quiz questions");
+      setIsQuizOpen(false);
+    } finally {
+      setIsQuizLoading(false);
+    }
+  };
+
+  const handleQuizComplete = async (results: { answers: (number | null)[], questions: any[] }) => {
+    try {
+      setIsQuizLoading(true);
+
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
+      const submission = {
+        date: dateStr,
+        time_taken_seconds: Math.floor((new Date().getTime() - new Date(quizStartTime!).getTime()) / 1000),
+        started_at: quizStartTime!,
+        answers: results.answers.map((ansIndex, i) => ({
+          mcq_id: Number(results.questions[i].id),
+          selected_option: ["A", "B", "C", "D"][ansIndex!]
+        }))
+      };
+
+      const res = await currentAffairsService.submitQuiz(submission);
+      setQuizResult(res);
+      toast.success("Quiz submitted successfully!");
+    } catch (err) {
+      console.error("Failed to submit quiz", err);
+      toast.error("Failed to submit quiz results");
     } finally {
       setIsQuizLoading(false);
     }
@@ -837,14 +900,26 @@ const CurrentAffairs = () => {
               Daily Quiz Challenge
             </h3>
             <p className="text-[13px] text-[#64748B] mt-0.5 font-medium">
-              Complete today's quiz ({formatArticleDate(selectedDate)}) to maintain your streak!
+              {quizResult ? (
+                <span className="text-emerald-600 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Quiz completed! You scored {quizResult.correct_answers}/{quizResult.total_questions}
+                </span>
+              ) : (
+                `Complete today's quiz (${formatArticleDate(selectedDate)}) to maintain your streak!`
+              )}
             </p>
           </div>
           <Button
             onClick={handleStartQuiz}
-            className="w-full sm:w-auto rounded-xl font-semibold px-6 flex-shrink-0 bg-white text-[#1e293b] hover:bg-slate-50 shadow-sm transition-all border border-[#F1F5F9] text-sm h-11"
+            className={cn(
+              "w-full sm:w-auto rounded-xl font-semibold px-6 flex-shrink-0 shadow-sm transition-all border text-sm h-11",
+              quizResult 
+                ? "bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100" 
+                : "bg-white text-[#1e293b] border-[#F1F5F9] hover:bg-slate-50"
+            )}
           >
-            Start Quiz
+            {quizResult ? "View Result" : "Start Quiz"}
           </Button>
         </motion.div>
 
@@ -1170,9 +1245,24 @@ const CurrentAffairs = () => {
       <DailyQuizModal
         isOpen={isQuizOpen}
         onClose={() => setIsQuizOpen(false)}
+        onComplete={handleQuizComplete}
         title={`Daily Quiz - ${formatArticleDate(selectedDate)}`}
         subtitle="Test your knowledge on today's current affairs"
-        questions={quizQuestions}
+        questions={quizResult ? quizResult.questions.map((q: any) => ({
+          id: q.mcq_id,
+          question: q.question_text,
+          options: Object.values(q.options),
+          correct_answer_index: ["A", "B", "C", "D"].indexOf(q.correct_option.toUpperCase()),
+          explanation: q.explanation,
+          is_correct: q.is_correct,
+          subject: "Current Affairs"
+        })) : quizQuestions}
+        initialAnswers={quizResult ? quizResult.questions.map((q: any) => ["A", "B", "C", "D"].indexOf(q.selected_option.toUpperCase())) : undefined}
+        initialShowEvaluation={!!quizResult}
+        initialShowDetails={!!quizResult}
+        score={quizResult?.correct_answers}
+        timeTaken={quizResult?.time_taken_seconds}
+        isSubmitted={!!quizResult}
         isLoading={isQuizLoading}
       />
     </DashboardLayout>

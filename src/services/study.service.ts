@@ -11,6 +11,45 @@ export interface StudyPlanResponse {
     topic: string;
     minutes: number;
     syllabus_id?: number;
+    plan_type?: 'OVERALL' | 'SUBJECT';
+}
+
+export interface RoadmapDayItem {
+    type: 'TOPIC' | 'TEST' | 'REVISION';
+    subject?: string;
+    part?: string;
+    image_url?: string;
+    topic?: { id: number; name: string; minutes: number; description: string }[];
+    minutes: number;
+    identifier?: string;
+    title?: string;
+    description?: string;
+    weekly_test_id?: number;
+}
+
+export interface RoadmapDay {
+    day: number;
+    date: string;
+    items: RoadmapDayItem[];
+}
+
+export interface RoadmapPlan {
+    plan_type: 'OVERALL' | 'SUBJECT';
+    subject_name: string | null;
+    label: string;
+    total_days: number;
+    days: RoadmapDay[];
+    isVirtual?: boolean;
+}
+
+export interface RoadmapResponse {
+    user_id: number;
+    total_plans: number;
+    access: {
+        overall_plans: { exam_type: string; sub_division: string; plan_type: string; subscribed: boolean }[];
+        subject_plans: { exam_type: string; sub_division: string; plan_type: string; subject_name: string; subscribed: boolean }[];
+    };
+    plan: RoadmapPlan[];
 }
 
 export interface StudyPlanGenerateRequest {
@@ -161,7 +200,7 @@ const studyService = {
      * Get all study plans for a user
      */
     getUserStudyPlans: async (userId: number): Promise<StudyPlanResponse[]> => {
-        const response = await apiClient.get(`/study-plan/user/${userId}`);
+        const response = await apiClient.get(`/study-plan/user/${userId}`, { params: { limit: 1000 } });
         return response.data;
     },
 
@@ -247,8 +286,9 @@ const studyService = {
     /**
      * Get the organized roadmap for a user
      */
-    getUserRoadmap: async (userId: number) => {
+    getUserRoadmap: async (userId: number): Promise<RoadmapResponse> => {
         const response = await apiClient.get(`/study-plan/roadmap/${userId}`);
+
         return response.data;
     },
 

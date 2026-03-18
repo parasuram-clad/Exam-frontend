@@ -73,6 +73,21 @@ class CurrentAffairsService {
         const response = await apiClient.post(`/current-affairs/items/${id}/bookmark`);
         return response.data.bookmarked;
     }
+
+    async submitQuiz(payload: {
+        date: string;
+        time_taken_seconds: number;
+        started_at: string;
+        answers: { mcq_id: number; selected_option: string }[];
+    }) {
+        const response = await apiClient.post("/current-affairs/quiz/submit", payload);
+        return response.data;
+    }
+
+    async getQuizResult(date: string) {
+        const response = await apiClient.get(`/current-affairs/quiz/result/${date}`);
+        return response.data;
+    }
 }
 
 export default new CurrentAffairsService();

@@ -11,9 +11,9 @@ interface StreakWidgetProps {
   onToggle?: () => void;
   isExpanded?: boolean;
   calendar?: {
-    day_no: number;
-    label: number;
-    status: 'completed' | 'active' | 'pending';
+    date: string;
+    day: string;
+    status: 'completed' | 'active' | 'pending' | 'skipped';
     is_today: boolean;
   }[];
 }
@@ -29,7 +29,7 @@ export function StreakWidget({ streakDays, onToggle, isExpanded = false, calenda
       const isToday = isSameDay(date, today);
 
       // If we have backend calendar info, use it. Otherwise fallback to calculation.
-      const backendDay = calendar?.find(c => c.day_no === (i + 1));
+      const backendDay = calendar?.find(c => c.date === format(date, "yyyy-MM-dd"));
       const completed = backendDay ? backendDay.status === 'completed' : isBefore(date, today);
 
       return {

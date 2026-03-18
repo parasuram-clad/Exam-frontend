@@ -17,11 +17,10 @@ import {
 } from "date-fns";
 
 interface CalendarData {
-    day_no: number;
-    label: number;
-    status: 'completed' | 'active' | 'pending';
+    date: string;
+    day: number;
+    status: 'completed' | 'active' | 'pending' | 'skipped';
     is_today: boolean;
-    date?: string; // Optional if backend provides actual dates
 }
 
 export function StreakCalendar({ data }: { data?: CalendarData[] }) {
@@ -49,9 +48,15 @@ export function StreakCalendar({ data }: { data?: CalendarData[] }) {
 
         if (isToday) return "today";
 
-        // If we have backend data, we should ideally match by date.
-        // For now, if no date is provided in backend data, we'll keep the logic simple
-        // but prefer the provided status if we can map it.
+        // Use backend data if available
+        if (data && data.length > 0) {
+            const dateStr = format(checkDay, "yyyy-MM-dd");
+            const backendDay = data.find(d => d.date === dateStr);
+            if (backendDay) {
+                if (backendDay.is_today && backendDay.status !== "completed") return "today";
+                return backendDay.status; // 'pending' | 'completed' | 'active' | 'skipped'
+            }
+        }
 
         if (isAfter(checkDay, today)) return undefined;
 
@@ -110,7 +115,7 @@ export function StreakCalendar({ data }: { data?: CalendarData[] }) {
                                     isSelectedMonth && (
                                         status === "today" ? "bg-[#72C146] text-white shadow-[0_4px_10px_rgba(114,193,70,0.3)]" :
                                             status === "skipped" ? "bg-[#C4C8D0] text-white" :
-                                                status === "completed" ? " text-primary" : ""
+                                                status === "completed" ? "bg-[#1a2b4b] text-white" : ""
                                     )
                                 )}
                             >

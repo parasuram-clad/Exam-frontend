@@ -37,7 +37,7 @@ export const StudyTopicCard = ({
   queryClient
 }: StudyTopicCardProps) => {
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const roadmapDay = roadmapData?.plan?.find((p: any) => p.day === activeDay);
+  const roadmapDay = roadmapData?.days?.find((d: any) => d.day === activeDay);
   const isFuture = roadmapDay?.date && roadmapDay.date > todayStr;
 
   const previousAssessmentDay = Math.floor((activeDay - 1) / 7) * 7;

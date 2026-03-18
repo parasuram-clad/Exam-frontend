@@ -2,17 +2,17 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, subDays, isWithinInterval } from "date-fns";
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Search, 
-  Calendar as CalendarIcon, 
-  SlidersHorizontal, 
-  Target, 
-  Pencil, 
-  Save, 
-  Loader2, 
-  BookOpen 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Calendar as CalendarIcon,
+  SlidersHorizontal,
+  Target,
+  Pencil,
+  Save,
+  Loader2,
+  BookOpen
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
