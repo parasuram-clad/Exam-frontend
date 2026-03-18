@@ -226,6 +226,13 @@ const StudyPlan = () => {
   }, [roadmapData, viewMode, selectedSubject]);
 
   useEffect(() => {
+    // Auto-switch to subject view if overall plan is not available
+    if (roadmapData && !hasOverallPlanData && hasSubjectPlanData && viewMode === 'overall') {
+      setViewMode('subject');
+    }
+  }, [roadmapData, hasOverallPlanData, hasSubjectPlanData, viewMode]);
+
+  useEffect(() => {
     console.log("roadmapData", roadmapData);
     console.log("userPlans", userPlans);
     if (roadmapData?.plan && userPlans) {
@@ -511,10 +518,24 @@ const StudyPlan = () => {
         <motion.div variants={itemVariants} initial="hidden" animate="visible" className="flex flex-col sm:flex-row sm:items-end gap-1">
           <div>
             <div className="flex items-center gap-2">
-              {(selectedTopic || selectedSubject) && <button onClick={() => { setSelectedTopic(null); setSelectedSubject(null); }} className="p-1 hover:bg-muted rounded-full mr-1"><ArrowLeft className="w-4 h-4" /></button>}
-              <h1 className="text-xl sm:text-2xl font-medium">{currentPlan?.label || "Study Plan"}</h1>
+              {(selectedTopic || (selectedSubject && showPlanToggle) || (selectedSubject && !hasOverallPlanData)) && (
+                <button 
+                  onClick={() => { 
+                    setSelectedTopic(null); 
+                    setSelectedSubject(null); 
+                  }} 
+                  className="p-1 hover:bg-muted rounded-full mr-1"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              )}
+              <h1 className="text-xl sm:text-2xl font-medium">
+                {selectedSubject ? selectedSubject : (currentPlan?.label || "Study Plan")}
+              </h1>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{selectedSubject ? (currentPlan?.plan_type === 'SUBJECT' ? "Subject Roadmap" : "Filtered View") : `${user?.exam_type || "TNPSC"} – ${user?.sub_division || "Group IV"}`}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              {selectedSubject ? (currentPlan?.plan_type === 'SUBJECT' ? "Subject Roadmap" : "Filtered View") : `${user?.exam_type || "TNPSC"} – ${user?.sub_division || "Group IV"}`}
+            </p>
           </div>
           {showPlanToggle && (
             <div className="flex bg-muted/30 p-1 rounded-xl sm:ml-auto">

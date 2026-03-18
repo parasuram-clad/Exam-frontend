@@ -127,15 +127,21 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
             allDayItems = subjectPlan.days
                 .flatMap((d: any) =>
                     (d?.items || [])
-                        .filter((i: any) => i?.type === 'TOPIC')
                         .map((t: any) => {
+                            let typeLabel = "";
+                            if (t.type === 'REVISION') typeLabel = "Revision";
+                            if (t.type === 'TEST') typeLabel = "Test";
+                            
                             const topicName =
                                 (Array.isArray(t?.topic) && t.topic[0]?.name) ||
+                                t?.title ||
                                 t?.subject ||
-                                "Study Topic";
+                                t?.identifier ||
+                                (t.type === 'REVISION' ? "Revision Day" : "Study Topic");
+
                             return {
-                                label: `Day ${d?.day || '?'}: ${topicName}`,
-                                id: `roadmap-${subject}-day${d?.day}`,
+                                label: `Day ${d?.day || '?'}: ${typeLabel ? typeLabel + " - " : ""}${topicName}`,
+                                id: `roadmap-${subject}-day${d?.day}-${t.identifier || Math.random()}`,
                                 dayNo: d?.day || 0,
                             };
                         })
@@ -160,11 +166,11 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
         }
 
         if (subscribed) {
-            return { preview: allDayItems.slice(0, 2), lockedCount: 0 };
+            return { preview: allDayItems.slice(0, 3), lockedCount: 0 };
         }
 
         // Unsubscribed: show first FREE_PREVIEW_DAYS day labels, then show how many are locked
-        const freeItems = allDayItems.filter(d => d.dayNo <= FREE_PREVIEW_DAYS).slice(0, 2);
+        const freeItems = allDayItems.filter(d => d.dayNo <= FREE_PREVIEW_DAYS).slice(0, 3);
         const lockedCount = Math.max(0, allDayItems.length - FREE_PREVIEW_DAYS);
         return { preview: freeItems, lockedCount };
     };
@@ -225,7 +231,7 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                            <h3 className="text-[14px] font-semibold text-foreground leading-tight truncate max-w-[120px]">
+                                            <h3 className="text-[14px] font-semibold text-foreground leading-tight truncate max-w-[160px]">
                                                 {subject}
                                             </h3>
                                             {/* {!subscribed && (

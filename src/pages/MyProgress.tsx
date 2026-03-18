@@ -15,7 +15,7 @@ import CardImg3 from "@/assets/my-progress/card-imag-3.png";
 import CardImg4 from "@/assets/my-progress/card-imag-4.png";
 import CardImgTop from "@/assets/my-progress/card-imag-top.png";
 import CardImgBottom from "@/assets/my-progress/card-imag-bottom.png";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import {
   ResponsiveContainer,
   BarChart,
@@ -163,6 +163,7 @@ const MyProgress = () => {
     subtitle: area.topic,
     accuracy: `${Math.round(area.accuracy)}% Acc`,
     color: area.badge_color === "red" ? "text-red-500" : "text-orange-500",
+    image: area.subject_image, // ✅ NEW
   }));
 
   // Limit to 4 if not expanded
@@ -174,6 +175,7 @@ const MyProgress = () => {
     subtitle: area.topic,
     accuracy: `${Math.round(area.accuracy)}% Acc`,
     color: "text-green-500",
+    image: area.subject_image, // ✅ NEW
   }));
 
   const displayedStrongAreas = isStrongExpanded ? strongAreas : strongAreas.slice(0, 4);
@@ -684,8 +686,14 @@ const MyProgress = () => {
                       className="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-2xl shadow-sm font-semibold text-[#1a2b4b]">
-                          {area.title.charAt(0)}
+                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden shadow-sm">
+                          {area.image ? (
+                            <img src={getMediaUrl(area.image)} alt={area.title} className="w-8 h-8 " />
+                          ) : (
+                            <span className="text-2xl font-semibold text-[#1a2b4b]">
+                              {area.title.charAt(0)}
+                            </span>
+                          )}
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-[#1a2b4b]">{area.title}</p>
@@ -737,8 +745,14 @@ const MyProgress = () => {
                       className="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-2xl shadow-sm font-semibold text-[#1a2b4b]">
-                          {area.title.charAt(0)}
+                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden shadow-sm">
+                          {area.image ? (
+                            <img src={getMediaUrl(area.image)} alt={area.title} className="w-8 h-8 " />
+                          ) : (
+                            <span className="text-2xl font-semibold text-[#1a2b4b]">
+                              {area.title.charAt(0)}
+                            </span>
+                          )}
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-[#1a2b4b]">{area.title}</p>

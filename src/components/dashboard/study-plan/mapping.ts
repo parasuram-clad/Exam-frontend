@@ -173,7 +173,7 @@ export const mapBackendPlanToFrontend = (
 
       return {
         id: `${subject.toLowerCase().replace(/\s+/g, '-')}-${dayNo}`,
-        image: getSubjectIconFallback(subject),
+        image: getMediaUrl(null, getSubjectIconFallback(subject)),
         title: subject,
         topicCount: items.length,
         progress,

@@ -30,7 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 
 // Static data fallbacks
 const notesData = [
@@ -411,7 +411,11 @@ export const StudyPlanRightSidebar = ({
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-secondary/30 flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105">
-                        <Target className="w-5 h-5 text-primary/70" />
+                        {item.subject_image ? (
+                          <img src={getMediaUrl(item.subject_image)} alt={item.subject} className="w-6 h-6" />
+                        ) : (
+                          <Target className="w-5 h-5 text-primary/70" />
+                        )}
                       </div>
                       <div>
                         <h4 className="font-medium text-[11px] sm:text-[12px] text-foreground leading-tight group-hover:text-primary transition-colors">
