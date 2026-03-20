@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import authService from "@/services/auth.service";
 import apiClient from "@/services/apiClient";
 import { useAuth } from "@/context/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -101,6 +102,7 @@ const Profile = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [profileImage, setProfileImage] = useState("");
   const { user, isLoading: isAuthLoading } = useAuth();
+  const queryClient = useQueryClient();
   const userId = user?.id || null;
 
   // Verification State
@@ -339,6 +341,7 @@ const Profile = () => {
       // Update the original data to match current data after success
       setOriginalProfileData({ ...profileData });
       setIsEditing(false);
+      await queryClient.invalidateQueries({ queryKey: ['user-me'] });
       toast.success("Profile updated successfully!");
     } catch (err) {
       console.error("Failed to update profile", err);
@@ -353,19 +356,38 @@ const Profile = () => {
     setIsEditing(false);
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (file && userId) {
       if (file.size > 2 * 1024 * 1024) {
         toast.error("Image size should be less than 2MB");
         return;
       }
+
+      // Show immediate local preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfileImage(reader.result as string);
-        toast.success("Profile picture updated!");
       };
       reader.readAsDataURL(file);
+
+      // Perform actual upload to backend
+      const uploadToastId = toast.loading("Uploading image...");
+      try {
+        const response = await authService.updateAvatar(userId, file);
+        if (response && response.photo_url) {
+          setProfileImage(getMediaUrl(response.photo_url));
+          await queryClient.invalidateQueries({ queryKey: ['user-me'] });
+          toast.success("Profile picture updated!", { id: uploadToastId });
+        }
+      } catch (err) {
+        console.error("Avatar upload failed:", err);
+        toast.error("Failed to upload profile picture", { id: uploadToastId });
+        // Revert preview on failure
+        if (user?.photo_url) {
+          setProfileImage(getMediaUrl(user.photo_url));
+        }
+      }
     }
   };
 

@@ -84,6 +84,20 @@ const authService = {
     },
 
     /**
+     * Upload user avatar
+     */
+    updateAvatar: async (userId: number, file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await apiClient.post(`/accounts/${userId}/avatar`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    },
+
+    /**
      * Register a new user
      */
     register: async (data: any) => {

@@ -43,7 +43,7 @@ const Signup = () => {
 
       const response = await authService.register(signupData);
       toast.success(`Account created! Your username is ${response.username}`);
-      navigate("/login");
+      navigate("/");
     } catch (error: any) {
       toast.error(getErrorMessage(error, "Registration failed. Please try again."));
     } finally {
