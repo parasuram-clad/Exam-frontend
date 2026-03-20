@@ -46,6 +46,14 @@ const chatbotService = {
     getConversations: async (userId: number): Promise<ChatSessionOut[]> => {
         const response = await apiClient.get(`/chatbot/conversations/${userId}`);
         return response.data;
+    },
+
+    /**
+     * Get chatbot greeting message
+     */
+    getGreeting: async (): Promise<{ message: string; timestamp: string }> => {
+        const response = await apiClient.get('/chatbot/greeting');
+        return response.data;
     }
 };
 

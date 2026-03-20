@@ -38,14 +38,29 @@ const QUICK_QUESTIONS = [
 const now = () =>
   new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
-const defaultMessages: Message[] = [
-  {
-    id: "1",
-    role: "assistant",
-    content: "Vanakkam! I am your AI Tutor. Start a new topic or ask a doubt.",
-    timestamp: "03:51 PM",
-  },
-];
+const formatChatTime = (dateStr: string | Date) => {
+  if (!dateStr) return "";
+  const d = typeof dateStr === 'string' && !dateStr.includes('Z') && !dateStr.includes('+')
+    ? new Date(dateStr + 'Z')
+    : new Date(dateStr);
+  return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+};
+
+const formatChatDate = (dateStr: string | Date) => {
+  if (!dateStr) return "";
+  const d = typeof dateStr === 'string' && !dateStr.includes('Z') && !dateStr.includes('+')
+    ? new Date(dateStr + 'Z')
+    : new Date(dateStr);
+  
+  const today = new Date();
+  if (d.toLocaleDateString() === today.toLocaleDateString()) {
+    return "TODAY";
+  }
+  
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
+};
+
+const defaultMessages: Message[] = [];
 
 /* ── animation variants ── */
 const pageVariants = {
@@ -136,7 +151,7 @@ const TypewriterText = ({ text }: { text: string }) => {
 
 const AskYourDoubt = () => {
   const [sessions, setSessions] = useState<ChatSession[]>([
-    { id: "1", title: "Vanakkam", date: "TODAY", messages: defaultMessages },
+    { id: "1", title: "New Chat", date: "TODAY", messages: [] },
   ]);
   const [activeSessionId, setActiveSessionId] = useState("1");
   const [input, setInput] = useState("");
@@ -160,7 +175,7 @@ const AskYourDoubt = () => {
         id: s.conversation_id.toString(),
         conversation_id: s.conversation_id,
         title: s.title,
-        date: new Date(s.created_at).toLocaleDateString() === new Date().toLocaleDateString() ? "TODAY" : new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase(),
+        date: formatChatDate(s.created_at),
         messages: []
       }));
 
@@ -184,11 +199,9 @@ const AskYourDoubt = () => {
         return merged;
       });
 
-      // If no session is active or the active one is very fresh, select the most recent remote one
-      if (activeSessionId === "1" && formattedSessions.length > 0) {
-        setActiveSessionId(formattedSessions[0].id);
-        loadHistory(formattedSessions[0].id, formattedSessions[0].conversation_id!);
-      }
+      // Ensure we stay on the "New Chat" (id "1") or whatever local one is active,
+      // instead of auto-switching to the most recent remote one.
+      // This fulfills the requirement to lead with a fresh chat on page load.
     }
   }, [remoteSessions]);
 
@@ -196,6 +209,24 @@ const AskYourDoubt = () => {
     if (window.innerWidth >= 1024) {
       setShowSidebar(true);
     }
+    // Fetch greeting for the initial new chat if it's empty
+    const fetchInitialGreeting = async () => {
+      if (activeSessionId === "1" && sessions.find(s => s.id === "1")?.messages.length === 0) {
+        try {
+          const { message, timestamp } = await chatbotService.getGreeting();
+          const welcomeMsg: Message = {
+            id: "welcome-1",
+            role: "assistant",
+            content: message,
+            timestamp: formatChatTime(timestamp),
+          };
+          setSessions(prev => prev.map(s => s.id === "1" ? { ...s, messages: [welcomeMsg] } : s));
+        } catch (error) {
+          console.error("Failed to fetch greeting:", error);
+        }
+      }
+    };
+    fetchInitialGreeting();
   }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -224,14 +255,14 @@ const AskYourDoubt = () => {
           id: `q-${item.id}`,
           role: "user" as const,
           content: item.question,
-          timestamp: new Date(item.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+          timestamp: formatChatTime(item.created_at)
         });
         if (item.answer) {
           msgs.push({
             id: `a-${item.id}`,
             role: "assistant" as const,
             content: item.answer,
-            timestamp: new Date(item.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+            timestamp: formatChatTime(item.created_at)
           });
         }
         return msgs;
@@ -276,7 +307,7 @@ const AskYourDoubt = () => {
             ...s,
             messages: [...s.messages, userMsg],
             title:
-              s.title === "New Chat" || (s.title === "Vanakkam" && s.messages.length <= 1)
+              s.title === "New Chat" && s.messages.length === 0
                 ? input.trim().slice(0, 30)
                 : s.title,
           }
@@ -304,7 +335,7 @@ const AskYourDoubt = () => {
           id: response.id.toString(),
           role: "assistant",
           content: response.answer || "I'm sorry, I couldn't process that.",
-          timestamp: new Date(response.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          timestamp: formatChatTime(response.created_at),
           isNew: true, // Mark only this specific message for animation
         };
 
@@ -345,7 +376,7 @@ const AskYourDoubt = () => {
     callApi();
   };
 
-  const newChat = () => {
+  const newChat = async () => {
     // If the active session is already a "New Chat" and has no messages (except welcome), just focus it
     const currentActive = sessions.find(s => s.id === activeSessionId);
     if (currentActive && !currentActive.conversation_id && currentActive.messages.length <= 1) {
@@ -358,20 +389,29 @@ const AskYourDoubt = () => {
       id,
       title: "New Chat",
       date: "TODAY",
-      messages: [
-        {
-          id: "welcome-" + id,
-          role: "assistant",
-          content: "Vanakkam! I am your AI Tutor. Start a new topic or ask a doubt.",
-          timestamp: now(),
-        },
-      ],
+      messages: [],
     };
 
     setIsTyping(false); // Stop any running typing if we switch to new chat
     setSessions((prev) => [session, ...prev]);
     setActiveSessionId(id);
     setInput("");
+
+    // Fetch welcome message from backend for the new chat
+    try {
+      const { message, timestamp } = await chatbotService.getGreeting();
+      const welcomeMsg: Message = {
+        id: "welcome-" + id,
+        role: "assistant",
+        content: message,
+        timestamp: formatChatTime(timestamp),
+      };
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, messages: [welcomeMsg] } : s))
+      );
+    } catch (error) {
+      console.error("Failed to fetch greeting for new chat:", error);
+    }
 
     setTimeout(() => {
       textAreaRef.current?.focus();
@@ -384,7 +424,7 @@ const AskYourDoubt = () => {
   const clearChat = () => {
     setSessions((prev) =>
       prev.map((s) =>
-        s.id === activeSessionId ? { ...s, messages: defaultMessages } : s
+        s.id === activeSessionId ? { ...s, messages: [] } : s
       )
     );
   };
