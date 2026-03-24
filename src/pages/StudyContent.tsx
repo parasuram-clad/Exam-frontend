@@ -602,7 +602,7 @@ const StudyContent = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  const isTopicCompleted = userPlans.some((p: any) => p.syllabus_id === parsedSubtopicId && p.plan_status === 'COMPLETED');
+  const isTopicCompleted = userPlans.some((p: any) => p.syllabus_id === parsedSubtopicId && p.is_completed === true);
 
   const { data: assessmentHistory, isLoading: isLoadingHistory } = useQuery({
     queryKey: ['assessment-history', user?.id, parsedSubtopicId],

@@ -120,14 +120,41 @@ const StudyPlan = () => {
   const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [setupData, setSetupData] = useState({
-    name: "",
-    medium: "",
-    examType: "TNPSC",
-    subDivision: ["Group IV"] as string[],
-    learnerType: "Student",
+    name: user?.full_name || "",
+    medium: user?.preferred_language === 'ta' ? 'tamil' : 'english',
+    examType: user?.exam_type || "TNPSC",
+    subDivision: user?.sub_division ? user.sub_division.split(", ") : ["Group IV"] as string[],
+    learnerType: user?.learner_type || "Student",
     studyGoal: "4 Hours",
-    targetYear: "2026"
+    targetYear: user?.target_exam_year?.toString() || new Date().getFullYear().toString()
   });
+
+  // Update setupData when user changes
+  useEffect(() => {
+    if (user) {
+      setSetupData(prev => ({
+        ...prev,
+        name: user.full_name || prev.name,
+        medium: user.preferred_language === 'ta' ? 'tamil' : 'english',
+        examType: user.exam_type || prev.examType,
+        subDivision: user.sub_division ? user.sub_division.split(", ") : prev.subDivision,
+        learnerType: user.learner_type || prev.learnerType,
+        targetYear: user.target_exam_year?.toString() || prev.targetYear || new Date().getFullYear().toString()
+      }));
+    }
+  }, [user]);
+
+  // Auto-open setup modal if no plans exist
+  useEffect(() => {
+    if (!loading && user && roadmapData) {
+      const hasPlan = roadmapData.plan && roadmapData.plan.length > 0;
+      const isActuallyEmpty = !hasPlan && userPlans.length === 0;
+      
+      if (isActuallyEmpty && !isGenerating) {
+        setIsSetupModalOpen(true);
+      }
+    }
+  }, [loading, roadmapData, userPlans, user, isGenerating]);
   const [viewMode, setViewMode] = useState<'overall' | 'subject'>('overall');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const prevSelectedSubject = useRef<string | null>(null);
@@ -377,7 +404,7 @@ const StudyPlan = () => {
     let isPrevAssessmentMissing = false;
     if (previousAssessmentDay > 0 && day.day > previousAssessmentDay) {
       const assessmentRows = userPlans.filter(p => p.day_no === previousAssessmentDay);
-      isPrevAssessmentMissing = assessmentRows.length > 0 && !assessmentRows.every(p => p.plan_status === 'COMPLETED');
+      isPrevAssessmentMissing = assessmentRows.length > 0 && !assessmentRows.every(p => p.is_completed === true);
     }
 
     if (isFuture && day.day > currentProgressDay) {
@@ -486,7 +513,7 @@ const StudyPlan = () => {
     navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}`);
   };
 
-  const overallProgress = userPlans.length > 0 ? Math.round((userPlans.filter(p => p.plan_status === 'COMPLETED').length / userPlans.length) * 100) : Math.round(((currentProgressDay - 1) / totalDays) * 100);
+  const overallProgress = userPlans.length > 0 ? Math.round((userPlans.filter(p => p.is_completed === true).length / userPlans.length) * 100) : Math.round(((currentProgressDay - 1) / totalDays) * 100);
   const userName = user?.full_name || user?.username || "Aspirant";
   const initials = userName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
   const avatarUrl = getMediaUrl(user?.photo_url, pic);
@@ -567,7 +594,28 @@ const StudyPlan = () => {
           />
         </motion.div>
 
-        {viewMode === 'subject' && !selectedSubject ? (
+        {!currentPlan ? (
+          <motion.div
+            variants={itemVariants}
+            className="w-full bg-card rounded-2xl p-12 border border-dashed border-border flex flex-col items-center justify-center text-center space-y-6"
+          >
+            <div className="p-6 bg-primary/10 rounded-full">
+              <BookOpen className="w-12 h-12 text-primary" />
+            </div>
+            <div className="max-w-md">
+              <h3 className="text-xl font-semibold mb-2">No Study Plan Generated</h3>
+              <p className="text-muted-foreground">
+                You haven't set up your exam preparation roadmap yet. Create a personalized plan to track your topics, daily goals, and upcoming assessments.
+              </p>
+            </div>
+            <Button 
+              onClick={() => setIsSetupModalOpen(true)}
+              className="rounded-full px-10 h-12 bg-[#1a2b4b] text-white hover:bg-[#1a2b4b]/90 shadow-lg shadow-[#1a2b4b]/20 transition-all active:scale-95"
+            >
+              Set Up My Smart Plan
+            </Button>
+          </motion.div>
+        ) : viewMode === 'subject' && !selectedSubject ? (
           <motion.section variants={itemVariants}><h2 className="text-lg font-medium mb-5">Select a Subject</h2><SubjectPlanView subjects={sortedAvailableSubjects || []} onSelectSubject={setSelectedSubject} userPlans={userPlans || []} roadmapData={roadmapData} /></motion.section>
         ) : (
           <>

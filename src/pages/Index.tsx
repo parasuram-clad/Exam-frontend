@@ -22,6 +22,8 @@ import pic from "@/assets/pic.png";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import WelcomeModal from "@/components/auth/WelcomeModal";
 import { useSearchParams } from "react-router-dom";
+import { StudySetupModal } from "@/components/dashboard/study-plan";
+import { toast } from "sonner";
 
 // Dashboard assets
 import heroBoy from "@/assets/dashboard/hero-boy.png";
@@ -128,6 +130,84 @@ const Index = () => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [canScroll, setCanScroll] = useState(false);
+  const [doubtInput, setDoubtInput] = useState("");
+  const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [setupData, setSetupData] = useState({
+    name: user?.full_name || "",
+    medium: user?.preferred_language === 'ta' ? 'tamil' : 'english',
+    examType: user?.exam_type || "TNPSC",
+    subDivision: user?.sub_division ? user.sub_division.split(", ") : ["Group IV"] as string[],
+    learnerType: user?.learner_type || "Student",
+    studyGoal: "4 Hours",
+    targetYear: user?.target_exam_year?.toString() || new Date().getFullYear().toString()
+  });
+
+  // Update setupData when user changes
+  useEffect(() => {
+    if (user) {
+      setSetupData(prev => ({
+        ...prev,
+        name: user.full_name || prev.name,
+        medium: user.preferred_language === 'ta' ? 'tamil' : 'english',
+        examType: user.exam_type || prev.examType,
+        subDivision: user.sub_division ? user.sub_division.split(", ") : prev.subDivision,
+        learnerType: user.learner_type || prev.learnerType,
+        targetYear: user.target_exam_year?.toString() || prev.targetYear || new Date().getFullYear().toString()
+      }));
+    }
+  }, [user]);
+
+  const handleGeneratePlan = async () => {
+    if (!user) return;
+    if (!setupData.name.trim() || !setupData.medium || setupData.subDivision.length === 0) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      setIsSetupModalOpen(false);
+      const dailyHours = parseInt(setupData.studyGoal.replace(/[^0-9]/g, '')) || 4;
+      await authService.updateProfile(user!.id, {
+        full_name: setupData.name,
+        exam_type: setupData.examType,
+        sub_division: setupData.subDivision.join(", "),
+        target_exam_year: parseInt(setupData.targetYear),
+        learner_type: setupData.learnerType,
+        preferred_language: setupData.medium === 'tamil' ? 'ta' : 'en',
+      });
+
+      await studyService.generateStudyPlan({
+        user_id: user!.id,
+        exam_type: setupData.examType,
+        sub_division: setupData.subDivision.join(", "),
+        year: parseInt(setupData.targetYear),
+        learner_type: setupData.learnerType,
+        daily_study_hours: dailyHours,
+        language: setupData.medium === 'tamil' ? 'Tamil' : 'English',
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['user-me'] }),
+        queryClient.invalidateQueries({ queryKey: ['study-plans', user!.id] }),
+        queryClient.invalidateQueries({ queryKey: ['roadmap', user!.id] }),
+      ]);
+
+      toast.success("Study plan generated successfully!");
+    } catch (err) {
+      toast.error("Failed to generate study plan.");
+      setIsSetupModalOpen(true);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleAskDoubt = () => {
+    if (doubtInput.trim()) {
+      navigate("/ask-doubt", { state: { initialQuery: doubtInput.trim() } });
+    }
+  };
 
   const checkScroll = () => {
     if (scrollContainerRef.current) {
@@ -188,7 +268,7 @@ const Index = () => {
   const currentProgressDay = calculateCurrentProgressDay(userPlans);
 
   const todaysPlan = useMemo(() => {
-    if (!roadmapData?.plan || roadmapData.plan.length === 0) return fallbackTodaysPlan;
+    if (!roadmapData?.plan || roadmapData.plan.length === 0) return [];
 
     // Status map to calculate progress
     const statusMap: Record<number, string> = {};
@@ -244,10 +324,10 @@ const Index = () => {
     });
   }, [roadmapData, userPlans, currentProgressDay]);
 
+  const { logout } = useAuth();
   const handleLogout = async () => {
     try {
-      await authService.logout();
-      navigate("/");
+      logout();
     } catch (err) {
       console.error("Logout failed:", err);
     }
@@ -537,77 +617,102 @@ const Index = () => {
             )}
           </div>
 
-          {/* Today's Plan Cards - Always Horizontal Scroll to prevent squishing */}
           <div
             ref={scrollContainerRef}
             onScroll={checkScroll}
-            className="grid grid-flow-col auto-cols-[250px] gap-4  -mx-4 px-4 lg:mx-0 lg:px-0 overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className={cn(
+              "flex gap-4 -mx-4 px-4 lg:mx-0 lg:px-0 overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+              todaysPlan.length === 0 ? "flex-col" : "grid grid-flow-col auto-cols-[250px]"
+            )}
           >
-            {todaysPlan.map((item) => (
+            {todaysPlan.length === 0 ? (
               <motion.div
-                key={item.title}
                 variants={itemVariants}
-                whileHover={{ scale: 1.01 }}
-                className="bg-card rounded-2xl p-4 border border-border shadow-sm flex flex-col h-[230px] snap-center relative"
+                className="w-full bg-card rounded-2xl p-8 border border-dashed border-border flex flex-col items-center justify-center text-center space-y-4"
               >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-2 gap-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={item.icon}
-                      alt={item.title}
-                      className="w-14 h-14 object-contain flex-shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-foreground text-sm truncate">
-                        {item.title}
-                      </h3>
-                      <p className="text-[10px] text-muted-foreground">
-                        {item.subtitle}
-                      </p>
-                    </div>
-                  </div>
-                  {item.tag && (
-                    <span className="text-[9px] font-medium bg-yellow-100   text-yellow-600 px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1 flex-shrink-0 mt-1">
-                      <span className="w-1 h-1 bg-yellow-600 rounded-full" />
-                      {item.tag}
-                    </span>
-                  )}
+                <div className="p-4 bg-primary/10 rounded-full">
+                  <Calendar className="w-8 h-8 text-primary" />
                 </div>
-
-                {/* Progress bar */}
-                <div className="mb-3">
-                  <Progress
-                    value={item.progress}
-                    className="h-1.5 bg-muted"
-                  />
+                <div>
+                  <h3 className="text-lg font-semibold">No Study Plan Generated</h3>
+                  <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                    Set up your personalized exam preparation roadmap to start tracking your daily progress.
+                  </p>
                 </div>
-
-                {/* Topics */}
-                <ul className="space-y-1 mb-2 flex-1">
-                  {item.topics.map((topic) => (
-                    <li
-                      key={topic}
-                      className="flex items-center gap-2 text-[13px] text-foreground"
-                    >
-                      <span className="w-1 h-1 bg-foreground/40 rounded-full flex-shrink-0" />
-                      {topic}
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Action */}
-                <Button
-                  onClick={() => navigate("/study-plan")}
-                  onMouseEnter={() => {
-                    if (user?.id) prefetchAllUserData(queryClient, user);
-                  }}
-                  className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-xl font-medium h-10 mt-auto text-sm"
+                <Button 
+                  onClick={() => setIsSetupModalOpen(true)}
+                  className="rounded-xl px-8 h-12 bg-[#1a2b4b] text-white hover:bg-[#1a2b4b]/90 shadow-lg shadow-[#1a2b4b]/10"
                 >
-                  {item.buttonLabel}
+                  Set Up My Plan
                 </Button>
               </motion.div>
-            ))}
+            ) : (
+              todaysPlan.map((item) => (
+                <motion.div
+                  key={item.title}
+                  variants={itemVariants}
+                  whileHover={{ scale: 1.01 }}
+                  className="bg-card rounded-2xl p-4 border border-border shadow-sm flex flex-col h-[230px] snap-center relative"
+                >
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-2 gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={item.icon}
+                        alt={item.title}
+                        className="w-14 h-14 object-contain flex-shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-foreground text-sm truncate">
+                          {item.title}
+                        </h3>
+                        <p className="text-[10px] text-muted-foreground">
+                          {item.subtitle}
+                        </p>
+                      </div>
+                    </div>
+                    {item.tag && (
+                      <span className="text-[9px] font-medium bg-yellow-100   text-yellow-600 px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1 flex-shrink-0 mt-1">
+                        <span className="w-1 h-1 bg-yellow-600 rounded-full" />
+                        {item.tag}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="mb-3">
+                    <Progress
+                      value={item.progress}
+                      className="h-1.5 bg-muted"
+                    />
+                  </div>
+
+                  {/* Topics */}
+                  <ul className="space-y-1 mb-2 flex-1">
+                    {item.topics.map((topic) => (
+                      <li
+                        key={topic}
+                        className="flex items-center gap-2 text-[13px] text-foreground"
+                      >
+                        <span className="w-1 h-1 bg-foreground/40 rounded-full flex-shrink-0" />
+                        {topic}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* Action */}
+                  <Button
+                    onClick={() => navigate("/study-plan")}
+                    onMouseEnter={() => {
+                      if (user?.id) prefetchAllUserData(queryClient, user);
+                    }}
+                    className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-xl font-medium h-10 mt-auto text-sm"
+                  >
+                    {item.buttonLabel}
+                  </Button>
+                </motion.div>
+              ))
+            )}
           </div>
         </motion.section>
 
@@ -672,11 +777,19 @@ const Index = () => {
                 <input
                   type="text"
                   placeholder="Ask your doubt"
+                  value={doubtInput}
+                  onChange={(e) => setDoubtInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleAskDoubt();
+                    }
+                  }}
                   className="flex-1 bg-transparent outline-none text-xs text-foreground placeholder:text-muted-foreground min-w-0"
                 />
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
+                  onClick={handleAskDoubt}
                   className="w-5 h-5 lg:w-6 lg:h-6 bg-gradient-to-br from-[#E2DDFF] to-[#A99AFF] text-[#1a2b4b] rounded-md flex items-center justify-center flex-shrink-0 shadow-md hover:shadow-lg transition-all"
                 >
                   <svg className="w-2.5 h-2.5 lg:w-3 lg:h-3" viewBox="0 0 24 24" fill="currentColor">
@@ -779,6 +892,14 @@ const Index = () => {
         </motion.div>
 
       </motion.div>
+      <StudySetupModal 
+        isOpen={isSetupModalOpen} 
+        onOpenChange={setIsSetupModalOpen} 
+        isGenerating={isGenerating} 
+        setupData={setupData} 
+        setSetupData={setSetupData} 
+        onGenerate={handleGeneratePlan} 
+      />
     </DashboardLayout>
   );
 };

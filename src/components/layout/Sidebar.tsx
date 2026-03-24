@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
-import authService from "@/services/auth.service";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
 interface NavItem {
@@ -47,11 +47,12 @@ export function Sidebar({ isOpen, onToggle, activePath }: SidebarProps) {
     { icon: User, label: t('nav.profile', 'Profile'), href: "/profile" },
   ];
 
+  const { logout } = useAuth();
+
   const handleLogout = async () => {
     try {
-      await authService.logout();
+      logout();
       toast.success("Logged out successfully");
-      navigate("/");
     } catch (err) {
       console.error("Logout failed:", err);
       toast.error("Logout failed");
@@ -141,6 +142,17 @@ export function Sidebar({ isOpen, onToggle, activePath }: SidebarProps) {
             </Button>
           </div>
         </div>
+
+        {/* Logout */}
+        {/* <div className="p-4 pt-0">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-rose-500 hover:bg-rose-50 transition-all duration-200"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>{t('nav.logout', 'Logout')}</span>
+          </button>
+        </div> */}
 
       </aside>
     </>

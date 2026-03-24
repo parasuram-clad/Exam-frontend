@@ -6,9 +6,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import authService from "@/services/auth.service";
 import { toast } from "sonner";
 import pic from "@/assets/pic.png";
+import { useAuth } from "@/context/AuthContext";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { notificationService, Notification } from "@/services/notification.service";
@@ -57,11 +57,12 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
         select: (data) => data.slice(0, 6), // top 6 in popover
     });
 
+    const { logout } = useAuth();
+
     const handleLogout = async () => {
         try {
-            await authService.logout();
+            logout();
             toast.success("Logged out successfully");
-            navigate("/");
         } catch (err) {
             console.error("Logout failed:", err);
             toast.error("Logout failed");

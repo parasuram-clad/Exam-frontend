@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { ArrowUp, Bot, MessageSquare, Clock, Plus, Eraser, Sparkles, HelpCircle } from "lucide-react";
@@ -205,13 +206,32 @@ const AskYourDoubt = () => {
     }
   }, [remoteSessions]);
 
+  const location = useLocation();
+  const initialQueryProcessed = useRef(false);
+
   useEffect(() => {
     if (window.innerWidth >= 1024) {
       setShowSidebar(true);
     }
-    // Fetch greeting for the initial new chat if it's empty
-    const fetchInitialGreeting = async () => {
-      if (activeSessionId === "1" && sessions.find(s => s.id === "1")?.messages.length === 0) {
+  }, []);
+
+  // Separate effect to handle the initial query from navigation
+  useEffect(() => {
+    const handleInitialQuery = async () => {
+      const initialQuery = location.state?.initialQuery;
+      
+      if (initialQuery && !initialQueryProcessed.current) {
+        initialQueryProcessed.current = true;
+        
+        // Slightly delay to ensure state and DOM are settled
+        setTimeout(() => {
+          sendMessage(initialQuery);
+        }, 300);
+
+        // Clear the state so it doesn't trigger again on refresh/re-renders
+        window.history.replaceState({}, document.title);
+      } else if (!initialQuery && !initialQueryProcessed.current && sessions[0]?.messages.length === 0) {
+        // Only fetch greeting if there's no initial query and if the session is empty
         try {
           const { message, timestamp } = await chatbotService.getGreeting();
           const welcomeMsg: Message = {
@@ -224,10 +244,12 @@ const AskYourDoubt = () => {
         } catch (error) {
           console.error("Failed to fetch greeting:", error);
         }
+        initialQueryProcessed.current = true;
       }
     };
-    fetchInitialGreeting();
-  }, []);
+
+    handleInitialQuery();
+  }, [location.state]); // Only depend on state changes
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -291,12 +313,14 @@ const AskYourDoubt = () => {
     }
   };
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
+  const sendMessage = async (customInput?: string) => {
+    const textToSend = customInput || input;
+    if (!textToSend.trim()) return;
+
     const userMsg: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: textToSend.trim(),
       timestamp: now(),
     };
 
@@ -308,13 +332,14 @@ const AskYourDoubt = () => {
             messages: [...s.messages, userMsg],
             title:
               s.title === "New Chat" && s.messages.length === 0
-                ? input.trim().slice(0, 30)
+                ? textToSend.trim().slice(0, 30)
                 : s.title,
           }
           : s
       )
     );
-    setInput("");
+
+    if (!customInput) setInput("");
     if (textAreaRef.current) {
       textAreaRef.current.style.height = "auto";
     }
@@ -614,7 +639,7 @@ const AskYourDoubt = () => {
                     >
                       <Button
                         size="icon"
-                        onClick={sendMessage}
+                        onClick={() => sendMessage()}
                         disabled={!input.trim()}
                         className="rounded-full w-8 h-8 sm:w-10 sm:h-10 bg-[#1e1b4b] hover:bg-[#1e1b4bb3] hover:text-[#e2e8f0] text-[#e2e8f0] border-none transition-all disabled:opacity-30"
                       >

@@ -44,7 +44,7 @@ export const StudyTopicCard = ({
   let isPrevAssessmentMissing = false;
   if (previousAssessmentDay > 0 && activeDay > previousAssessmentDay) {
     const assessmentRows = userPlans.filter(p => p.day_no === previousAssessmentDay);
-    isPrevAssessmentMissing = assessmentRows.length > 0 && !assessmentRows.every(p => p.plan_status === 'COMPLETED');
+    isPrevAssessmentMissing = assessmentRows.length > 0 && !assessmentRows.every(p => p.is_completed === true);
   }
 
   const isLocked = (isFuture && activeDay > currentProgressDay) || isPrevAssessmentMissing;

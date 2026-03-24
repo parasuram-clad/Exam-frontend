@@ -19,6 +19,9 @@ import MindMapView from "./pages/MindMapView";
 import AskYourDoubt from "./pages/AskYourDoubt";
 import CurrentAffairs from "./pages/CurrentAffairs";
 import Notifications from "./pages/Notifications";
+import UpgradePlan from "./pages/UpgradePlan";
+import Payment from "./pages/Payment";
+import RenewPlan from "./pages/RenewPlan";
 import NotFound from "./pages/NotFound";
 import { ChatbotWidget } from "./components/ChatbotWidget";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -59,6 +62,9 @@ const App = () => (
               <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
               <Route path="/study-plan/topic/:topicId/subtopic/:subtopicId/mindmap" element={<ProtectedRoute><MindMapView /></ProtectedRoute>} />
               <Route path="/study-plan/topic/:topicId/subtopic/:subtopicId/section/:sectionId/mindmap" element={<ProtectedRoute><MindMapView /></ProtectedRoute>} />
+              <Route path="/upgrade-plan" element={<ProtectedRoute><UpgradePlan /></ProtectedRoute>} />
+              <Route path="/renew-plan" element={<ProtectedRoute><RenewPlan /></ProtectedRoute>} />
+              <Route path="/payment" element={<ProtectedRoute><Payment /></ProtectedRoute>} />
 
               {/* Fallback */}
               <Route path="*" element={<NotFound />} />

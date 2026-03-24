@@ -3,6 +3,7 @@ import { CreditCard, Check, Zap, Smartphone, FileText, Shield, Bell, Lock, Crown
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 interface MyPlanTabProps {
   user: any;
@@ -53,6 +54,7 @@ const AVAILABLE_PLANS = [
 ];
 
 export const MyPlanTab = ({ user }: MyPlanTabProps) => {
+  const navigate = useNavigate();
   return (
     <div className="space-y-12">
       {/* Current Subscription Header */}
@@ -102,7 +104,10 @@ export const MyPlanTab = ({ user }: MyPlanTabProps) => {
                   <div className="text-white/60 text-[10px] uppercase font-bold tracking-widest mb-1">Total Recurring</div>
                   <div className="text-3xl font-bold text-white">₹4,999<span className="text-sm font-normal text-white/60">/yr</span></div>
                 </div>
-                <Button className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl px-8 h-12 font-bold shadow-lg border-none">
+                <Button 
+                  onClick={() => navigate("/renew-plan")}
+                  className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl px-8 h-12 font-bold shadow-lg border-none"
+                >
                   Manage Subscription
                 </Button>
               </div>
@@ -158,6 +163,11 @@ export const MyPlanTab = ({ user }: MyPlanTabProps) => {
 
               <Button
                 variant={plan.status === "active" ? "outline" : "default"}
+                onClick={() => {
+                  if (plan.status === "upgrade" || plan.status === "available") {
+                    navigate("/upgrade-plan");
+                  }
+                }}
                 className={cn(
                   "w-full h-11 rounded-xl font-bold transition-all",
                   plan.status === "active" 

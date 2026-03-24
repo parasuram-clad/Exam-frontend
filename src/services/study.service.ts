@@ -12,6 +12,7 @@ export interface StudyPlanResponse {
     minutes: number;
     syllabus_id?: number;
     plan_type?: 'OVERALL' | 'SUBJECT';
+    is_completed: boolean;
 }
 
 export interface RoadmapDayItem {
@@ -25,6 +26,7 @@ export interface RoadmapDayItem {
     title?: string;
     description?: string;
     weekly_test_id?: number;
+    is_completed?: boolean;
 }
 
 export interface RoadmapDay {

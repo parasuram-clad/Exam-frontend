@@ -208,9 +208,14 @@ export const StudySetupModal = ({
                     <SelectValue placeholder="Select Year" />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-border/50 shadow-xl p-2">
-                    <SelectItem value="2026" className="rounded-lg focus:bg-accent/10">2026</SelectItem>
-                    <SelectItem value="2027" className="rounded-lg focus:bg-accent/10">2027</SelectItem>
-                    <SelectItem value="2028" className="rounded-lg focus:bg-accent/10">2028</SelectItem>
+                    {[0, 1, 2].map((offset) => {
+                      const year = (new Date().getFullYear() + offset).toString();
+                      return (
+                        <SelectItem key={year} value={year} className="rounded-lg focus:bg-accent/10">
+                          {year}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
