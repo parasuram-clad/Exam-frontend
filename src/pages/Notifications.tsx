@@ -162,6 +162,23 @@ export default function Notifications() {
         ? notifications
         : notifications.filter(n => !n.read_status);
 
+    const formatNotificationDate = (dateString: string) => {
+        try {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+            
+            if (diffInSeconds < 60) return '0m ago';
+            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+            
+            const { format } = require('date-fns');
+            return format(date, 'MMM dd, hh:mm a');
+        } catch (e) {
+            return 'Recently';
+        }
+    };
+
     return (
         <DashboardLayout>
             <div className="max-w-4xl mx-auto p-4 lg:p-8 space-y-6">
@@ -197,15 +214,17 @@ export default function Notifications() {
                         )}
                     </div>
 
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => markAllReadMutation.mutate()}
-                        disabled={unreadCount === 0 || markAllReadMutation.isPending}
-                        className="h-9 text-[11px] font-medium text-primary hover:bg-transparent rounded-xl px-4"
-                    >
-                        {markAllReadMutation.isPending ? "Updating..." : "Mark all as read"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => markAllReadMutation.mutate()}
+                            disabled={unreadCount === 0 || markAllReadMutation.isPending}
+                            className="h-9 text-[11px] font-medium text-primary hover:bg-transparent rounded-xl px-4"
+                        >
+                            {markAllReadMutation.isPending ? "Updating..." : "Mark all as read"}
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Notifications List */}
@@ -275,24 +294,19 @@ export default function Notifications() {
 
                                                 {/* Content */}
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between mb-1.5">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={cn(
-                                                                "text-[9px] font-medium uppercase tracking-[0.1em] py-0.5 px-2 rounded-md",
-                                                                bg, color
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex-1 min-w-0 flex items-center gap-3">
+                                                            <h4 className={cn(
+                                                                "text-[15px] leading-tight font-semibold tracking-tight truncate",
+                                                                !n.read_status ? "text-[#0F172A]" : "text-[#64748B]"
                                                             )}>
-                                                                {n.category.replace(/_/g, ' ')}
-                                                            </span>
+                                                                {n.title || n.category.replace(/_/g, ' ')}
+                                                            </h4>
                                                             {!n.read_status && (
-                                                                <span className="flex h-2 w-2 rounded-full bg-accent animate-pulse" />
+                                                                <span className="flex h-2 w-2 rounded-full bg-accent animate-pulse shrink-0" />
                                                             )}
                                                         </div>
-                                                        <div className="flex items-center gap-4">
-                                                            <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1.5">
-                                                                <Clock className="w-3.5 h-3.5 opacity-60" />
-                                                                {formatDistanceToNow(new Date(n.date_sent), { addSuffix: true })}
-                                                            </span>
-
+                                                        <div className="flex items-center gap-4 ml-4 shrink-0">
                                                             <DropdownMenu>
                                                                 <DropdownMenuTrigger asChild>
                                                                     <button className="p-1.5 hover:bg-muted rounded-lg transition-colors opacity-0 group-hover:opacity-100">
@@ -323,19 +337,16 @@ export default function Notifications() {
                                                         </div>
                                                     </div>
 
-                                                    <h4 className={cn(
-                                                        "text-[15px] leading-tight mb-1 font-medium tracking-tight",
-                                                        !n.read_status ? "text-foreground" : "text-muted-foreground"
-                                                    )}>
-                                                        {n.message.split(': ')[0]}
-                                                    </h4>
-
                                                     <p className={cn(
-                                                        "text-[13px] leading-relaxed line-clamp-2 font-medium",
+                                                        "text-[13px] leading-relaxed line-clamp-2 font-medium mb-1.5",
                                                         !n.read_status ? "text-muted-foreground" : "text-muted-foreground/70"
                                                     )}>
-                                                        {n.message.split(': ').length > 1 ? n.message.split(': ').slice(1).join(': ') : n.message}
+                                                        {n.message}
                                                     </p>
+
+                                                    <span className="text-[10px] font-medium text-[#94A3B8]/80 flex items-center gap-1.5">
+                                                        {formatNotificationDate(n.date_sent)}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </motion.div>

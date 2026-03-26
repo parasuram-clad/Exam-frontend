@@ -29,6 +29,7 @@ import PublicRoute from "./components/auth/PublicRoute";
 import InitialDataLoader from "./components/layout/InitialDataLoader";
 import { AuthProvider } from "./context/AuthContext";
 import ErrorBoundary from "./components/ErrorBoundary";
+import NotificationHandler from "./components/NotificationHandler";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
       <AuthProvider>
         <InitialDataLoader>
         <TooltipProvider>
+          <NotificationHandler />
           <Sonner />
           <BrowserRouter>
             <Routes>

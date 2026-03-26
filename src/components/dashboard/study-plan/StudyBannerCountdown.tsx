@@ -7,6 +7,7 @@ interface StudyBannerCountdownProps {
   overallProgress: number;
   currentProgressDay: number;
   examEndDate?: string;
+  progressLabel?: string;
 }
 
 export const StudyBannerCountdown = ({
@@ -14,7 +15,8 @@ export const StudyBannerCountdown = ({
   user,
   overallProgress,
   currentProgressDay,
-  examEndDate
+  examEndDate,
+  progressLabel = "Overall Progress"
 }: StudyBannerCountdownProps) => {
   const getDaysLeft = () => {
     if (examEndDate) {
@@ -62,11 +64,18 @@ export const StudyBannerCountdown = ({
       />
       
       <div className="relative z-10 max-w-4xl mx-auto">
-        <div className="flex items-center justify-center gap-2 mb-8 sm:mb-10">
-          <span className="text-xl sm:text-2xl md:text-3xl font-medium text-accent">{daysLeft}</span>
-          <span className="text-primary-foreground text-sm sm:text-base md:text-xl font-medium">
-            Days Left for {user?.exam_type ? `${user.exam_type} ${user.sub_division || ''}`.trim() : "Exam"}
-          </span>
+        <div className="flex flex-col items-center justify-center gap-1 mb-6 sm:mb-8">
+          <div className="flex items-center gap-2">
+            <span className="text-xl sm:text-2xl md:text-3xl font-medium text-accent">{daysLeft}</span>
+            <span className="text-primary-foreground text-sm sm:text-base md:text-xl font-medium">
+              Days Left for {user?.exam_type ? `${user.exam_type} ${user.sub_division || ''}`.trim() : "Exam"}
+            </span>
+          </div>
+          {examEndDate && isValid(parseISO(examEndDate)) && (
+            <span className="text-accent/80 text-xs sm:text-sm font-medium">
+              Exam Date: {new Date(examEndDate).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </span>
+          )}
         </div>
 
         <div className="relative px-2">
@@ -122,7 +131,7 @@ export const StudyBannerCountdown = ({
         </div>
 
         <div className="flex justify-between mt-4">
-          <span className="text-primary-foreground/60 text-xs font-medium">Overall Progress</span>
+          <span className="text-primary-foreground/60 text-xs font-medium">{progressLabel}</span>
           <span className="text-accent text-xs font-medium">{overallProgress}%</span>
         </div>
       </div>

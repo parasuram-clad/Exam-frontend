@@ -13,8 +13,10 @@ export interface Subtopic {
   totalTime: number;
   status: "continue" | "start" | "completed";
   isTest?: boolean;
+  testType?: "WEEKLY" | "MONTHLY";
   weeklyTestId?: number;
   weekNo?: number;
+  monthNo?: number;
 }
 
 export interface StudyTopicCardData {

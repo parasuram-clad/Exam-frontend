@@ -1,8 +1,6 @@
 import { motion } from "framer-motion";
-import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { StudyTopicCardData as StudyTopicCardType, getSubjectIconFallback } from "./constants";
 import { format } from "date-fns";
 
@@ -131,14 +129,24 @@ export const StudyTopicCard = ({
         )}
       </div>
 
-      {/* Progress bar */}
+      {/* Progress bar — colored by status like mobile */}
       <div className="mb-3">
-        <Progress value={topic.progress} className="h-1.5 bg-muted" />
+        <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all duration-700",
+              topic.status === 'completed' ? "bg-emerald-500" :
+                topic.status === 'in-progress' ? "bg-primary" :
+                  "bg-muted-foreground/20"
+            )}
+            style={{ width: `${Math.min(100, topic.progress || 0)}%` }}
+          />
+        </div>
       </div>
 
-      {/* Topics */}
+      {/* Topics — max 2 + N more, matching mobile */}
       <ul className="space-y-1 mb-2 flex-1 overflow-hidden">
-        {topic.topics.slice(0, 3).map((t, i) => (
+        {topic.topics.slice(0, 2).map((t, i) => (
           <li
             key={i}
             className="flex items-center gap-2 text-[12px] text-foreground/80"
@@ -147,9 +155,9 @@ export const StudyTopicCard = ({
             <span className="truncate">{t.name}</span>
           </li>
         ))}
-        {topic.topics.length > 3 && (
-          <li className="text-[11px] text-muted-foreground pl-3">
-            +{topic.topics.length - 3} more
+        {topic.topics.length > 2 && (
+          <li className="text-[11px] font-semibold text-primary pl-3">
+            + {topic.topics.length - 2} more
           </li>
         )}
       </ul>

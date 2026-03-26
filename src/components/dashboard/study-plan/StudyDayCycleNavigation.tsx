@@ -66,37 +66,44 @@ export const StudyDayCycleNavigation = ({
         >
           {dynamicDayCycle.map((item, index) => (
             <div key={index} data-day={item.day} className="flex items-start shrink-0">
-              <div className="flex flex-col items-center w-[60px] md:w-[72px] shrink-0">
+              <div className={cn("flex flex-col items-center shrink-0", item.isRevision ? "w-auto min-w-[72px]" : "w-[60px] md:w-[72px]")}>
                 <motion.button
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => handleDayClick(item)}
                   className={cn(
                     "w-11 h-11 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center transition-all duration-200 relative cursor-pointer",
-                    item.status === "completed" && "bg-primary text-primary-foreground",
-                    item.status === "current" && "bg-accent text-accent-foreground shadow-lg ring-2 ring-accent/30",
-                    item.status === "locked" && "bg-secondary text-muted-foreground/50 hover:bg-secondary/80",
-                    item.status === "assessment" && "bg-card border-2 border-dashed border-border text-muted-foreground",
+                    // Revision day — always amber, never override with completed/locked
+                    item.isRevision && item.status !== "current" && "bg-amber-50 border border-amber-200 text-amber-700",
+                    item.isRevision && item.status === "current" && "bg-accent text-accent-foreground shadow-lg ring-2 ring-accent/30",
+                    !item.isRevision && item.status === "completed" && "bg-primary text-primary-foreground",
+                    !item.isRevision && item.status === "current" && "bg-accent text-accent-foreground shadow-lg ring-2 ring-accent/30",
+                    !item.isRevision && item.status === "locked" && "bg-secondary text-muted-foreground/50 hover:bg-secondary/80",
+                    !item.isRevision && item.status === "assessment" && "bg-card border-2 border-dashed border-border text-muted-foreground",
                     activeDay === item.day && item.status === "locked" && "ring-2 ring-primary/20 bg-secondary/80 text-foreground",
-                    activeDay === item.day && item.status !== "locked" && "ring-4 ring-accent/40 scale-105"
+                    activeDay === item.day && item.status !== "locked" && !item.isRevision && "ring-4 ring-accent/40 scale-105",
+                    activeDay === item.day && item.isRevision && "ring-2 ring-amber-300 scale-105"
                   )}
                 >
-                  {item.status === "completed" ? (
+                  {item.status === "completed" && !item.isRevision ? (
                     <Check className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
                   ) : item.isAssessment ? (
                     <ClipboardList className="w-4 h-4 md:w-5 md:h-5" />
                   ) : item.isRevision ? (
-                    <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
+                    <RotateCcw className={cn("w-4 h-4 md:w-5 md:h-5", item.status === "current" ? "" : "text-amber-700")} />
                   ) : item.status === "current" ? (
                     <BookOpen className="w-5 h-5 md:w-6 md:h-6" />
                   ) : (
                     <Lock className="w-4 h-4 md:w-5 md:h-5" />
                   )}
                 </motion.button>
-                <span className={cn(
-                  "text-[10px] md:text-[11px] mt-2 font-medium text-center leading-tight",
-                  item.status === "locked" ? "text-muted-foreground/40" : "text-muted-foreground",
-                  activeDay === item.day && "text-foreground font-medium"
+                 <span className={cn(
+                  "text-[10px] md:text-[11px] mt-2 font-medium text-center leading-tight whitespace-nowrap",
+                  item.status === "locked" && !item.isRevision ? "text-muted-foreground/40" : "text-muted-foreground",
+                  item.isRevision && "text-amber-700",
+                  item.status === "completed" && !item.isRevision && "text-emerald-600",
+                  activeDay === item.day && "font-semibold",
+                  activeDay === item.day && !item.isRevision && "text-foreground",
                 )}>
                   {item.label}
                 </span>

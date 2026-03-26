@@ -12,7 +12,6 @@ import { prefetchAllUserData } from "@/services/prefetch";
 import { useAuth } from "@/context/AuthContext";
 import { BASE_URL } from "@/config/env";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Bell, ChevronLeft, ChevronRight, Calendar, FileText, Trophy } from "lucide-react";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -249,7 +248,8 @@ const Index = () => {
       const sortedDays = Array.from(new Set(plans.map(p => p.day_no))).sort((a, b) => a - b);
       const firstIncomplete = sortedDays.find(day => {
         const dayPlans = plans.filter(p => p.day_no === day);
-        return !dayPlans.every(p => p.plan_status === 'COMPLETED');
+        // Use is_completed (boolean) as source of truth, same as mobile
+        return !dayPlans.every(p => p.is_completed === true);
       });
       return firstIncomplete || sortedDays[0] || 1;
     }
@@ -270,11 +270,15 @@ const Index = () => {
   const todaysPlan = useMemo(() => {
     if (!roadmapData?.plan || roadmapData.plan.length === 0) return [];
 
-    // Status map to calculate progress
+    // Build statusMap exactly like mapping.ts:
+    // key = syllabus_id (number), value = 'COMPLETED' | plan_status
     const statusMap: Record<number, string> = {};
-    if (userPlans) {
+    if (Array.isArray(userPlans)) {
       userPlans.forEach((p: any) => {
-        if (p.syllabus_id) statusMap[p.syllabus_id] = p.plan_status;
+        const sid = Number(p.syllabus_id);
+        if (!isNaN(sid) && sid > 0) {
+          statusMap[sid] = p.is_completed ? 'COMPLETED' : (p.plan_status || 'start');
+        }
       });
     }
 
@@ -292,16 +296,28 @@ const Index = () => {
       let icon = getMediaUrl(item.image_url, getSubjectIconFallback(title));
 
       if (item.type === 'TOPIC') {
-        const totalTopics = item.topic?.length || 1;
-        const completedCount = item.topic?.filter((t: any) => statusMap[t.id] === 'COMPLETED').length || 0;
-        const startCount = item.topic?.filter((t: any) => statusMap[t.id] === 'IN_PROGRESS').length || 0;
+        const subtopics = Array.isArray(item.topic) ? item.topic : [];
+        const totalTopics = subtopics.length || 1;
+
+        // Match mapping.ts exactly: t.is_completed OR statusMap entry = COMPLETED
+        const completedCount = subtopics.filter((t: any) => {
+          const sid = Number(t.id);
+          return t.is_completed === true || statusMap[sid] === 'COMPLETED';
+        }).length;
+
+        const inProgressCount = subtopics.filter((t: any) => {
+          const sid = Number(t.id);
+          return !t.is_completed && statusMap[sid] !== 'COMPLETED' && statusMap[sid] === 'IN_PROGRESS';
+        }).length;
 
         progress = Math.round((completedCount / totalTopics) * 100);
         subtitle = `${totalTopics} Topic${totalTopics > 1 ? 's' : ''}`;
-        tag = title.includes("History") || title.includes("Economy") ? "General studies" : "Topic";
-        topics = item.topic?.map((t: any) => t.name) || [];
+        tag = "Topic";
+        topics = subtopics.map((t: any) => t.name || 'Untitled') as string[];
 
-        buttonLabel = progress === 100 ? "Review" : (completedCount > 0 || startCount > 0) ? "Continue Learning" : "Start Now";
+        buttonLabel = progress === 100 ? "Review"
+          : (completedCount > 0 || inProgressCount > 0) ? "Continue Learning"
+          : "Start Now";
       } else if (item.type === 'TEST') {
         subtitle = "Test available";
         topics = [item.description || "Weekly Revision Test"];
@@ -679,25 +695,37 @@ const Index = () => {
                     )}
                   </div>
 
-                  {/* Progress bar */}
+                  {/* Progress bar — colored by status like mobile */}
                   <div className="mb-3">
-                    <Progress
-                      value={item.progress}
-                      className="h-1.5 bg-muted"
-                    />
+                    <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-full rounded-full transition-all duration-700",
+                          item.progress >= 100 ? "bg-emerald-500" :
+                          item.progress > 0 ? "bg-primary" :
+                          "bg-muted-foreground/20"
+                        )}
+                        style={{ width: `${Math.min(100, item.progress || 0)}%` }}
+                      />
+                    </div>
                   </div>
 
-                  {/* Topics */}
+                  {/* Topics — max 2 + N more, matching mobile */}
                   <ul className="space-y-1 mb-2 flex-1">
-                    {item.topics.map((topic) => (
+                    {item.topics.slice(0, 2).map((topic) => (
                       <li
                         key={topic}
-                        className="flex items-center gap-2 text-[13px] text-foreground"
+                        className="flex items-center gap-2 text-[12px] text-foreground/80 truncate"
                       >
                         <span className="w-1 h-1 bg-foreground/40 rounded-full flex-shrink-0" />
-                        {topic}
+                        <span className="truncate">{topic}</span>
                       </li>
                     ))}
+                    {item.topics.length > 2 && (
+                      <li className="text-[11px] font-semibold text-primary pl-3">
+                        + {item.topics.length - 2} more
+                      </li>
+                    )}
                   </ul>
 
                   {/* Action */}

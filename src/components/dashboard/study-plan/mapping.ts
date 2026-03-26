@@ -18,7 +18,7 @@ export const mapRoadmapToFrontend = (
   // Create a status map for quick lookup
   const statusMap: Record<number, string> = {};
   const testRevisionStatusMap: Record<string, string> = {};
-  
+
   if (Array.isArray(backendPlans)) {
     backendPlans.forEach(p => {
       if (p.syllabus_id) {
@@ -38,7 +38,7 @@ export const mapRoadmapToFrontend = (
   }
 
   const result: Record<number, StudyTopicCardData[]> = {};
-  
+
   if (!Array.isArray(roadmapPlan)) {
     console.warn('mapRoadmapToFrontend: roadmapPlan is not an array');
     return result;
@@ -46,13 +46,25 @@ export const mapRoadmapToFrontend = (
 
   roadmapPlan.forEach(dayPlan => {
     if (!dayPlan || !Array.isArray(dayPlan.items)) return;
-    
+
     result[dayPlan.day] = dayPlan.items.map((item: any, idx: number): StudyTopicCardData => {
       if (item.type === 'TOPIC') {
         const subtopics = Array.isArray(item.topic) ? item.topic : [];
         const completedCount = subtopics.filter((t: any) => t.is_completed || statusMap[t.id] === 'COMPLETED').length;
-        const inProgressCount = subtopics.filter((t: any) => !t.is_completed && statusMap[t.id] === 'IN_PROGRESS').length;
-        const progress = Math.round((completedCount / (subtopics.length || 1)) * 100);
+        const inProgressCount = subtopics.filter((t: any) => !t.is_completed && (statusMap[t.id] === 'IN_PROGRESS' || timingMap[t.id] > 0)).length;
+        
+        // Calculate progress including timing for a consistent % with mobile
+        let totalTopicProgress = 0;
+        subtopics.forEach((t: any) => {
+          if (t.is_completed || statusMap[t.id] === 'COMPLETED') {
+            totalTopicProgress += 100;
+          } else {
+            const spent = timingMap[t.id] || 0;
+            const planned = t.minutes || 45;
+            totalTopicProgress += Math.min(90, (spent / (planned || 1)) * 100);
+          }
+        });
+        const progress = Math.round(totalTopicProgress / (subtopics.length || 1));
 
         let overallStatus: 'completed' | 'in-progress' | 'start' = 'start';
         if (subtopics.length > 0 && completedCount === subtopics.length) {
@@ -77,7 +89,7 @@ export const mapRoadmapToFrontend = (
             description: t.description || '',
             timeSpent: Math.round(timingMap[t.id] || 0),
             totalTime: t.minutes || 0,
-            status: (t.is_completed || statusMap[t.id] === 'COMPLETED' ? 'completed' : statusMap[t.id] === 'IN_PROGRESS' ? 'continue' : 'start') as any,
+            status: (t.is_completed || statusMap[t.id] === 'COMPLETED' ? 'completed' : (statusMap[t.id] === 'IN_PROGRESS' || timingMap[t.id] > 0 ? 'continue' : 'start')) as any,
           })),
         };
       } else {
@@ -129,14 +141,16 @@ export const mapRoadmapToFrontend = (
             totalTime: totalTime,
             status: (statusStr === 'COMPLETED' ? 'completed' : statusStr === 'IN_PROGRESS' ? 'continue' : 'start') as any,
             isTest: item.type === 'TEST',
+            testType: item.identifier?.startsWith('MONTH_') ? 'MONTHLY' : 'WEEKLY',
             weeklyTestId: item.weekly_test_id,
-            weekNo: item.identifier?.startsWith('MONTH_') ? parseInt(item.identifier.split('_')[1], 10) : weekNo
+            weekNo: item.identifier?.startsWith('WEEK_') ? parseInt(item.identifier.split('_')[1], 10) : (item.identifier?.startsWith('MONTH_') ? undefined : weekNo),
+            monthNo: item.identifier?.startsWith('MONTH_') ? parseInt(item.identifier.split('_')[1], 10) : undefined
           }],
         };
       }
     });
   });
-  
+
   console.log('mapRoadmapToFrontend finished. Result keys:', Object.keys(result));
   return result;
 };
@@ -161,9 +175,21 @@ export const mapBackendPlanToFrontend = (
     });
 
     result[dayNo] = Object.entries(groupedBySubject).map(([subject, items]): StudyTopicCardData => {
-      const completedCount = items.filter(i => i.is_completed).length;
-      const inProgressCount = items.filter(i => i.plan_status === 'IN_PROGRESS' && !i.is_completed).length;
-      const progress = Math.round((completedCount / (items.length || 1)) * 100);
+      const completedCount = items.filter(i => i.is_completed || i.plan_status === 'COMPLETED').length;
+      const inProgressCount = items.filter(i => (i.plan_status === 'IN_PROGRESS' || (topicTimings.filter(tt => tt.syllabus_id === i.syllabus_id).reduce((acc, curr) => acc + (curr.total_estimate || 0), 0) > 0)) && !i.is_completed).length;
+      
+      let totalItemProgress = 0;
+      items.forEach(i => {
+        if (i.is_completed || i.plan_status === 'COMPLETED') {
+          totalItemProgress += 100;
+        } else {
+          const sumTimings = topicTimings
+            .filter(t => t.syllabus_id === i.syllabus_id)
+            .reduce((acc, curr) => acc + (curr.total_estimate || 0), 0);
+          totalItemProgress += Math.min(90, (sumTimings / (i.minutes || 45)) * 100);
+        }
+      });
+      const progress = Math.round(totalItemProgress / (items.length || 1));
 
       let overallStatus: 'completed' | 'in-progress' | 'start' = 'start';
       if (items.length > 0 && completedCount === items.length) {
@@ -188,7 +214,7 @@ export const mapBackendPlanToFrontend = (
             id: i.id.toString(), name: i.topic, description: `Chapter: ${i.chapter}`,
             timeSpent: Math.round(sumTimings || (i.is_completed ? i.minutes : 0)),
             totalTime: i.minutes,
-            status: i.is_completed ? 'completed' as const : i.plan_status === 'IN_PROGRESS' ? 'continue' as const : 'start' as const,
+            status: (i.is_completed || i.plan_status === 'COMPLETED') ? 'completed' as const : (i.plan_status === 'IN_PROGRESS' || sumTimings > 0) ? 'continue' as const : 'start' as const,
           };
         }),
       };

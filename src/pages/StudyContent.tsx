@@ -1005,11 +1005,11 @@ const StudyContent = () => {
       // Update study plan status to COMPLETED
       const planToUpdate = userPlans.find((p: any) => p.syllabus_id === parsedSubtopicId);
       if (planToUpdate) {
-          try {
-              await studyService.updateStudyPlan(planToUpdate.id, { plan_status: 'COMPLETED' });
-          } catch(e) {
-              console.error("Failed to update study plan status", e);
-          }
+        try {
+          await studyService.updateStudyPlan(planToUpdate.id, { plan_status: 'COMPLETED' });
+        } catch (e) {
+          console.error("Failed to update study plan status", e);
+        }
       }
 
       // Invalidate queries to refresh progress and history

@@ -37,6 +37,8 @@ export interface RoadmapDay {
 
 export interface RoadmapPlan {
     plan_type: 'OVERALL' | 'SUBJECT';
+    overall_plan_id?: number;
+    subject_id?: number;
     subject_name: string | null;
     label: string;
     total_days: number;
@@ -48,8 +50,21 @@ export interface RoadmapResponse {
     user_id: number;
     total_plans: number;
     access: {
-        overall_plans: { exam_type: string; sub_division: string; plan_type: string; subscribed: boolean }[];
-        subject_plans: { exam_type: string; sub_division: string; plan_type: string; subject_name: string; subscribed: boolean }[];
+        overall_plans: { 
+            exam_type: string; 
+            sub_division: string; 
+            plan_type: string; 
+            overall_plan_id?: number;
+            subscribed: boolean 
+        }[];
+        subject_plans: { 
+            exam_type: string; 
+            sub_division: string; 
+            plan_type: string; 
+            subject_name: string; 
+            subject_id?: number;
+            subscribed: boolean 
+        }[];
     };
     plan: RoadmapPlan[];
 }
@@ -329,19 +344,17 @@ const studyService = {
         });
         return response.data;
     },
-    /**
-     * Get weekly test questions
-     */
-    getWeeklyTestQuestions: async (userId: number, weekNo: number) => {
+    
+    // ================================================================
+    // WEEKLY TEST (OVERALL PLAN)
+    // ================================================================
+    getWeeklyTestQuestions: async (userId: number, weekNo: number, overallPlanId?: number) => {
         const response = await apiClient.get('/weekly-test/questions', {
-            params: { user_id: userId, week_no: weekNo }
+            params: { user_id: userId, week_no: weekNo, overall_plan_id: overallPlanId }
         });
         return response.data;
     },
 
-    /**
-     * Submit weekly test
-     */
     submitWeeklyTest: async (payload: {
         weekly_test_id: number;
         answers: { mcq_id: number; selected_option: string }[];
@@ -352,39 +365,30 @@ const studyService = {
         return response.data;
     },
 
-    /**
-     * Get weekly test result
-     */
-    getWeeklyTestResult: async (userId: number, weekNo: number) => {
+    getWeeklyTestResult: async (userId: number, weekNo: number, overallPlanId?: number) => {
         const response = await apiClient.get('/weekly-test/result', {
-            params: { user_id: userId, week_no: weekNo }
+            params: { user_id: userId, week_no: weekNo, overall_plan_id: overallPlanId }
         });
         return response.data;
     },
 
-    /**
-     * Get weekly test history
-     */
-    getWeeklyTestHistory: async (userId: number) => {
+    getWeeklyTestHistory: async (userId: number, overallPlanId?: number) => {
         const response = await apiClient.get('/weekly-test/history', {
-            params: { user_id: userId }
+            params: { user_id: userId, overall_plan_id: overallPlanId }
         });
         return response.data;
     },
 
-    /**
-     * Get monthly test questions
-     */
-    getMonthlyTestQuestions: async (userId: number, monthNo: number) => {
+    // ================================================================
+    // MONTHLY TEST (OVERALL PLAN)
+    // ================================================================
+    getMonthlyTestQuestions: async (userId: number, monthNo: number, overallPlanId?: number) => {
         const response = await apiClient.get('/monthly-test/questions', {
-            params: { user_id: userId, month_no: monthNo }
+            params: { user_id: userId, month_no: monthNo, overall_plan_id: overallPlanId }
         });
         return response.data;
     },
 
-    /**
-     * Submit monthly test
-     */
     submitMonthlyTest: async (payload: {
         monthly_test_id: number;
         answers: { mcq_id: number; selected_option: string }[];
@@ -395,22 +399,84 @@ const studyService = {
         return response.data;
     },
 
-    /**
-     * Get monthly test result
-     */
-    getMonthlyTestResult: async (userId: number, monthNo: number) => {
+    getMonthlyTestResult: async (userId: number, monthNo: number, overallPlanId?: number) => {
         const response = await apiClient.get('/monthly-test/result', {
-            params: { user_id: userId, month_no: monthNo }
+            params: { user_id: userId, month_no: monthNo, overall_plan_id: overallPlanId }
         });
         return response.data;
     },
 
-    /**
-     * Get monthly test history
-     */
-    getMonthlyTestHistory: async (userId: number) => {
+    getMonthlyTestHistory: async (userId: number, overallPlanId?: number) => {
         const response = await apiClient.get('/monthly-test/history', {
-            params: { user_id: userId }
+            params: { user_id: userId, overall_plan_id: overallPlanId }
+        });
+        return response.data;
+    },
+
+    // ================================================================
+    // SUBJECT WEEKLY TEST
+    // ================================================================
+    getSubjectWeeklyTestQuestions: async (subjectId: number, weekNo: number) => {
+        const response = await apiClient.get('/subject-weekly-test/questions', {
+            params: { subject_id: subjectId, week_no: weekNo }
+        });
+        return response.data;
+    },
+
+    submitSubjectWeeklyTest: async (payload: {
+        subject_weekly_test_id: number;
+        answers: { mcq_id: number; selected_option: string }[];
+        started_at: string;
+        submitted_at: string;
+    }) => {
+        const response = await apiClient.post('/subject-weekly-test/submit', payload);
+        return response.data;
+    },
+
+    getSubjectWeeklyTestResult: async (subjectId: number, weekNo: number) => {
+        const response = await apiClient.get('/subject-weekly-test/result', {
+            params: { subject_id: subjectId, week_no: weekNo }
+        });
+        return response.data;
+    },
+
+    getSubjectWeeklyTestHistory: async (subjectId: number) => {
+        const response = await apiClient.get('/subject-weekly-test/history', {
+            params: { subject_id: subjectId }
+        });
+        return response.data;
+    },
+
+    // ================================================================
+    // SUBJECT MONTHLY TEST
+    // ================================================================
+    getSubjectMonthlyTestQuestions: async (subjectId: number, monthNo: number) => {
+        const response = await apiClient.get('/subject-monthly-test/questions', {
+            params: { subject_id: subjectId, month_no: monthNo }
+        });
+        return response.data;
+    },
+
+    submitSubjectMonthlyTest: async (payload: {
+        subject_monthly_test_id: number;
+        answers: { mcq_id: number; selected_option: string }[];
+        started_at: string;
+        submitted_at: string;
+    }) => {
+        const response = await apiClient.post('/subject-monthly-test/submit', payload);
+        return response.data;
+    },
+
+    getSubjectMonthlyTestResult: async (subjectId: number, monthNo: number) => {
+        const response = await apiClient.get('/subject-monthly-test/result', {
+            params: { subject_id: subjectId, month_no: monthNo }
+        });
+        return response.data;
+    },
+
+    getSubjectMonthlyTestHistory: async (subjectId: number) => {
+        const response = await apiClient.get('/subject-monthly-test/history', {
+            params: { subject_id: subjectId }
         });
         return response.data;
     },

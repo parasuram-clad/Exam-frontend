@@ -22,6 +22,7 @@ const CircularProgress = ({ progress, size = 48 }: { progress: number; size?: nu
     const radius = (size - 4) / 2;
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (progress / 100) * circumference;
+    const isComplete = progress >= 100;
 
     return (
         <div className="relative inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
@@ -36,7 +37,10 @@ const CircularProgress = ({ progress, size = 48 }: { progress: number; size?: nu
                     cy={size / 2}
                 />
                 <circle
-                    className="text-accent transition-all duration-700 ease-out"
+                    className={cn(
+                        "transition-all duration-700 ease-out",
+                        isComplete ? "text-emerald-500" : "text-accent"
+                    )}
                     strokeWidth="3.5"
                     strokeDasharray={circumference}
                     strokeDashoffset={offset}
@@ -48,7 +52,10 @@ const CircularProgress = ({ progress, size = 48 }: { progress: number; size?: nu
                     cy={size / 2}
                 />
             </svg>
-            <span className="absolute text-[10px] font-semibold text-foreground">{progress}%</span>
+            <span className={cn(
+                "absolute text-[10px] font-semibold",
+                isComplete ? "text-emerald-600" : "text-foreground"
+            )}>{progress}%</span>
         </div>
     );
 };
@@ -131,7 +138,7 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
                             let typeLabel = "";
                             if (t.type === 'REVISION') typeLabel = "Revision";
                             if (t.type === 'TEST') typeLabel = "Test";
-                            
+
                             const topicName =
                                 (Array.isArray(t?.topic) && t.topic[0]?.name) ||
                                 t?.title ||

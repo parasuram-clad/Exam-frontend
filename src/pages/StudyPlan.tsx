@@ -149,7 +149,7 @@ const StudyPlan = () => {
     if (!loading && user && roadmapData) {
       const hasPlan = roadmapData.plan && roadmapData.plan.length > 0;
       const isActuallyEmpty = !hasPlan && userPlans.length === 0;
-      
+
       if (isActuallyEmpty && !isGenerating) {
         setIsSetupModalOpen(true);
       }
@@ -186,23 +186,54 @@ const StudyPlan = () => {
   // Show the tab switch as long as both plan types exist — subscribed or not
   const showPlanToggle = hasOverallPlanData && hasSubjectPlanData;
 
-  // Weekly Test State
+  // Weekly/Monthly Test State
   const [isWeeklyTestModalOpen, setIsWeeklyTestModalOpen] = useState(false);
   const [weeklyTestQuestions, setWeeklyTestQuestions] = useState<TestQuestion[]>([]);
   const [currentWeeklyTestId, setCurrentWeeklyTestId] = useState<number | null>(null);
   const [currentWeekNo, setCurrentWeekNo] = useState<number | null>(null);
+  const [currentMonthNo, setCurrentMonthNo] = useState<number | null>(null);
+  const [currentTestType, setCurrentTestType] = useState<"WEEKLY" | "MONTHLY" | null>(null);
   const [isFetchingQuestions, setIsFetchingQuestions] = useState(false);
   const [testStartTime, setTestStartTime] = useState<number | null>(null);
 
-  const weeklyTestSubmitMutation = useMutation({
-    mutationFn: (data: any) => studyService.submitWeeklyTest(data),
-    onSuccess: () => {
-      toast.success("Weekly test submitted successfully!");
+  const testSubmitMutation = useMutation({
+    mutationFn: (data: any) => {
+      const { testType, planType, ...payload } = data;
+      if (planType === 'SUBJECT') {
+        return testType === 'MONTHLY'
+          ? studyService.submitSubjectMonthlyTest(payload)
+          : studyService.submitSubjectWeeklyTest(payload);
+      }
+      return testType === 'MONTHLY'
+        ? studyService.submitMonthlyTest(payload)
+        : studyService.submitWeeklyTest(payload);
+    },
+    onSuccess: (_, variables) => {
+      const { testType, planType } = variables;
+      toast.success(`${testType === 'MONTHLY' ? 'Monthly' : 'Weekly'} test submitted successfully!`);
       setIsWeeklyTestModalOpen(false);
-      navigate(`/test-series/weekly/test/${currentWeeklyTestId}/analytics?week=${currentWeekNo}`);
+
+      const testId = currentWeeklyTestId;
+      const week = currentWeekNo;
+      const month = currentMonthNo;
+      const subjectId = currentPlan?.subject_id;
+
+      if (planType === 'SUBJECT') {
+        if (testType === 'MONTHLY') {
+          navigate(`/test-series/subject-monthly/test/${testId}/analytics?month=${month}&subject_id=${subjectId}`);
+        } else {
+          navigate(`/test-series/subject-weekly/test/${testId}/analytics?week=${week}&subject_id=${subjectId}`);
+        }
+      } else {
+        if (testType === 'MONTHLY') {
+          navigate(`/test-series/monthly/test/${testId}/analytics?month=${month}`);
+        } else {
+          navigate(`/test-series/weekly/test/${testId}/analytics?week=${week}`);
+        }
+      }
     },
     onError: (error: any) => {
-      toast.error(getErrorMessage(error, "Failed to submit weekly test"));
+      toast.error(getErrorMessage(error, "Failed to submit test"));
     }
   });
 
@@ -211,11 +242,11 @@ const StudyPlan = () => {
     if (days.length > 0) {
       for (const day of days) {
         const topics = dayWisePlans[day];
-        if (!topics.every(t => t.status === 'completed')) {
+        if (topics && !topics.every(t => t.status === 'completed')) {
           return day;
         }
       }
-      return days[days.length - 1] < totalDays ? days[days.length - 1] + 1 : totalDays;
+      return totalDays + 1; // All days completed
     }
     return 1;
   };
@@ -231,7 +262,7 @@ const StudyPlan = () => {
   const currentPlan = useMemo(() => {
     const result = (viewMode === 'overall')
       ? roadmapData?.plan?.find(p => p.plan_type === 'OVERALL')
-      : roadmapData?.plan?.find(p => p.plan_type === 'SUBJECT' && p.subject_name === selectedSubject) || (function () {
+      : (roadmapData?.plan?.find(p => p.plan_type === 'SUBJECT' && (p.subject_name === selectedSubject || p.label === selectedSubject)) || (function () {
         const overallPlan = roadmapData?.plan?.find(p => p.plan_type === 'OVERALL');
         if (overallPlan && selectedSubject) {
           const filteredDays = overallPlan.days.filter(d =>
@@ -248,7 +279,7 @@ const StudyPlan = () => {
           };
         }
         return undefined;
-      })();
+      })());
     return result;
   }, [roadmapData, viewMode, selectedSubject]);
 
@@ -287,17 +318,72 @@ const StudyPlan = () => {
           prevSelectedSubject.current = selectedSubject;
           prevViewMode.current = viewMode;
         } else if (activeDay > totalRoadmapDays) {
-          setActiveDay(1);
         }
       } else {
-        console.warn('No relevant days found for current plan');
+        if (selectedSubject) {
+          console.warn('No relevant days found for current plan:', selectedSubject);
+        }
         setDynamicDayWisePlans({});
       }
     }
   }, [roadmapData, userPlans, topicTimings, weeklyHistoryData, monthlyHistoryData, viewMode, selectedSubject, currentPlan]);
 
-  const totalDays = currentPlan?.total_days || (currentPlan?.days && currentPlan.days.length > 0 ? Math.max(...currentPlan.days.map(d => d.day)) : 120);
-  const currentProgressDay = calculateCurrentProgressDay(dynamicDayWisePlans, totalDays);
+  // Derived progress values for the banner HUD
+  const totalDays = useMemo(() => currentPlan?.total_days || (currentPlan?.days && currentPlan.days.length > 0 ? Math.max(...currentPlan.days.map(d => d.day)) : 120), [currentPlan]);
+  const currentProgressDay = useMemo(() => calculateCurrentProgressDay(dynamicDayWisePlans, totalDays), [dynamicDayWisePlans, totalDays]);
+
+  const overallProgress = useMemo(() => {
+    if (!totalDays || totalDays === 0) return 0;
+
+    // Build a timing lookup: syllabus_id -> total_estimate (minutes)
+    const timingMap: Record<number, number> = {};
+    topicTimings.forEach((t: TopicTiming) => {
+      timingMap[t.syllabus_id] = (timingMap[t.syllabus_id] || 0) + (t.total_estimate || 0);
+    });
+
+    // Day-cycle based progress: (Full Days Completed + Current Day Fraction) / Total Days
+    // IMPORTANT: iterate individual SUBTOPICS (not cards) to match mobile's calculation
+    const completedFullDays = Math.max(0, currentProgressDay - 1);
+
+    let currentDayFraction = 0;
+    if (currentProgressDay <= totalDays) {
+      const todayCards = dynamicDayWisePlans[currentProgressDay] || [];
+      // Flatten to individual subtopics
+      const allSubtopics: { syllabusId: number; minutes: number; isCompleted: boolean }[] = [];
+      todayCards.forEach(card => {
+        if (card.subtopics && card.subtopics.length > 0) {
+          card.subtopics.forEach(st => {
+            const sid = parseInt(st.id, 10);
+            if (!isNaN(sid)) {
+              allSubtopics.push({
+                syllabusId: sid,
+                minutes: st.totalTime || 45,
+                isCompleted: st.status === 'completed',
+              });
+            }
+          });
+        }
+      });
+
+      if (allSubtopics.length > 0) {
+        let topicProgressSum = 0;
+        allSubtopics.forEach(st => {
+          if (st.isCompleted) {
+            topicProgressSum += 100;
+          } else {
+            const spent = timingMap[st.syllabusId] || 0;
+            const planned = st.minutes || 45;
+            topicProgressSum += Math.min(90, (spent / planned) * 100);
+          }
+        });
+        currentDayFraction = (topicProgressSum / allSubtopics.length) / 100;
+      }
+    }
+
+    const progress = ((completedFullDays + currentDayFraction) / totalDays) * 100;
+    return Math.min(100, Math.round(progress));
+  }, [currentProgressDay, totalDays, dynamicDayWisePlans, topicTimings]);
+
   const daysLeft = Math.max(0, totalDays - currentProgressDay + 1);
 
   // Navigation Logic
@@ -372,7 +458,23 @@ const StudyPlan = () => {
       )).sort();
 
       console.log('Derived subjects from plan array fallback:', subjectsFromPlanItems);
-      return subjectsFromPlanItems;
+      if (subjectsFromPlanItems.length > 0) return subjectsFromPlanItems;
+    }
+
+    // 3. Last fallback: Check OVERALL plan items for unique subjects
+    const overallPlan = roadmapData?.plan?.find(p => p.plan_type === 'OVERALL');
+    if (overallPlan?.days) {
+      const subjectsInOverall = new Set<string>();
+      overallPlan.days.forEach(d => {
+        d.items.forEach((item: any) => {
+          if (item.type === 'TOPIC' && item.subject) {
+            subjectsInOverall.add(item.subject);
+          }
+        });
+      });
+      if (subjectsInOverall.size > 0) {
+        return Array.from(subjectsInOverall).sort();
+      }
     }
 
     console.warn('Could not derive any subjects from roadmapData');
@@ -474,19 +576,49 @@ const StudyPlan = () => {
       if (subtopic?.isTest) {
         setIsFetchingQuestions(true);
         try {
+          const testType = subtopic.testType || 'WEEKLY';
+          const planType = currentPlan?.plan_type || 'OVERALL';
           const weekNo = subtopic.weekNo || Math.ceil(activeDay / 7);
+          const monthNo = subtopic.monthNo || Math.ceil(activeDay / 30);
+
           if (subtopic.status === 'completed') {
-            navigate(`/test-series/weekly/test/0/analytics?week=${weekNo}`);
+            const subjectParam = planType === 'SUBJECT' ? `&subject_id=${currentPlan?.subject_id}` : '';
+            if (testType === 'MONTHLY') {
+              navigate(`/test-series/${planType === 'SUBJECT' ? 'subject-monthly' : 'monthly'}/test/0/analytics?month=${monthNo}${subjectParam}`);
+            } else {
+              navigate(`/test-series/${planType === 'SUBJECT' ? 'subject-weekly' : 'weekly'}/test/0/analytics?week=${weekNo}${subjectParam}`);
+            }
             setIsDialogOpen(false);
             return;
           }
-          const response = await studyService.getWeeklyTestQuestions(user!.id, weekNo);
+
+          let response;
+          if (planType === 'SUBJECT') {
+            const sId = currentPlan?.subject_id || 0;
+            response = await (testType === 'MONTHLY'
+              ? studyService.getSubjectMonthlyTestQuestions(sId, monthNo)
+              : studyService.getSubjectWeeklyTestQuestions(sId, weekNo));
+          } else {
+            const opId = currentPlan?.overall_plan_id;
+            response = await (testType === 'MONTHLY'
+              ? studyService.getMonthlyTestQuestions(user!.id, monthNo, opId)
+              : studyService.getWeeklyTestQuestions(user!.id, weekNo, opId));
+          }
+
           const transformedQuestions: TestQuestion[] = response.questions.map((q: any) => ({
-            id: q.mcq_id, question: q.question, options: Object.values(q.options), correctAnswer: 0, category: "Weekly Test", difficulty: "Medium"
+            id: q.mcq_id,
+            question: q.question,
+            options: Object.values(q.options),
+            correctAnswer: 0,
+            category: testType === 'MONTHLY' ? "Monthly Test" : "Weekly Test",
+            difficulty: "Medium"
           }));
+
           setWeeklyTestQuestions(transformedQuestions);
-          setCurrentWeeklyTestId(response.weekly_test_id);
-          setCurrentWeekNo(response.week_no);
+          setCurrentWeeklyTestId(response.weekly_test_id || response.subject_weekly_test_id || response.subject_monthly_test_id || response.monthly_test_id);
+          setCurrentWeekNo(response.week_no || weekNo);
+          setCurrentMonthNo(response.month_no || monthNo);
+          setCurrentTestType(testType);
           setTestStartTime(Date.now());
           setIsWeeklyTestModalOpen(true);
           setIsDialogOpen(false);
@@ -513,7 +645,27 @@ const StudyPlan = () => {
     navigate(`/study-plan/topic/${topicId}/subtopic/${subtopicId}`);
   };
 
-  const overallProgress = userPlans.length > 0 ? Math.round((userPlans.filter(p => p.is_completed === true).length / userPlans.length) * 100) : Math.round(((currentProgressDay - 1) / totalDays) * 100);
+  const bannerProgress = useMemo(() => {
+    // If no subject selected in subject mode, show the total completion instead of day-cycle
+    if (viewMode === 'subject' && !selectedSubject) {
+      if (userPlans.length === 0) return 0;
+      const completed = userPlans.filter(p => p.is_completed).length;
+      return Math.round((completed / userPlans.length) * 100);
+    }
+    return overallProgress;
+  }, [viewMode, selectedSubject, overallProgress, userPlans]);
+
+  const bannerDay = useMemo(() => {
+    return Math.min(currentProgressDay, totalDays || 1);
+  }, [currentProgressDay, totalDays]);
+
+  const bannerLabel = useMemo(() => {
+    if (viewMode === 'subject' && selectedSubject) {
+      return `${selectedSubject} Progress`;
+    }
+    return "Overall Progress";
+  }, [viewMode, selectedSubject]);
+
   const userName = user?.full_name || user?.username || "Aspirant";
   const initials = userName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
   const avatarUrl = getMediaUrl(user?.photo_url, pic);
@@ -546,11 +698,11 @@ const StudyPlan = () => {
           <div>
             <div className="flex items-center gap-2">
               {(selectedTopic || (selectedSubject && showPlanToggle) || (selectedSubject && !hasOverallPlanData)) && (
-                <button 
-                  onClick={() => { 
-                    setSelectedTopic(null); 
-                    setSelectedSubject(null); 
-                  }} 
+                <button
+                  onClick={() => {
+                    setSelectedTopic(null);
+                    setSelectedSubject(null);
+                  }}
                   className="p-1 hover:bg-muted rounded-full mr-1"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -585,16 +737,17 @@ const StudyPlan = () => {
 
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8 pb-10 pt-4" >
         <motion.div variants={itemVariants}>
-          <StudyBannerCountdown 
-            daysLeft={daysLeft} 
-            examEndDate={dashboardData?.exam_calendar?.exam_date || overallPlanDate || (currentPlan?.days && currentPlan.days.length > 0 ? currentPlan.days[currentPlan.days.length - 1].date : undefined)} 
-            user={user} 
-            overallProgress={overallProgress} 
-            currentProgressDay={currentProgressDay} 
+          <StudyBannerCountdown
+            daysLeft={daysLeft}
+            examEndDate={dashboardData?.exam_calendar?.exam_date || overallPlanDate || (currentPlan?.days && currentPlan.days.length > 0 ? currentPlan.days[currentPlan.days.length - 1].date : undefined)}
+            user={user}
+            overallProgress={bannerProgress}
+            currentProgressDay={bannerDay}
+            progressLabel={bannerLabel}
           />
         </motion.div>
 
-        {!currentPlan ? (
+        {(!roadmapData?.plan || roadmapData.plan.length === 0) ? (
           <motion.div
             variants={itemVariants}
             className="w-full bg-card rounded-2xl p-12 border border-dashed border-border flex flex-col items-center justify-center text-center space-y-6"
@@ -608,7 +761,7 @@ const StudyPlan = () => {
                 You haven't set up your exam preparation roadmap yet. Create a personalized plan to track your topics, daily goals, and upcoming assessments.
               </p>
             </div>
-            <Button 
+            <Button
               onClick={() => setIsSetupModalOpen(true)}
               className="rounded-full px-10 h-12 bg-[#1a2b4b] text-white hover:bg-[#1a2b4b]/90 shadow-lg shadow-[#1a2b4b]/20 transition-all active:scale-95"
             >
@@ -656,10 +809,10 @@ const StudyPlan = () => {
         isOpen={isWeeklyTestModalOpen}
         onOpenChange={setIsWeeklyTestModalOpen}
         questions={weeklyTestQuestions}
-        weekNo={currentWeekNo}
+        weekNo={currentTestType === 'WEEKLY' ? currentWeekNo : currentMonthNo}
         testId={currentWeeklyTestId}
         testStartTime={testStartTime}
-        isSubmitting={weeklyTestSubmitMutation.isPending}
+        isSubmitting={testSubmitMutation.isPending}
         onSubmit={(answersRecord) => {
           if (!user?.id || !currentWeeklyTestId) return;
           const optionLetters = ['A', 'B', 'C', 'D', 'E'];
@@ -667,8 +820,14 @@ const StudyPlan = () => {
             mcq_id: weeklyTestQuestions[parseInt(idx)].id,
             selected_option: ans.selectedOption !== null ? optionLetters[ans.selectedOption] : ''
           }));
-          weeklyTestSubmitMutation.mutate({
-            weekly_test_id: currentWeeklyTestId,
+
+          testSubmitMutation.mutate({
+            testType: currentTestType,
+            planType: currentPlan?.plan_type || 'OVERALL',
+            [currentTestType === 'MONTHLY'
+              ? (currentPlan?.plan_type === 'SUBJECT' ? 'subject_monthly_test_id' : 'monthly_test_id')
+              : (currentPlan?.plan_type === 'SUBJECT' ? 'subject_weekly_test_id' : 'weekly_test_id')
+            ]: currentWeeklyTestId,
             answers,
             started_at: testStartTime ? new Date(testStartTime).toISOString() : new Date().toISOString(),
             submitted_at: new Date().toISOString()

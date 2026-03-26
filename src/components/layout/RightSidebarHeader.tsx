@@ -190,10 +190,18 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center justify-between gap-2 mb-1">
                                                         <p className={cn("text-[11px] font-medium leading-none truncate", !n.read_status ? "text-[#0F172A]" : "text-[#64748B]")}>
-                                                            {n.category.replace(/_/g, ' ')}
+                                                            {n.title || n.category.replace(/_/g, ' ')}
                                                         </p>
-                                                        <span className="text-[9px] text-[#94A3B8] shrink-0 font-medium tracking-tight">
-                                                            {formatDistanceToNow(new Date(n.date_sent), { addSuffix: true })}
+                                                         <span className="text-[9px] text-[#94A3B8] shrink-0 font-medium tracking-tight">
+                                                            {(() => {
+                                                                const date = new Date(n.date_sent);
+                                                                const now = new Date();
+                                                                const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+                                                                if (diffInSeconds < 60) return '0m ago';
+                                                                if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+                                                                if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+                                                                return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                                                            })()}
                                                         </span>
                                                     </div>
                                                     <p className={cn("text-[11px] line-clamp-2 leading-relaxed", !n.read_status ? "text-[#334155] font-medium" : "text-[#64748B]")}>
