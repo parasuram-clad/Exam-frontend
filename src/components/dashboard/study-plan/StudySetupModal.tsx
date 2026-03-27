@@ -64,7 +64,7 @@ export const StudySetupModal = ({
       >
         <div className="relative p-5 sm:p-8 md:p-10 bg-[radial-gradient(circle_at_top,#FAFFE9_0%,transparent_50%),linear-gradient(to_br,#F8FAFF_0%,white_50%,#F0F7FF_100%)] min-h-[500px] flex flex-col justify-center overflow-hidden">
           <div className="absolute top-[-90%] left-0 w-full h-full rounded-full bg-gradient-to-br from-[#DDEFD9] via-white to-[#DDEFD9] min-h-[500px] flex flex-col blur-2xl justify-center"></div>
-          
+
           <div className="absolute top-20 left-0 w-20 h-20 pointer-events-none">
             <img src={modalTopLeft} alt="" className="w-full h-full object-contain opacity-20" />
           </div>

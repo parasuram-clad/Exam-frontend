@@ -27,73 +27,7 @@ interface LeaderboardWidgetProps {
   data?: LeaderboardEntry[];
 }
 
-const defaultLeaderboardData: LeaderboardEntry[] = [
-  {
-    rank: 1,
-    name: "Priya Sharma",
-    initials: "PS",
-    marks: 270,
-    accuracy: "95%",
-    color: "bg-amber-500"
-  },
-  {
-    rank: 2,
-    name: "You (Arun Kumar)",
-    initials: "AK",
-    marks: 268,
-    accuracy: "92%",
-    isYou: true,
-    color: "bg-slate-500"
-  },
-  {
-    rank: 3,
-    name: "Jagan",
-    initials: "JA",
-    marks: 263,
-    accuracy: "92%",
-    color: "bg-orange-700"
-  },
-  {
-    rank: 4,
-    name: "Sharmila",
-    initials: "SH",
-    marks: 259,
-    accuracy: "89%",
-    color: "bg-blue-600"
-  },
-  {
-    rank: 5,
-    name: "Thameem Ansari",
-    initials: "TA",
-    marks: 259,
-    accuracy: "89%",
-    color: "bg-yellow-500"
-  },
-  {
-    rank: 6,
-    name: "Raghuram",
-    initials: "RA",
-    marks: 259,
-    accuracy: "89%",
-    color: "bg-green-600"
-  },
-  {
-    rank: 7,
-    name: "Manju Shree",
-    initials: "MS",
-    marks: 259,
-    accuracy: "89%",
-    color: "bg-purple-600"
-  },
-  {
-    rank: 8,
-    name: "Helen Mary",
-    initials: "HM",
-    marks: 259,
-    accuracy: "89%",
-    color: "bg-orange-600"
-  },
-];
+const defaultLeaderboardData: LeaderboardEntry[] = [];
 
 const RankMedal = ({ rank, isModal = false }: { rank: number; isModal?: boolean }) => {
   const sizeClass = isModal ? "w-8 h-8" : "w-6 h-6";
@@ -152,6 +86,18 @@ const RankMedal = ({ rank, isModal = false }: { rank: number; isModal?: boolean 
 };
 
 export function LeaderboardWidget({ data = defaultLeaderboardData }: LeaderboardWidgetProps) {
+  if (data.length === 0) {
+    return (
+      <div className="bg-card rounded-xl p-5 border border-border shadow-sm animate-fade-in w-full flex flex-col items-center justify-center py-10 gap-4">
+        <Trophy className="w-12 h-12 text-amber-500/20" />
+        <div className="text-center">
+          <h3 className="text-base font-semibold text-foreground">Leaderboard</h3>
+          <p className="text-xs text-muted-foreground mt-1 text-balance">The competition is heating up! Join a test to see rankings.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card rounded-xl p-5 border border-border shadow-sm animate-fade-in w-full">
       {/* Header */}

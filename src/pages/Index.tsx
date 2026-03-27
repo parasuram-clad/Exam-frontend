@@ -65,35 +65,7 @@ interface StudyPlanItem {
   buttonLabel: string;
 }
 
-const fallbackTodaysPlan: StudyPlanItem[] = [
-  {
-    icon: historyIcon,
-    title: "History",
-    subtitle: "2 Topics",
-    tag: "General studies",
-    progress: 65,
-    topics: ["Indus Valley Civilization", "Guptas, Delhi Sultans"],
-    buttonLabel: "Continue Learning",
-  },
-  {
-    icon: economyIcon,
-    title: "Economy",
-    subtitle: "2 Topics",
-    tag: "General studies",
-    progress: 30,
-    topics: ["Nature of Indian economy", "Five-year plan models"],
-    buttonLabel: "Start Now",
-  },
-  {
-    icon: currentAffairsIcon,
-    title: "Current Affairs",
-    subtitle: "Test available",
-    tag: "",
-    progress: 0,
-    topics: ["Daily & Monthly Updates", "TNPSC-Focused News"],
-    buttonLabel: "View Details",
-  },
-];
+const fallbackTodaysPlan: StudyPlanItem[] = [];
 
 const Index = () => {
   const navigate = useNavigate();

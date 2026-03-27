@@ -165,11 +165,7 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
         }
 
         if (allDayItems.length === 0) {
-            allDayItems = [
-                { label: "Day 1: Core Fundamentals", id: "m1", dayNo: 1 },
-                { label: "Day 2: Advanced Concepts", id: "m2", dayNo: 2 },
-                { label: "Day 3: Practice Session", id: "m3", dayNo: 3 },
-            ];
+            allDayItems = [];
         }
 
         if (subscribed) {
@@ -190,7 +186,7 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
         if (userPlans && userPlans.length > 0) {
             return new Set(userPlans.filter(p => p.subject === subject).map(p => p.day_no)).size;
         }
-        return 12;
+        return 0;
     };
 
     return (

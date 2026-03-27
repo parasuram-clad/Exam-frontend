@@ -33,6 +33,8 @@ import incorrectIcon from "@/assets/results/incorrect-icon.png";
 import unattemptedIcon from "@/assets/results/unattempted-icon.png";
 import clockIcon from "@/assets/results/clock-icon.png";
 
+import { testSeriesOverallService } from "@/services/testSeriesOverall.service";
+
 // ── Types ──
 interface UnitTopic {
     name: string;
@@ -50,83 +52,6 @@ interface UnitAnalysis {
     questionCount: number;
     topics: UnitTopic[];
 }
-
-
-// ── Mock Data ──
-const generateAnalytics = () => {
-    const correct = 153;
-    const incorrect = 45;
-    const unattempted = 2;
-    const total = correct + incorrect + unattempted;
-    const timeTaken = "1h 48m";
-    const score = correct;
-    const totalMarks = 200;
-    const accuracy = Math.round((correct / (correct + incorrect)) * 100);
-
-    const units: UnitAnalysis[] = [
-        {
-            name: "General Science",
-            icon: scienceIcon,
-            badge: "Good Performance",
-            badgeColor: "bg-green-100 text-green-700",
-            score: 22,
-            total: 30,
-            questionCount: 5,
-            topics: [
-                { name: "Nature of Universe", score: 5, total: 5 },
-                { name: "Measurement of physical quantities", score: 3, total: 5 },
-                { name: "General scientific laws in motion", score: 4, total: 5 },
-                { name: "Force, pressure, and energy", score: 4, total: 5 },
-                { name: "Environmental science", score: 2, total: 5 },
-                { name: "Latest inventions in science and technology", score: 4, total: 5 },
-            ],
-        },
-        {
-            name: "Geography",
-            icon: geographyIcon,
-            badge: "Excellence",
-            badgeColor: "bg-green-100 text-green-700",
-            score: 27,
-            total: 30,
-            questionCount: 5,
-            topics: [
-                { name: "Earth location", score: 5, total: 5 },
-                { name: "Physical features", score: 3, total: 5 },
-                { name: "Monsoon, rainfall, weather, and climate", score: 5, total: 5 },
-                { name: "Water resources", score: 5, total: 5 },
-                { name: "Rivers", score: 5, total: 5 },
-                { name: "Soil, Minerals, and Natural resources", score: 4, total: 5 },
-            ],
-        },
-        {
-            name: "History",
-            icon: historyIcon,
-            badge: "Moderate",
-            badgeColor: "bg-yellow-100 text-yellow-700",
-            score: 33,
-            total: 40,
-            questionCount: 10,
-            topics: [
-                { name: "Ancient Indian History", score: 8, total: 10 },
-                { name: "Medieval Indian History", score: 7, total: 10 },
-                { name: "Modern Indian History", score: 9, total: 10 },
-                { name: "Tamil Nadu History", score: 9, total: 10 },
-            ],
-        },
-    ];
-
-    const leaderboard: LeaderboardEntry[] = [
-        { rank: 1, name: "Priya Sharma", initials: "PS", color: "bg-pink-500", marks: 98, accuracy: "95%" },
-        { rank: 2, name: "Jagan", initials: "JA", color: "bg-red-500", marks: 94, accuracy: "90%" },
-        { rank: 3, name: "Sharmila", initials: "SH", color: "bg-orange-500", marks: 91, accuracy: "86%" },
-        { rank: 4, name: "Thameem", initials: "TA", color: "bg-blue-500", marks: 87, accuracy: "80%" },
-        { rank: 5, name: "Raghuram", initials: "RA", color: "bg-green-500", marks: 83, accuracy: "79%" },
-        { rank: 6, name: "Manju Shree", initials: "MS", color: "bg-purple-500", marks: 79, accuracy: "73%" },
-        { rank: 7, name: "You (Arun)", initials: "AK", color: "bg-gray-400", marks: 75, accuracy: "70%", isYou: true },
-    ];
-
-    return { correct, incorrect, unattempted, total, timeTaken, score, totalMarks, accuracy, units, leaderboard, yourRank: 16 };
-};
 
 // ── Circular Progress Ring ──
 const CircularProgress = ({ value, total, size = 56, strokeWidth = 4, color = "#14B8A6" }: { value: number; total: number; size?: number; strokeWidth?: number; color?: string }) => {
@@ -158,12 +83,24 @@ const TestAnalytics = () => {
     const [searchParams] = useSearchParams();
     const weekNoStr = searchParams.get('week');
     const weekNo = weekNoStr ? parseInt(weekNoStr) : null;
+    const planIdStr = searchParams.get('planId');
+    const planId = planIdStr ? parseInt(planIdStr) : null;
+
     const navigate = useNavigate();
     const { user } = useAuth();
     const isDesktop = useMediaQuery("(min-width: 1280px)");
 
+    const isOverall = subject?.toLowerCase() === 'overall' || subject?.toLowerCase() === 'general';
+
     const { data: resultData, isLoading: resultLoading } = useQuery({
-        queryKey: [subject === 'weekly' ? 'weekly-test-result' : 'monthly-test-result', user?.id, weekNo, testId],
+        queryKey: [
+            subject === 'weekly' ? 'weekly-test-result' : 
+            subject === 'monthly' ? 'monthly-test-result' : 
+            'overall-test-result', 
+            user?.id, 
+            testId, 
+            planId
+        ],
         queryFn: async () => {
             if (subject === 'weekly') {
                 const wNo = weekNo || parseInt(testId || "1");
@@ -172,10 +109,12 @@ const TestAnalytics = () => {
                 const mNoStr = searchParams.get('month');
                 const mNo = mNoStr ? parseInt(mNoStr) : parseInt(testId || "1");
                 return await studyService.getMonthlyTestResult(user!.id, mNo);
+            } else if (isOverall) {
+                return await testSeriesOverallService.getResult(parseInt(testId || "0"), planId || 0);
             }
             return null;
         },
-        enabled: !!user?.id && (subject === 'weekly' || subject === 'monthly'),
+        enabled: !!user?.id && (subject === 'weekly' || subject === 'monthly' || isOverall),
     });
 
     const { data: dashboardData } = useQuery({
@@ -247,20 +186,7 @@ const TestAnalytics = () => {
             isYou: l.is_current_user || l.is_you,
             color: (l.is_current_user || l.is_you) ? "bg-slate-500" : (l.rank === 1 ? "bg-amber-500" : "bg-blue-600")
         })) || []
-    } : {
-        ...generateAnalytics(),
-        yourRank: dashboardData?.leaderboard?.your_rank || 0,
-        questions: [],
-        headerLeaderboard: dashboardData?.leaderboard?.leaderboard?.map((l: any) => ({
-            rank: l.rank,
-            name: l.name,
-            initials: l.initials || l.name.split(' ').map((n: any) => n[0]).join('').substring(0, 2).toUpperCase(),
-            marks: l.total_marks,
-            accuracy: `${l.accuracy}%`,
-            isYou: l.is_current_user || l.is_you,
-            color: (l.is_current_user || l.is_you) ? "bg-slate-500" : (l.rank === 1 ? "bg-amber-500" : "bg-blue-600")
-        })) || []
-    };
+    } : null;
 
     const [expandedUnit, setExpandedUnit] = useState<string | null>(null);
     const [showQuestions, setShowQuestions] = useState(false);
@@ -271,19 +197,11 @@ const TestAnalytics = () => {
         if (!showQuestions) {
             setTimeout(() => {
                 questionsRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
+            }, 1000);
         }
     };
 
     const userName = user?.full_name || user?.username || "Aspirant";
-    const initials = userName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .substring(0, 2)
-        .toUpperCase();
-
-    const avatarUrl = getMediaUrl(user?.photo_url, pic);
 
     const completedDate = resultData?.submitted_at
         ? new Date(resultData.submitted_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
@@ -298,6 +216,20 @@ const TestAnalytics = () => {
                 <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
                     <Loader2 className="w-10 h-10 text-primary animate-spin" />
                     <p className="text-muted-foreground animate-pulse font-medium">Loading test results...</p>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (!data) {
+        return (
+            <DashboardLayout
+                hideHeader={isDesktop}
+                activePath={subject === 'weekly' ? '/study-plan' : '/test-series'}
+            >
+                <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+                    <p className="text-muted-foreground font-medium text-lg">No results found for this test.</p>
+                    <Button onClick={() => navigate(-1)} variant="outline" className="rounded-xl">Go Back</Button>
                 </div>
             </DashboardLayout>
         );
@@ -328,10 +260,10 @@ const TestAnalytics = () => {
         >
             <div className="hidden lg:block px-4 lg:px-0">
                 <h1 className="text-xl sm:text-2xl font-medium text-[#1e293b] capitalize">
-                    {subject === 'weekly' ? `Weekly Test Review` : subject === 'monthly' ? `Monthly Test Review` : 'Test Series'}
+                    {subject === 'weekly' ? `Weekly Test Review` : subject === 'monthly' ? `Monthly Test Review` : isOverall ? `Overall Test Review` : 'Test Series'}
                 </h1>
                 <p className="text-[12px] sm:text-sm text-[#64748B] mt-0.5 font-medium">
-                    {subject === 'weekly' ? `Week ${weekNo || testId}` : subject === 'monthly' ? `Month ${searchParams.get('month') || testId}` : 'TNPSC – Group II'} | 2026
+                    {subject === 'weekly' ? `Week ${weekNo || testId}` : subject === 'monthly' ? `Month ${searchParams.get('month') || testId}` : isOverall ? `Test Set ${testId}` : 'TNPSC – Group II'} | 2026
                 </p>
             </div>
             <div

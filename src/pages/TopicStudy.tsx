@@ -15,40 +15,7 @@ interface SubTopic {
   status: "completed" | "in_progress" | "not_started";
 }
 
-const subTopics: SubTopic[] = [
-  {
-    id: "sangam",
-    title: "Sangam Period",
-    description: "Learn about early Tamil society, culture, and political structure through Sangam literature and historical sources, with focus on key events and contributions.",
-    timeSpent: 20,
-    totalTime: 45,
-    status: "in_progress",
-  },
-  {
-    id: "medieval",
-    title: "Medieval Kingdoms",
-    description: "Study the rise of major Tamil dynasties, their administration, economy, and cultural contributions, with emphasis on Cholas, Pandyas, and Pallavas.",
-    timeSpent: 0,
-    totalTime: 35,
-    status: "not_started",
-  },
-  {
-    id: "vijayanagar",
-    title: "Vijayanagar Empire",
-    description: "Explore the golden age of South Indian history, covering administration, art, architecture, and the socio-economic conditions.",
-    timeSpent: 35,
-    totalTime: 35,
-    status: "completed",
-  },
-  {
-    id: "colonial",
-    title: "Colonial Period",
-    description: "Understand the impact of European colonization on Tamil Nadu, resistance movements, and social reforms.",
-    timeSpent: 0,
-    totalTime: 40,
-    status: "not_started",
-  },
-];
+const subTopics: SubTopic[] = [];
 
 const TopicStudy = () => {
   const { topicId } = useParams<{ topicId: string }>();
