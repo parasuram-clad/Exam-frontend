@@ -151,9 +151,14 @@ export default function Notifications() {
             case 'BILLING': return { Icon: AlertTriangle, bg: 'bg-rose-50', color: 'text-rose-500', border: 'border-rose-100' };
             case 'DAILY_TEST':
             case 'WEEKLY_TEST':
-            case 'TEST_SERIES': return { Icon: FileText, bg: 'bg-accent/5', color: 'text-accent', border: 'border-accent/10' };
+            case 'TEST_SERIES':
+            case 'EXAM': return { Icon: FileText, bg: 'bg-blue-50', color: 'text-blue-500', border: 'border-blue-100' };
+            case 'RESULT': return { Icon: Trophy, bg: 'bg-emerald-50', color: 'text-emerald-500', border: 'border-emerald-100' };
             case 'STREAK':
             case 'ACHIEVEMENT': return { Icon: Trophy, bg: 'bg-amber-50', color: 'text-amber-500', border: 'border-amber-100' };
+            case 'WELCOME': return { Icon: Bell, bg: 'bg-indigo-50', color: 'text-indigo-500', border: 'border-indigo-100' };
+            case 'SYSTEM':
+            case 'UPDATE': return { Icon: RefreshCw, bg: 'bg-slate-50', color: 'text-slate-500', border: 'border-slate-100' };
             default: return { Icon: Bell, bg: 'bg-primary/5', color: 'text-primary', border: 'border-primary/10' };
         }
     };

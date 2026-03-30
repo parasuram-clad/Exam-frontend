@@ -744,6 +744,7 @@ const StudyPlan = () => {
             overallProgress={bannerProgress}
             currentProgressDay={bannerDay}
             progressLabel={bannerLabel}
+            hideProgressBar={viewMode === 'subject' && !selectedSubject}
           />
         </motion.div>
 

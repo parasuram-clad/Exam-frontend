@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Bell, FileText, Trophy, Settings, User, LogOut, Medal, AlertTriangle, Check } from "lucide-react";
+import { Bell, FileText, Trophy, Settings, User, LogOut, Medal, AlertTriangle, Check, RefreshCw } from "lucide-react";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -28,9 +28,14 @@ const getIconDetails = (category: string) => {
         case 'BILLING': return { Icon: AlertTriangle, bg: 'bg-rose-50', color: 'text-rose-500' };
         case 'DAILY_TEST':
         case 'WEEKLY_TEST':
-        case 'TEST_SERIES': return { Icon: FileText, bg: 'bg-blue-50', color: 'text-blue-500' };
+        case 'TEST_SERIES':
+        case 'EXAM': return { Icon: FileText, bg: 'bg-blue-50', color: 'text-blue-500' };
+        case 'RESULT': return { Icon: Trophy, bg: 'bg-emerald-50', color: 'text-emerald-500' };
         case 'STREAK':
-        case 'ACHIEVEMENT': return { Icon: Trophy, bg: 'bg-emerald-50', color: 'text-emerald-500' };
+        case 'ACHIEVEMENT': return { Icon: Trophy, bg: 'bg-amber-50', color: 'text-amber-500' };
+        case 'WELCOME': return { Icon: Bell, bg: 'bg-indigo-50', color: 'text-indigo-500' };
+        case 'SYSTEM':
+        case 'UPDATE': return { Icon: RefreshCw, bg: 'bg-slate-50', color: 'text-slate-500' };
         default: return { Icon: Bell, bg: 'bg-indigo-50', color: 'text-indigo-500' };
     }
 };

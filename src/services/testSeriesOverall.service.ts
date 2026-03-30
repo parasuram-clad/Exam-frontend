@@ -47,6 +47,11 @@ export interface OverallRoadmapResponse {
       total_questions: number;
       total_marks: number;
       duration_hours: number;
+      marking_scheme: {
+        correct: number;
+        incorrect: number;
+        unattempted: number;
+      };
     };
   }>;
 }

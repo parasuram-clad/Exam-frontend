@@ -16,7 +16,6 @@ export interface Question {
     options: string[];
     correctAnswer: number;
     category?: string;
-    difficulty?: "Easy" | "Medium" | "Hard";
 }
 
 export interface Answer {
@@ -187,19 +186,6 @@ const TestEngine = ({
                                 {question.category && (
                                     <Badge variant="outline" className="border-blue-500 text-blue-500 text-[10px] sm:text-xs">
                                         {question.category}
-                                    </Badge>
-                                )}
-                                {question.difficulty && (
-                                    <Badge
-                                        variant="outline"
-                                        className={cn(
-                                            "text-[10px] sm:text-xs",
-                                            question.difficulty === "Easy" && "border-success text-success",
-                                            question.difficulty === "Medium" && "border-warning text-warning",
-                                            question.difficulty === "Hard" && "border-destructive text-destructive"
-                                        )}
-                                    >
-                                        {question.difficulty}
                                     </Badge>
                                 )}
                             </div>

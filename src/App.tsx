@@ -9,6 +9,7 @@ import TestSeries from "./pages/TestSeries";
 import TestDetails from "./pages/TestDetails";
 import TestAttempt from "./pages/TestAttempt";
 import TestAnalytics from "./pages/TestAnalytics";
+import SubjectRoadmap from "./pages/SubjectRoadmap";
 import TopicStudy from "./pages/TopicStudy";
 import StudyContent from "./pages/StudyContent";
 import MyProgress from "./pages/MyProgress";
@@ -56,6 +57,7 @@ const App = () => (
               <Route path="/test-series" element={<ProtectedRoute><TestSeries /></ProtectedRoute>} />
               <Route path="/test-series/:subject" element={<ProtectedRoute><TestDetails /></ProtectedRoute>} />
               <Route path="/test-series/:subject/test/:testId" element={<ProtectedRoute><TestAttempt /></ProtectedRoute>} />
+              <Route path="/test-series/subject/:subjectId/roadmap" element={<ProtectedRoute><SubjectRoadmap /></ProtectedRoute>} />
               <Route path="/test-series/:subject/test/:testId/analytics" element={<ProtectedRoute><TestAnalytics /></ProtectedRoute>} />
               <Route path="/progress" element={<ProtectedRoute><MyProgress /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

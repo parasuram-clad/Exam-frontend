@@ -17,6 +17,11 @@ export interface TestSet {
         obtained: number | null;
         total: number | null;
     };
+    marking_scheme?: {
+        correct: number;
+        incorrect: number;
+        unattempted: number;
+    };
     difficulty: "Easy" | "Moderate" | "Hard";
     syllabus: string[];
     syllabus_detailed?: any[];

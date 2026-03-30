@@ -20,6 +20,7 @@ import { BASE_URL } from "@/config/env";
 import { SubjectWiseView, TestSubject } from "@/components/test-series/SubjectWiseView";
 import { TestSetsView, TestSet } from "@/components/test-series/TestSetsView";
 import { testSeriesOverallService, OverallRoadmapResponse, RoadmapEntry } from "@/services/testSeriesOverall.service";
+import { testSeriesSubjectService } from "@/services/testSeriesSubject.service";
 import { GeneratePlanModal } from "@/components/test-series/GeneratePlanModal";
 import { toast } from "sonner";
 import test1Icon from "../assets/test-1.png";
@@ -29,9 +30,6 @@ import test4Icon from "../assets/test-4.png";
 import test5Icon from "../assets/tes-5.png";
 import test6Icon from "../assets/test-6.png";
 import testHero from "../assets/test-hero.png";
-
-// Static categories for Subject Wise (can be fetched later)
-const testSubjects: TestSubject[] = [];
 
 const TestSeriesSidebar = ({ user }: { user: UserMe | null }) => {
   const navigate = useNavigate();
@@ -82,11 +80,37 @@ const TestSeries = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"subject" | "sets">("sets");
   const [roadmap, setRoadmap] = useState<OverallRoadmapResponse['plans'][0] | null>(null);
+  const [subjects, setSubjects] = useState<TestSubject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isDesktop = useMediaQuery("(min-width: 1280px)");
   const userName = user?.full_name || user?.username || "Student";
+
+  const getSubjectIcon = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes('history')) return <Landmark className="w-4 h-4" />;
+    if (n.includes('polity')) return <Globe className="w-4 h-4" />;
+    if (n.includes('geo')) return <Globe className="w-4 h-4" />;
+    if (n.includes('eco')) return <Banknote className="w-4 h-4" />;
+    if (n.includes('aptitude')) return <Brain className="w-4 h-4" />;
+    if (n.includes('science')) return <Microscope className="w-4 h-4" />;
+    if (n.includes('english') || n.includes('tamil')) return <BookOpen className="w-4 h-4" />;
+    return <Newspaper className="w-4 h-4" />;
+  };
+
+  const getSubjectColor = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes('history')) return { text: "text-amber-600", bg: "bg-amber-50" };
+    if (n.includes('polity')) return { text: "text-blue-600", bg: "bg-blue-50" };
+    if (n.includes('geo')) return { text: "text-teal-600", bg: "bg-teal-50" };
+    if (n.includes('aptitude')) return { text: "text-emerald-600", bg: "bg-emerald-50" };
+    if (n.includes('science')) return { text: "text-orange-600", bg: "bg-orange-50" };
+    if (n.includes('english')) return { text: "text-indigo-600", bg: "bg-indigo-50" };
+    if (n.includes('tamil')) return { text: "text-rose-600", bg: "bg-rose-50" };
+    return { text: "text-slate-600", bg: "bg-slate-50" };
+  };
 
   useEffect(() => {
     const initTestSeries = async () => {
@@ -94,12 +118,11 @@ const TestSeries = () => {
 
       try {
         setLoading(true);
+        // 1. Fetch Overall Roadmap
         const roadmaps = await testSeriesOverallService.getRoadmap();
 
         if (roadmaps.plans && roadmaps.plans.length > 0) {
-          // Select the first active plan
           setRoadmap(roadmaps.plans[0]);
-          setLoading(false);
         } else {
           // No plan exists. Check if we can auto-generate
           const canAutoGenerate =
@@ -118,18 +141,45 @@ const TestSeries = () => {
               language: user.preferred_language === "ta" ? "Tamil" : "English",
               learner_type: user.learner_type || "Student"
             });
-            // Fetch roadmap again after generation
             const updatedRoadmaps = await testSeriesOverallService.getRoadmap();
             if (updatedRoadmaps.plans.length > 0) setRoadmap(updatedRoadmaps.plans[0]);
           } else {
-            // Missing details, show modal
             setIsModalOpen(true);
+          }
+        }
+
+        // 2. Fetch Available Subjects for Subject-Wise View
+        if (user.exam_type && user.sub_division) {
+          setSubjectsLoading(true);
+          const response = await testSeriesSubjectService.getAvailableSubjects(
+            user.exam_type!,
+            user.sub_division!,
+            user.preferred_language === "ta" ? "Tamil" : "English"
+          );
+
+          if (response.subjects) {
+            const mappedSubjects: TestSubject[] = response.subjects.map((sub: any) => {
+              const { text: color, bg } = getSubjectColor(sub.subject_name);
+              return {
+                id: sub.subject_name.toLowerCase().replace(/\s+/g, '-'),
+                subjectId: sub.id,
+                name: sub.subject_name,
+                icon: sub.subject_image || test1Icon, // Use provided image or fallback
+                testsAvailable: sub.testsAvailable || 25,
+                completed: sub.completed || 0,
+                total: sub.total || 25,
+                difficulty: sub.difficulty || "Moderate",
+                iconBg: bg
+              };
+            });
+            setSubjects(mappedSubjects);
           }
         }
       } catch (error) {
         console.error("Test series initialization failed:", error);
       } finally {
         setLoading(false);
+        setSubjectsLoading(false);
       }
     };
 
@@ -155,6 +205,7 @@ const TestSeries = () => {
     name: `Test Set ${test.series_no}`,
     duration: `${roadmap.test_details.duration_hours * 60} m`,
     questions: roadmap.test_details.total_questions,
+    marking_scheme: roadmap.test_details.marking_scheme,
     difficulty: test.series_no % 3 === 0 ? "Hard" : test.series_no % 2 === 0 ? "Moderate" : "Easy",
     syllabus: test.syllabus ? test.syllabus.map((s: any) => s.part) : ["Full Syllabus"],
     syllabus_detailed: test.syllabus,
@@ -178,13 +229,13 @@ const TestSeries = () => {
             {roadmap ? `${roadmap.exam_type} – ${roadmap.sub_division} | ${roadmap.year}` : "Choose your path to success"}
           </p>
         </div>
-        {!loading && (
+        {roadmap && (
           <Button
             variant="outline"
             onClick={() => setIsModalOpen(true)}
-            className="rounded-xl border-slate-200 text-slate-600 hover:text-slate-900 gap-2 h-9 px-4 text-xs font-medium"
+            className="rounded-xl border-slate-200 text-slate-600 hover:text-slate-900 gap-2 h-9 px-4 text-xs font-medium shadow-sm transition-all active:scale-[0.98]"
           >
-            <Sparkles className="w-4 h-4 text-amber-500" />
+            <Sparkles className="w-3 h-3 text-amber-500" />
             Switch Plan
           </Button>
         )}
@@ -259,8 +310,29 @@ const TestSeries = () => {
           <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
           <p className="text-slate-500 font-medium">Loading your test series...</p>
         </div>
+      ) : !roadmap ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white rounded-2xl border border-dashed border-slate-200 shadow-sm"
+        >
+          <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-6">
+            <Sparkles className="w-10 h-10 text-amber-500" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">No Test Series Roadmap Found</h2>
+          <p className="text-slate-500 max-w-sm mb-8 text-sm leading-relaxed">
+            Personalize your exam preparation by generating a custom test series roadmap based on your target exam and learning style.
+          </p>
+          <Button
+            onClick={() => setIsModalOpen(true)}
+            className="rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white px-8 h-12 text-sm font-medium transition-all active:scale-[0.98] shadow-lg flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4 text-amber-400 group-hover:animate-pulse" />
+            Generate My Test Series Plan
+          </Button>
+        </motion.div>
       ) : activeTab === "subject" ? (
-        <SubjectWiseView subjects={testSubjects} />
+        <SubjectWiseView subjects={subjects} />
       ) : (
         <TestSetsView testSets={mappedTestSets} />
       )}

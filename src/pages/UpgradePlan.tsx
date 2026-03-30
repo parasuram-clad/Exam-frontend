@@ -1,10 +1,10 @@
 import { DashboardLayout } from "@/components/layout";
 import { motion } from "framer-motion";
-import { 
-  Check, 
-  Zap, 
-  Crown, 
-  Star, 
+import {
+  Check,
+  Zap,
+  Crown,
+  Star,
   ArrowRight,
   ShieldCheck,
   TrendingUp,
@@ -91,7 +91,7 @@ const UpgradePlan = () => {
     <DashboardLayout>
       <div className="max-w-6xl mx-auto px-4 py-8 md:py-12 no-scrollbar">
         {/* Back Button */}
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="flex items-center text-muted-foreground hover:text-accent transition-all duration-300 mb-8 group text-xs font-bold uppercase tracking-widest"
         >
@@ -110,15 +110,15 @@ const UpgradePlan = () => {
               Premium Preparation
             </Badge>
           </motion.div>
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-3xl md:text-5xl font-bold text-foreground tracking-tight leading-tight"
           >
             Accelerate your success with <br />
-            <span className="text-accent italic">Copilot Premium</span>
+            <span className="text-accent ">Copilot Premium</span>
           </motion.h1>
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -181,12 +181,12 @@ const UpgradePlan = () => {
                   </ul>
                 </div>
 
-                <Button 
+                <Button
                   onClick={() => handleSelectPlan(plan.id)}
                   className={cn(
                     "w-full h-11 rounded-xl font-bold text-sm transition-all duration-300 border-none shadow-sm",
-                    plan.popular 
-                      ? "bg-accent text-accent-foreground hover:bg-accent/90" 
+                    plan.popular
+                      ? "bg-accent text-accent-foreground hover:bg-accent/90"
                       : "bg-primary text-primary-foreground hover:opacity-90"
                   )}
                 >
@@ -201,7 +201,7 @@ const UpgradePlan = () => {
         {/* Why Choose Copilot Section */}
         <div className="mt-8 bg-[#0F172A] rounded-[32px] p-8 md:p-14 relative overflow-hidden text-white shadow-xl border-none">
           <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-accent/15 rounded-full blur-[100px] -mr-48 -mt-48 pointer-events-none opacity-40" />
-          
+
           <div className="relative z-10">
             <div className="text-center space-y-3 mb-14 max-w-2xl mx-auto">
               <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Why Upgrade to Copilot Pro?</h2>

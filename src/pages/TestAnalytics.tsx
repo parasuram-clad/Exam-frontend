@@ -34,6 +34,7 @@ import unattemptedIcon from "@/assets/results/unattempted-icon.png";
 import clockIcon from "@/assets/results/clock-icon.png";
 
 import { testSeriesOverallService } from "@/services/testSeriesOverall.service";
+import { testSeriesSubjectService } from "@/services/testSeriesSubject.service";
 
 // ── Types ──
 interface UnitTopic {
@@ -91,6 +92,7 @@ const TestAnalytics = () => {
     const isDesktop = useMediaQuery("(min-width: 1280px)");
 
     const isOverall = subject?.toLowerCase() === 'overall' || subject?.toLowerCase() === 'general';
+    const isSubject = subject?.toLowerCase() === 'subject';
 
     const { data: resultData, isLoading: resultLoading } = useQuery({
         queryKey: [
@@ -111,10 +113,12 @@ const TestAnalytics = () => {
                 return await studyService.getMonthlyTestResult(user!.id, mNo);
             } else if (isOverall) {
                 return await testSeriesOverallService.getResult(parseInt(testId || "0"), planId || 0);
+            } else if (isSubject) {
+                return await testSeriesSubjectService.getResult(planId || 0, parseInt(testId || "0"));
             }
             return null;
         },
-        enabled: !!user?.id && (subject === 'weekly' || subject === 'monthly' || isOverall),
+        enabled: !!user?.id && (subject === 'weekly' || subject === 'monthly' || isOverall || isSubject),
     });
 
     const { data: dashboardData } = useQuery({
@@ -260,7 +264,7 @@ const TestAnalytics = () => {
         >
             <div className="hidden lg:block px-4 lg:px-0">
                 <h1 className="text-xl sm:text-2xl font-medium text-[#1e293b] capitalize">
-                    {subject === 'weekly' ? `Weekly Test Review` : subject === 'monthly' ? `Monthly Test Review` : isOverall ? `Overall Test Review` : 'Test Series'}
+                    {subject === 'weekly' ? `Weekly Test Review` : subject === 'monthly' ? `Monthly Test Review` : (isOverall || isSubject) ? `Full Test Review` : 'Test Review'}
                 </h1>
                 <p className="text-[12px] sm:text-sm text-[#64748B] mt-0.5 font-medium">
                     {subject === 'weekly' ? `Week ${weekNo || testId}` : subject === 'monthly' ? `Month ${searchParams.get('month') || testId}` : isOverall ? `Test Set ${testId}` : 'TNPSC – Group II'} | 2026

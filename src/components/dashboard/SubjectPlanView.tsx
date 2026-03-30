@@ -147,7 +147,7 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
                                 (t.type === 'REVISION' ? "Revision Day" : "Study Topic");
 
                             return {
-                                label: `Day ${d?.day || '?'}: ${typeLabel ? typeLabel + " - " : ""}${topicName}`,
+                                label: `${typeLabel ? typeLabel + " - " : ""}${topicName}`,
                                 id: `roadmap-${subject}-day${d?.day}-${t.identifier || Math.random()}`,
                                 dayNo: d?.day || 0,
                             };
@@ -158,7 +158,7 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
                 .filter(p => p?.subject === subject)
                 .sort((a, b) => (a?.day_no || 0) - (b?.day_no || 0));
             allDayItems = subjectPlans.map(p => ({
-                label: `Day ${p?.day_no || '?'}: ${p?.topic || 'Untitled'}`,
+                label: `${p?.topic || 'Untitled'}`,
                 id: p?.id?.toString() || Math.random().toString(),
                 dayNo: p?.day_no || 0,
             }));
@@ -205,7 +205,7 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.08, type: "spring", stiffness: 120, damping: 18 }}
                         className={cn(
-                            "bg-card rounded-2xl border border-border shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden cursor-pointer active:scale-[0.98] h-[230px]",
+                            "group bg-card rounded-2xl p-6 border border-border shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col active:scale-[0.98] h-full relative overflow-hidden",
                             !subscribed && "border-dashed"
                         )}
                         onClick={() => {
@@ -217,55 +217,42 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
                             onSelectSubject(subject);
                         }}
                     >
-                        <div className="p-4 flex-1">
-                            {/* Header */}
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    {/* Subject Icon from backend */}
-                                    <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-xl bg-muted/30 shrink-0">
-                                        <img
-                                            src={icon}
-                                            alt={subject}
-                                            className="w-11 h-11 object-contain"
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).src = getSubjectIconFallback(subject);
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                            <h3 className="text-[14px] font-semibold text-foreground leading-tight truncate max-w-[160px]">
-                                                {subject}
-                                            </h3>
-                                            {/* {!subscribed && (
-                                                <span className="flex items-center gap-0.5 bg-amber-100 text-amber-700 text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0">
-                                                    <Lock className="w-2.5 h-2.5" />
-                                                    Locked
-                                                </span>
-                                            )} */}
-                                        </div>
-                                        <p className="text-[10px] text-muted-foreground mt-0.5">{unitCount} Study Days</p>
-                                    </div>
-                                </div>
-                                <CircularProgress progress={subscribed ? progress : 0} />
+                        {/* Circular Progress in top right */}
+
+
+                        {/* Centered Header Content */}
+                        <div className="flex flex-col items-center text-center gap-4 mb-4">
+                            {/* Subject Icon Container */}
+                            <div className="w-16 h-16 flex items-center justify-center shrink-0 transition-transform duration-500 group-hover:scale-110">
+                                <img
+                                    src={icon}
+                                    alt={subject}
+                                    className="w-full h-full object-contain"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = getSubjectIconFallback(subject);
+                                    }}
+                                />
                             </div>
 
-                            {/* Daily Schedule Preview */}
-                            <ul className="space-y-2 mb-3">
-                                {schedule.map((item) => (
-                                    <li key={item.id} className="flex items-center gap-2.5 text-xs text-foreground/80 truncate">
-                                        <div className="w-[6px] h-[6px] rounded-full bg-[#7C79EC] shrink-0" />
-                                        <span className="truncate">{item.label}</span>
-                                    </li>
-                                ))}
-                            </ul>
+                            {/* Title & Stats */}
+                            <div className="flex flex-col">
+                                <h3 className="text-[17px] font-bold text-foreground tracking-tight leading-tight mb-1.5">
+                                    {subject}
+                                </h3>
+                                <div className="flex items-center justify-center gap-2">
+                                    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                                        {unitCount} Study Days
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="px-4 pb-4 mt-auto">
+                        {/* Compact Action Button at the bottom */}
+                        <div className="mt-auto">
                             <button
-                                className="w-full h-10 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 bg-[#0F172A] hover:bg-[#1E293B] text-white"
+                                className="w-full h-11 bg-[#0F172A] text-white hover:bg-[#1E293B] rounded-xl text-sm font-medium shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                             >
-                                View Daily Plan <ChevronRight className="w-4 h-4" />
+                                View Plan <ChevronRight className="w-4 h-4" />
                             </button>
                         </div>
                     </motion.div>
