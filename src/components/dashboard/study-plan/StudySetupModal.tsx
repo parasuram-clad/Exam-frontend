@@ -58,8 +58,6 @@ export const StudySetupModal = ({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
         className="w-[92vw] max-w-xl p-0 overflow-hidden border-none bg-white rounded-[24px] shadow-2xl max-h-[95vh] overflow-y-auto"
       >
         <div className="relative p-5 sm:p-8 md:p-10 bg-[radial-gradient(circle_at_top,#FAFFE9_0%,transparent_50%),linear-gradient(to_br,#F8FAFF_0%,white_50%,#F0F7FF_100%)] min-h-[500px] flex flex-col justify-center overflow-hidden">
@@ -91,7 +89,7 @@ export const StudySetupModal = ({
                 placeholder="Enter your name"
                 value={setupData.name}
                 onChange={(e) => setSetupData((prev: any) => ({ ...prev, name: e.target.value }))}
-                className="h-11 px-4 rounded-xl bg-muted/30 border border-[#E2E8F0] focus:ring-primary/20 hover:border-primary/30 transition-all text-[#64748B] text-sm"
+                className="h-11 px-4 rounded-xl bg-muted/30 border border-[#E2E8F0] focus:ring-primary/20 hover:border-primary/30 transition-all text-primary text-sm"
               />
             </div>
 
@@ -101,7 +99,10 @@ export const StudySetupModal = ({
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
                   <Globe className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
                 </div>
-                <Select onValueChange={(val) => setSetupData((prev: any) => ({ ...prev, medium: val }))}>
+                <Select
+                  value={setupData.medium}
+                  onValueChange={(val) => setSetupData((prev: any) => ({ ...prev, medium: val }))}
+                >
                   <SelectTrigger className="w-full bg-muted/30 border-none h-12 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background text-foreground/80 shadow-none">
                     <SelectValue placeholder="Select Medium" />
                   </SelectTrigger>

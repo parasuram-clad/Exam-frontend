@@ -605,8 +605,8 @@ const MyProgress = () => {
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-[#1a2b4b]">{area.title}</p>
-                          <p className="text-xs text-gray-500 font-medium">{area.subtitle}</p>
+                          <p className="text-sm font-semibold text-[#1a2b4b]">{area.subtitle}</p>
+                          <p className="text-xs text-gray-500 font-medium">{area.title}</p>
                         </div>
                       </div>
                       <Badge
@@ -664,8 +664,9 @@ const MyProgress = () => {
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-[#1a2b4b]">{area.title}</p>
-                          <p className="text-xs text-gray-500 font-medium">{area.subtitle}</p>
+                          <p className="text-sm font-semibold text-[#1a2b4b]">{area.subtitle}</p>
+                          <p className="text-xs text-gray-500 font-medium">{area.title}</p>
+
                         </div>
                       </div>
                       <Badge

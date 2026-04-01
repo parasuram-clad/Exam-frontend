@@ -24,7 +24,9 @@ import {
   BarChart2,
   Calendar,
   Layers,
-  Loader2
+  Loader2,
+  Pin,
+  MousePointer2
 } from "lucide-react";
 import { cn, getErrorMessage, getMediaUrl } from "@/lib/utils";
 import { DailyQuizModal, QUIZ_QUESTIONS } from "@/components/dashboard/DailyQuizModal";
@@ -373,6 +375,7 @@ const StudyContent = () => {
   const [mode, setMode] = useState<Mode>("reading");
   const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset>("light");
   const [showTopBar, setShowTopBar] = useState(false);
+  const [headerMode, setHeaderMode] = useState<"hover" | "fixed">("fixed");
   const [openPyqAccordion, setOpenPyqAccordion] = useState<string | null>(null); // Format: "sectionId-paragraphIndex"
   const [openAnswers, setOpenAnswers] = useState<Set<string>>(new Set());
   const [visibleKeywords, setVisibleKeywords] = useState<string[]>([]);
@@ -1200,8 +1203,8 @@ const StudyContent = () => {
         onMouseLeave={() => setShowTopBar(false)}
       >
         <div className={cn(
-          "absolute inset-0 transition-opacity duration-200",
-          showTopBar ? "opacity-100" : "opacity-0 pointer-events-none",
+          "absolute inset-0 transition-all duration-300",
+          (showTopBar || headerMode === "fixed") ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none",
           backgroundPreset === 'dark' ? "bg-[#1a1a1a] border-b border-gray-800" : "bg-white border-b border-gray-200 shadow-sm"
         )}>
           <div className="max-w-[1400px] mx-auto h-full px-4 sm:px-8 flex items-center justify-between gap-4">
@@ -1255,6 +1258,26 @@ const StudyContent = () => {
                     {p.charAt(0).toUpperCase() + p.slice(1)}
                   </button>
                 ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setHeaderMode(headerMode === 'hover' ? 'fixed' : 'hover')}
+                  className={cn(
+                    "p-1.5 rounded-xl transition-all border flex items-center gap-2",
+                    headerMode === 'fixed'
+                      ? "bg-[#1f2937] text-white border-[#1f2937] shadow-sm ml-2"
+                      : cn("bg-transparent border-gray-200/20 ml-2", getTextColor())
+                  )}
+                  title={headerMode === 'fixed' ? "Unpin Header" : "Pin Header"}
+                >
+                  {headerMode === 'fixed' ? (
+                    <Pin className="w-3.5 h-3.5 text-blue-400 rotate-45 transition-transform" />
+                  ) : (
+                    <MousePointer2 className="w-3.5 h-3.5 opacity-40" />
+                  )}
+                  <span className="text-[11px] font-medium uppercase tracking-wider hidden xs:inline">{headerMode}</span>
+                </button>
               </div>
             </div>
           </div>

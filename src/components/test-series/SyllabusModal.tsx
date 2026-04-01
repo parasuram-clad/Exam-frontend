@@ -84,7 +84,7 @@ export const SyllabusModal = ({ isOpen, onClose, subjectId, subjectPlanId, subje
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 60 }}
                         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        className="relative w-full sm:max-w-[580px] bg-white sm:rounded-2xl rounded-t-3xl shadow-2xl border border-slate-100 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto"
+                        className="relative w-full sm:max-w-[580px] bg-white sm:rounded-2xl rounded-t-3xl shadow-2xl border border-slate-100 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                     >
                         {/* Drag handle – mobile only */}
                         <div className="flex justify-center pt-3 pb-1 sm:hidden">
@@ -159,7 +159,9 @@ export const SyllabusModal = ({ isOpen, onClose, subjectId, subjectPlanId, subje
                                             </div>
                                             <div className="absolute left-[66.66%] top-2 bottom-2 w-[1px] bg-[#E2E8F0]" />
                                             <div>
-                                                <p className="text-xl sm:text-2xl font-bold text-[#1E293B] mb-0.5 whitespace-nowrap">{roadmap.test_details.duration_hours} Hrs</p>
+                                                <p className="text-xl sm:text-2xl font-bold text-[#1E293B] mb-0.5 whitespace-nowrap">
+                                                    {`${Math.round(roadmap.test_details.duration_hours * 60)} Mins`}
+                                                </p>
                                                 <p className="text-[9px] sm:text-[10px] text-[#94A3B8] font-bold uppercase">Duration</p>
                                             </div>
                                         </div>

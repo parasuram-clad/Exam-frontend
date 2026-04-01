@@ -35,7 +35,7 @@ export const GeneratePlanModal: React.FC<GeneratePlanModalProps> = ({
     exam_type: initialData.exam_type || "TNPSC",
     sub_division: initialData.sub_division || "Group IV",
     year: initialData.target_exam_year ? Number(initialData.target_exam_year) : 2026,
-    language: initialData.preferred_language === "ta" ? "Tamil" : (initialData.preferred_language || "English"),
+    language: initialData.preferred_language === "ta" ? "Tamil" : "English",
     learner_type: initialData.learner_type || "Student",
   });
   const [loading, setLoading] = useState(false);
@@ -55,14 +55,12 @@ export const GeneratePlanModal: React.FC<GeneratePlanModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
+      <DialogContent
         className="w-[92vw] max-w-xl p-0 overflow-hidden border-none bg-white rounded-[24px] shadow-2xl max-h-[95vh] overflow-y-auto"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <div className="relative p-6 sm:p-10 bg-[radial-gradient(circle_at_top,#FAFFE9_0%,transparent_50%),linear-gradient(to_br,#F8FAFF_0%,white_50%,#F0F7FF_100%)] min-h-[500px] flex flex-col justify-center overflow-hidden">
           <div className="absolute top-[-90%] left-0 w-full h-full rounded-full bg-gradient-to-br from-[#DDEFD9] via-white to-[#DDEFD9] min-h-[500px] flex flex-col blur-2xl justify-center"></div>
-          
+
           <div className="absolute top-20 left-0 w-20 h-20 pointer-events-none opacity-20">
             <img src={modalTopLeft} alt="" className="w-full h-full object-contain" />
           </div>

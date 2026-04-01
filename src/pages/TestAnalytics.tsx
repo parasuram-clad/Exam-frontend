@@ -94,7 +94,7 @@ const TestAnalytics = () => {
     const isOverall = subject?.toLowerCase() === 'overall' || subject?.toLowerCase() === 'general';
     const isSubject = subject?.toLowerCase() === 'subject';
 
-    const { data: resultData, isLoading: resultLoading } = useQuery({
+    const { data: resultData, isLoading: resultLoading, refetch } = useQuery({
         queryKey: [
             subject === 'weekly' ? 'weekly-test-result' : 
             subject === 'monthly' ? 'monthly-test-result' : 
@@ -121,11 +121,21 @@ const TestAnalytics = () => {
         enabled: !!user?.id && (subject === 'weekly' || subject === 'monthly' || isOverall || isSubject),
     });
 
-    const { data: dashboardData } = useQuery({
+    const { data: dashboardData, refetch: refetchDashboard } = useQuery({
         queryKey: ['dashboard-data', user?.id],
         queryFn: () => studyService.getDashboardData(user!.id),
         enabled: !!user?.id,
     });
+
+    // Handle auto-refresh when window gains focus
+    useEffect(() => {
+        const handleFocus = () => {
+            refetch();
+            refetchDashboard();
+        };
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }, [refetch, refetchDashboard]);
 
     // Map backend data to frontend format
     const data = resultData ? {

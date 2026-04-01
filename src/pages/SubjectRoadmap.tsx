@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -38,39 +38,45 @@ const SubjectRoadmap = () => {
     const [selectedTest, setSelectedTest] = useState<{ seriesNo: number; date: string } | null>(null);
     const [selectedSeriesNo, setSelectedSeriesNo] = useState<number | null>(null);
 
-    useEffect(() => {
-        const fetchRoadmap = async () => {
-            if (!subjectId) return;
+    const fetchRoadmap = useCallback(async () => {
+        if (!subjectId) return;
 
+        try {
+            setLoading(true);
             try {
-                setLoading(true);
-                try {
+                const data = await testSeriesSubjectService.getRoadmap(Number(subjectId));
+                setRoadmap(data);
+            } catch (err: any) {
+                if (err.response?.status === 404 && user) {
+                    toast.info(`Initializing ${subjectName} roadmap...`);
+                    await testSeriesSubjectService.generatePlan(
+                        Number(subjectId),
+                        Number(user.target_exam_year || 2026),
+                        user.preferred_language === "ta" ? "Tamil" : "English"
+                    );
                     const data = await testSeriesSubjectService.getRoadmap(Number(subjectId));
                     setRoadmap(data);
-                } catch (err: any) {
-                    if (err.response?.status === 404 && user) {
-                        toast.info(`Initializing ${subjectName} roadmap...`);
-                        await testSeriesSubjectService.generatePlan(
-                            Number(subjectId),
-                            Number(user.target_exam_year || 2026),
-                            user.preferred_language === "ta" ? "Tamil" : "English"
-                        );
-                        const data = await testSeriesSubjectService.getRoadmap(Number(subjectId));
-                        setRoadmap(data);
-                    } else {
-                        throw err;
-                    }
+                } else {
+                    throw err;
                 }
-            } catch (error) {
-                console.error("Failed to fetch subject roadmap:", error);
-                toast.error("Failed to load test series roadmap");
-            } finally {
-                setLoading(false);
             }
-        };
+        } catch (error) {
+            console.error("Failed to fetch subject roadmap:", error);
+            // toast.error("Failed to load test series roadmap");
+        } finally {
+            setLoading(false);
+        }
+    }, [subjectId, user, subjectName]);
 
+    // Handle auto-refresh when window gains focus
+    useEffect(() => {
+        window.addEventListener('focus', fetchRoadmap);
+        return () => window.removeEventListener('focus', fetchRoadmap);
+    }, [fetchRoadmap]);
+
+    useEffect(() => {
         fetchRoadmap();
-    }, [subjectId, user]);
+    }, [fetchRoadmap]);
 
     const handleStartTest = () => {
         if (!selectedTest || !roadmap) return;
@@ -186,24 +192,42 @@ const SubjectRoadmap = () => {
                                                 </h3>
                                                 <p className={cn(
                                                     "text-[10px] font-bold mt-1 px-2 py-0.5 rounded-md inline-block uppercase tracking-wider",
-                                                    test.access === "REQUIRES_SUBSCRIPTION"
-                                                        ? "bg-[#eff7db] text-[#0F172A]"
-                                                        : test.access === "SUBSCRIBED"
-                                                            ? "bg-emerald-50 text-emerald-600"
-                                                            : "bg-slate-100 text-slate-500"
+                                                    test.obtained_marks !== null 
+                                                        ? "bg-emerald-100 text-emerald-700" 
+                                                        : test.status === "LOCKED"
+                                                            ? "bg-slate-100 text-slate-400"
+                                                            : test.access === "REQUIRES_SUBSCRIPTION"
+                                                                ? "bg-[#eff7db] text-[#0F172A]"
+                                                                : "bg-sky-50 text-sky-600"
                                                 )}>
-                                                    {test.access === "REQUIRES_SUBSCRIPTION" ? "Premium" : test.access === "SUBSCRIBED" ? "Unlocked" : "Free"}
+                                                    {test.obtained_marks !== null 
+                                                        ? "Completed" 
+                                                        : test.status === "LOCKED" 
+                                                            ? "Locked"
+                                                            : test.access === "REQUIRES_SUBSCRIPTION" 
+                                                                ? "Premium"
+                                                                : "Unlocked"
+                                                    }
                                                 </p>
                                             </div>
                                         </div>
 
-                                        {/* Score Display (Top Right) */}
-                                        {test.obtained_marks !== null && (
+                                        {/* Score Display / Unlock Info (Top Right) */}
+                                        {test.obtained_marks !== null ? (
                                             <div className="text-right">
                                                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest leading-none">Score</p>
-                                                <p className="text-lg  text-slate-800 mt-1">
+                                                <p className="text-lg text-slate-800 mt-1 font-bold">
                                                     {test.obtained_marks}<span className="text-slate-400 text-sm">/{roadmap.test_details.total_marks || roadmap.test_details.total_questions}</span>
                                                 </p>
+                                            </div>
+                                        ) : test.status === "LOCKED" && test.test_date && (
+                                            <div className="text-right">
+                                                <div className="bg-slate-50 border border-slate-100 flex flex-col items-end px-2 py-1 rounded-md">
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight leading-none mb-1">Unlocks</p>
+                                                    <p className="text-[11px] font-bold text-slate-600 leading-none">
+                                                        {new Date(test.test_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                    </p>
+                                                </div>
                                             </div>
                                         )}
                                     </div>

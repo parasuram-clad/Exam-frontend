@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import authService, { UserMe } from "@/services/auth.service";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,16 +31,14 @@ import test5Icon from "../assets/tes-5.png";
 import test6Icon from "../assets/test-6.png";
 import testHero from "../assets/test-hero.png";
 
-const TestSeriesSidebar = ({ user }: { user: UserMe | null }) => {
+const TestSeriesSidebar = ({ user, attempts, activeTab }: { user: UserMe | null, attempts: any[], activeTab: "subject" | "sets" }) => {
   const navigate = useNavigate();
-  // TODO: Fetch real last attempts from backend
-  const attempts: any[] = [];
 
   return (
     <div className="flex flex-col gap-6">
       <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm">
         <h3 className="text-lg font-medium text-slate-900 mb-6 tracking-tight">
-          Improve Your Last Attempts
+          Analyze Last Attempts
         </h3>
         <div className="space-y-4">
           {attempts.length > 0 ? (
@@ -50,23 +48,36 @@ const TestSeriesSidebar = ({ user }: { user: UserMe | null }) => {
                 className="flex items-center justify-between p-4 rounded-lg bg-white border border-slate-50 shadow-sm hover:shadow-md transition-all duration-300 group"
               >
                 <div className="min-w-0 pr-2">
-                  <p className="text-[12px] font-medium text-slate-800 mb-1 truncate">{attempt.name}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-bold text-sky-600 uppercase tracking-wider bg-sky-50 px-1.5 py-0.5 rounded">
+                      Set {attempt.series_no}
+                    </span>
+                    <p className="text-[12px] font-medium text-slate-800 truncate">{attempt.subject_name || (activeTab === "sets" ? "Overall Test" : "Subject Test")}</p>
+                  </div>
                   <p className="text-[10px] text-slate-400 whitespace-nowrap">
-                    Score: <span className="text-slate-900">{attempt.score}</span>
+                    Score: <span className={cn(
+                      "font-bold",
+                      attempt.score_percentage > 70 ? "text-emerald-600" : attempt.score_percentage > 40 ? "text-amber-600" : "text-rose-600"
+                    )}>{attempt.correct_answers}/{attempt.total_questions} ({attempt.score_percentage}%)</span>
                   </p>
                 </div>
                 <Button
                   variant="outline"
-                  onClick={() => navigate(`/test-series/${attempt.subject}/test/${attempt.testId}`)}
-                  className="h-9 px-4 rounded-xl bg-sky-50 border-0 text-sky-600 hover:bg-sky-100  text-xs font-medium transition-all"
+                  onClick={() => {
+                    const subject = activeTab === "sets" ? "overall" : "subject";
+                    const planId = activeTab === "sets" ? attempt.overall_plan_id : attempt.subject_plan_id;
+                    navigate(`/test-series/${subject}/test/${attempt.series_no}/analytics?planId=${planId}`);
+                  }}
+                  className="h-8 px-3 rounded-lg bg-sky-50 border-0 text-sky-600 hover:bg-sky-100 text-[10px] font-bold transition-all"
                 >
-                  Start now
+                  View Analysis
                 </Button>
               </div>
             ))
           ) : (
             <div className="py-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-              <p className="text-xs text-slate-400 font-medium">No recent attempts found.</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">No recent attempts</p>
+              <p className="text-[9px] text-slate-300 mt-1 uppercase font-bold tracking-tight">Complete a test to see history</p>
             </div>
           )}
         </div>
@@ -84,6 +95,8 @@ const TestSeries = () => {
   const [loading, setLoading] = useState(true);
   const [subjectsLoading, setSubjectsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const isDesktop = useMediaQuery("(min-width: 1280px)");
   const userName = user?.full_name || user?.username || "Student";
@@ -112,79 +125,110 @@ const TestSeries = () => {
     return { text: "text-slate-600", bg: "bg-slate-50" };
   };
 
-  useEffect(() => {
-    const initTestSeries = async () => {
-      if (!user) return;
+  const fetchHistory = useCallback(async () => {
+    if (!user) return;
 
-      try {
-        setLoading(true);
-        // 1. Fetch Overall Roadmap
-        const roadmaps = await testSeriesOverallService.getRoadmap();
-
-        if (roadmaps.plans && roadmaps.plans.length > 0) {
-          setRoadmap(roadmaps.plans[0]);
-        } else {
-          // No plan exists. Check if we can auto-generate
-          const canAutoGenerate =
-            user.exam_type &&
-            user.sub_division &&
-            user.target_exam_year &&
-            user.preferred_language &&
-            user.learner_type;
-
-          if (canAutoGenerate) {
-            toast.info("Initializing your personalized test series...", { icon: "🚀" });
-            await testSeriesOverallService.generatePlan({
-              exam_type: user.exam_type!,
-              sub_division: user.sub_division!,
-              year: Number(user.target_exam_year!),
-              language: user.preferred_language === "ta" ? "Tamil" : "English",
-              learner_type: user.learner_type || "Student"
-            });
-            const updatedRoadmaps = await testSeriesOverallService.getRoadmap();
-            if (updatedRoadmaps.plans.length > 0) setRoadmap(updatedRoadmaps.plans[0]);
-          } else {
-            setIsModalOpen(true);
-          }
-        }
-
-        // 2. Fetch Available Subjects for Subject-Wise View
-        if (user.exam_type && user.sub_division) {
-          setSubjectsLoading(true);
-          const response = await testSeriesSubjectService.getAvailableSubjects(
-            user.exam_type!,
-            user.sub_division!,
-            user.preferred_language === "ta" ? "Tamil" : "English"
-          );
-
-          if (response.subjects) {
-            const mappedSubjects: TestSubject[] = response.subjects.map((sub: any) => {
-              const { text: color, bg } = getSubjectColor(sub.subject_name);
-              return {
-                id: sub.subject_name.toLowerCase().replace(/\s+/g, '-'),
-                subjectId: sub.id,
-                name: sub.subject_name,
-                icon: sub.subject_image || test1Icon, // Use provided image or fallback
-                testsAvailable: sub.testsAvailable || 25,
-                completed: sub.completed || 0,
-                total: sub.total || 25,
-                difficulty: sub.difficulty || "Moderate",
-                iconBg: bg
-              };
-            });
-            setSubjects(mappedSubjects);
-          }
-        }
-      } catch (error) {
-        console.error("Test series initialization failed:", error);
-      } finally {
-        setLoading(false);
-        setSubjectsLoading(false);
+    try {
+      setHistoryLoading(true);
+      if (activeTab === "sets" && roadmap?.overall_plan_id) {
+        const response = await testSeriesOverallService.getHistory(roadmap.overall_plan_id);
+        const list = response.history || [];
+        const sorted = list
+          .filter((a: any) => a.status === "COMPLETED")
+          .sort((a: any, b: any) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime())
+          .slice(0, 5)
+          .map((a: any) => ({ ...a, overall_plan_id: roadmap.overall_plan_id }));
+        setHistory(sorted);
+      } else if (activeTab === "subject" && subjects.length > 0) {
+        // Fetch history for first 3 subjects as recent attempts
+        const historyPromises = subjects.slice(0, 5).map(sub =>
+          testSeriesSubjectService.getHistory(sub.subjectId).catch(() => ({ history: [] }))
+        );
+        const historyResponses = await Promise.all(historyPromises);
+        const allHistory = historyResponses.flatMap((res, idx) =>
+          (res.history || []).map((a: any) => ({ ...a, subject_plan_id: subjects[idx].subjectId }))
+        );
+        // Sort all subject history by date completed
+        setHistory(allHistory.filter((a: any) => a.status === "COMPLETED").sort((a, b) =>
+          new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime()
+        ).slice(0, 5));
+      } else {
+        setHistory([]);
       }
-    };
+    } catch (err) {
+      console.error("Failed to fetch history:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [user, activeTab, roadmap, subjects]);
 
-    initTestSeries();
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  const initTestSeries = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      // 1. Fetch Overall Roadmap
+      const roadmaps = await testSeriesOverallService.getRoadmap();
+
+      if (roadmaps.plans && roadmaps.plans.length > 0) {
+        setRoadmap(roadmaps.plans[0]);
+      } else {
+        // No plan exists. Let user generate it explicitly via modal
+        setIsModalOpen(true);
+      }
+
+      // 2. Fetch Available Subjects for Subject-Wise View
+      if (user.exam_type && user.sub_division) {
+        setSubjectsLoading(true);
+        const response = await testSeriesSubjectService.getAvailableSubjects(
+          user.exam_type!,
+          user.sub_division!,
+          user.preferred_language === "ta" ? "Tamil" : "English"
+        );
+
+        if (response.subjects) {
+          const mappedSubjects: TestSubject[] = response.subjects.map((sub: any) => {
+            const { text: color, bg } = getSubjectColor(sub.subject_name);
+            return {
+              id: sub.subject_name.toLowerCase().replace(/\s+/g, '-'),
+              subjectId: sub.id,
+              name: sub.subject_name,
+              icon: sub.subject_image || test1Icon, // Use provided image or fallback
+              testsAvailable: sub.testsAvailable || 25,
+              completed: sub.completed || 0,
+              total: sub.total || 25,
+              difficulty: sub.difficulty || "Moderate",
+              iconBg: bg
+            };
+          });
+          setSubjects(mappedSubjects);
+        }
+      }
+    } catch (error) {
+      console.error("Test series initialization failed:", error);
+    } finally {
+      setLoading(false);
+      setSubjectsLoading(false);
+    }
   }, [user]);
+
+  // Handle auto-refresh when window gains focus (e.g. coming back from test journey)
+  useEffect(() => {
+    const handleFocus = () => {
+      initTestSeries();
+      fetchHistory();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [initTestSeries, fetchHistory]);
+
+  useEffect(() => {
+    initTestSeries();
+  }, [initTestSeries]);
 
   const handleGeneratePlan = async (formData: any) => {
     try {
@@ -220,7 +264,7 @@ const TestSeries = () => {
   return (
     <DashboardLayout
       hideHeader={isDesktop}
-      rightSidebar={<TestSeriesSidebar user={user} />}
+      rightSidebar={<TestSeriesSidebar user={user} attempts={history} activeTab={activeTab} />}
     >
       <div className="px-1 mb-6 flex items-center justify-between">
         <div>
