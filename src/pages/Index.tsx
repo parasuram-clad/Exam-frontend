@@ -193,10 +193,22 @@ const Index = () => {
     checkScroll();
     window.addEventListener('resize', checkScroll);
 
-    // Check for welcome trigger
-    if (searchParams.get("welcome") === "true") {
+    // Check for welcome trigger - only show once per user AND only for new users
+    const welcomeParam = searchParams.get("welcome") === "true";
+    const storageKey = `welcome_modal_shown_${user?.id}`;
+    const hasShownWelcome = localStorage.getItem(storageKey);
+    const isNewUser = user && !user.is_onboarded;
+
+    if (welcomeParam && isNewUser && !hasShownWelcome) {
       setIsWelcomeModalOpen(true);
+      localStorage.setItem(storageKey, "true");
+      
       // Clean up the URL
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("welcome");
+      setSearchParams(newParams, { replace: true });
+    } else if (welcomeParam) {
+      // If user is already onboarded or welcome was shown, just clean up params
       const newParams = new URLSearchParams(searchParams);
       newParams.delete("welcome");
       setSearchParams(newParams, { replace: true });
