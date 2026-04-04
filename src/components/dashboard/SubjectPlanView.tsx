@@ -16,6 +16,7 @@ interface SubjectPlanViewProps {
     onSelectSubject: (subject: string) => void;
     userPlans: any[];
     roadmapData?: any;
+    topicTimings?: any[];
 }
 
 const CircularProgress = ({ progress, size = 48 }: { progress: number; size?: number }) => {
@@ -72,7 +73,8 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
     subjects,
     onSelectSubject,
     userPlans,
-    roadmapData
+    roadmapData,
+    topicTimings = []
 }) => {
     // Get the icon for a subject — prefer backend image_url from the roadmap plan
     const getSubjectIcon = (subject: string): string => {
@@ -109,8 +111,35 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
             p => p?.subject === subject || (p?.plan_type === 'SUBJECT' && p?.subject_name === subject)
         );
         if (subjectPlans.length === 0) return 0;
-        const completed = subjectPlans.filter(p => p?.plan_status === 'COMPLETED').length;
-        return Math.round((completed / subjectPlans.length) * 100);
+
+        // Create a timing map for active/finished sessions
+        const timingMap: Record<number, number> = {};
+        const now = new Date();
+        topicTimings.forEach(t => {
+            let m = Number(t.total_estimate || 0);
+            if (!t.end_time && t.start_time) {
+                const startTimeStr = t.start_time.endsWith('Z') ? t.start_time : `${t.start_time}Z`;
+                const start = new Date(startTimeStr);
+                if (!isNaN(start.getTime())) m += Math.max(0, Math.round((now.getTime() - start.getTime()) / (1000 * 60)));
+            }
+            timingMap[t.syllabus_id] = (timingMap[t.syllabus_id] || 0) + m;
+        });
+
+        let totalProgressWeight = 0;
+        subjectPlans.forEach(p => {
+            if (p.is_completed || p.plan_status === 'COMPLETED') {
+                totalProgressWeight += 100;
+            } else {
+                const spent = timingMap[p.syllabus_id] || 0;
+                const planned = p.minutes || 45;
+                // Cap non-completed topics at 90% progress
+                totalProgressWeight += Math.min(90, (spent / (planned || 1)) * 100);
+            }
+        });
+
+        const progress = Math.round(totalProgressWeight / subjectPlans.length);
+        console.log(`Time-based progress for ${subject}: ${progress}%`);
+        return progress;
     };
 
     const isSubscribed = (subject: string) => {
@@ -217,7 +246,9 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
                             onSelectSubject(subject);
                         }}
                     >
-                        {/* Circular Progress in top right */}
+                        <div className="absolute top-4 right-4">
+                            <CircularProgress progress={progress} size={42} />
+                        </div>
 
 
                         {/* Centered Header Content */}

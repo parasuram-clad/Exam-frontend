@@ -42,38 +42,37 @@ const TestSeriesSidebar = ({ user, attempts, activeTab }: { user: UserMe | null,
         </h3>
         <div className="space-y-4">
           {attempts.length > 0 ? (
-            attempts.map((attempt, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-4 rounded-lg bg-white border border-slate-50 shadow-sm hover:shadow-md transition-all duration-300 group"
-              >
-                <div className="min-w-0 pr-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-bold text-sky-600 uppercase tracking-wider bg-sky-50 px-1.5 py-0.5 rounded">
-                      Set {attempt.series_no}
-                    </span>
-                    <p className="text-[12px] font-medium text-slate-800 truncate">{attempt.subject_name || (activeTab === "sets" ? "Overall Test" : "Subject Test")}</p>
-                  </div>
-                  <p className="text-[10px] text-slate-400 whitespace-nowrap">
-                    Score: <span className={cn(
-                      "font-bold",
-                      attempt.score_percentage > 70 ? "text-emerald-600" : attempt.score_percentage > 40 ? "text-amber-600" : "text-rose-600"
-                    )}>{attempt.correct_answers}/{attempt.total_questions} ({attempt.score_percentage}%)</span>
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const subject = activeTab === "sets" ? "overall" : "subject";
-                    const planId = activeTab === "sets" ? attempt.overall_plan_id : attempt.subject_plan_id;
-                    navigate(`/test-series/${subject}/test/${attempt.series_no}/analytics?planId=${planId}`);
-                  }}
-                  className="h-8 px-3 rounded-lg bg-sky-50 border-0 text-sky-600 hover:bg-sky-100 text-[10px] font-bold transition-all"
+            attempts.map((attempt, index) => {
+              const planType = activeTab === "sets" ? "overall" : "subject";
+              return (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-4 rounded-lg bg-white border border-slate-50 shadow-sm hover:shadow-md transition-all duration-300 group"
                 >
-                  View Analysis
-                </Button>
-              </div>
-            ))
+                  <div className="min-w-0 pr-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold text-sky-600 uppercase tracking-wider bg-sky-50 px-1.5 py-0.5 rounded">
+                        Set {attempt.series_no}
+                      </span>
+                      <p className="text-[12px] font-medium text-slate-800 truncate">{attempt.subject_name || (activeTab === "sets" ? "Overall Test" : "Subject Test")}</p>
+                    </div>
+                    <p className="text-[10px] text-slate-400 whitespace-nowrap">
+                      Score: <span className={cn(
+                        "font-bold",
+                        attempt.score_percentage > 70 ? "text-emerald-600" : attempt.score_percentage > 40 ? "text-amber-600" : "text-rose-600"
+                      )}>{attempt.correct_answers}/{attempt.total_questions} ({attempt.score_percentage}%)</span>
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate(`/test-series/${planType}/test/${attempt.series_no}/analytics?plan_id=${attempt.plan_id}`)}
+                    className="h-8 px-3 rounded-lg bg-sky-50 border-0 text-sky-600 hover:bg-sky-100 text-[10px] font-bold transition-all"
+                  >
+                    View Analysis
+                  </Button>
+                </div>
+              );
+            })
           ) : (
             <div className="py-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">No recent attempts</p>
@@ -130,14 +129,14 @@ const TestSeries = () => {
 
     try {
       setHistoryLoading(true);
-      if (activeTab === "sets" && roadmap?.overall_plan_id) {
-        const response = await testSeriesOverallService.getHistory(roadmap.overall_plan_id);
+      if (activeTab === "sets" && roadmap?.plan_id) {
+        const response = await testSeriesOverallService.getHistory(roadmap.plan_id);
         const list = response.history || [];
         const sorted = list
           .filter((a: any) => a.status === "COMPLETED")
           .sort((a: any, b: any) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime())
           .slice(0, 5)
-          .map((a: any) => ({ ...a, overall_plan_id: roadmap.overall_plan_id }));
+          .map((a: any) => ({ ...a, plan_id: roadmap.plan_id }));
         setHistory(sorted);
       } else if (activeTab === "subject" && subjects.length > 0) {
         // Fetch history for first 3 subjects as recent attempts
@@ -146,7 +145,7 @@ const TestSeries = () => {
         );
         const historyResponses = await Promise.all(historyPromises);
         const allHistory = historyResponses.flatMap((res, idx) =>
-          (res.history || []).map((a: any) => ({ ...a, subject_plan_id: subjects[idx].subjectId }))
+          (res.history || []).map((a: any) => ({ ...a, plan_id: subjects[idx].subjectId }))
         );
         // Sort all subject history by date completed
         setHistory(allHistory.filter((a: any) => a.status === "COMPLETED").sort((a, b) =>
@@ -195,12 +194,12 @@ const TestSeries = () => {
             const { text: color, bg } = getSubjectColor(sub.subject_name);
             return {
               id: sub.subject_name.toLowerCase().replace(/\s+/g, '-'),
-              subjectId: sub.id,
+              subjectId: Number(sub.id) || 0,
               name: sub.subject_name,
-              icon: sub.subject_image || test1Icon, // Use provided image or fallback
-              testsAvailable: sub.testsAvailable || 25,
+              icon: sub.subject_image || test1Icon,
+              testsAvailable: sub.available || 0,
               completed: sub.completed || 0,
-              total: sub.total || 25,
+              total: sub.total_series || 0,
               difficulty: sub.difficulty || "Moderate",
               iconBg: bg
             };
@@ -216,7 +215,7 @@ const TestSeries = () => {
     }
   }, [user]);
 
-  // Handle auto-refresh when window gains focus (e.g. coming back from test journey)
+  // Handle auto-refresh when window gains focus
   useEffect(() => {
     const handleFocus = () => {
       initTestSeries();
@@ -243,23 +242,23 @@ const TestSeries = () => {
   };
 
   // Map backend roadmap to UI TestSet format
-  const mappedTestSets: TestSet[] = roadmap?.roadmap.map((test) => ({
+  const mappedTestSets: TestSet[] = (roadmap?.roadmap || []).map((test) => ({
     id: test.series_no.toString(),
-    planId: roadmap.overall_plan_id,
+    plan_id: roadmap!.plan_id,
     name: `Test Set ${test.series_no}`,
-    duration: `${roadmap.test_details.duration_hours * 60} m`,
-    questions: roadmap.test_details.total_questions,
-    marking_scheme: roadmap.test_details.marking_scheme,
+    duration: `${(roadmap!.test_details.duration_hours || 1.5) * 60} m`,
+    questions: roadmap!.test_details.total_questions,
+    marking_scheme: roadmap!.test_details.marking_scheme,
     difficulty: test.series_no % 3 === 0 ? "Hard" : test.series_no % 2 === 0 ? "Moderate" : "Easy",
     syllabus: test.syllabus ? test.syllabus.map((s: any) => s.part) : ["Full Syllabus"],
     syllabus_detailed: test.syllabus,
     score: test.obtained_marks !== null ? {
       obtained: test.obtained_marks,
-      total: test.total_marks || roadmap.test_details.total_marks
+      total: test.total_marks || roadmap!.test_details.total_marks
     } : undefined,
     status: test.status,
     planned_date: test.test_date
-  })) || [];
+  }));
 
   return (
     <DashboardLayout

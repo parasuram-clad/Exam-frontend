@@ -20,21 +20,51 @@ export const mapRoadmapToFrontend = (
   const testRevisionStatusMap: Record<string, string> = {};
 
   if (Array.isArray(backendPlans)) {
+    console.log('Building statusMap from backendPlans...');
     backendPlans.forEach(p => {
+      const currentStatus = p.is_completed ? 'COMPLETED' : (p.plan_status || 'ACTIVE');
+
       if (p.syllabus_id) {
-        statusMap[p.syllabus_id] = p.is_completed ? 'COMPLETED' : p.plan_status;
+        const existingStatus = statusMap[p.syllabus_id];
+        // Priority: COMPLETED (3) > IN_PROGRESS (2) > ACTIVE (1)
+        if (!existingStatus ||
+          currentStatus === 'COMPLETED' ||
+          (currentStatus === 'IN_PROGRESS' && existingStatus === 'ACTIVE')) {
+          statusMap[p.syllabus_id] = currentStatus;
+        }
       } else if (p.topic) {
-        testRevisionStatusMap[p.topic] = p.is_completed ? 'COMPLETED' : p.plan_status;
+        const key = p.topic;
+        const existingStatus = testRevisionStatusMap[key];
+        if (!existingStatus ||
+          currentStatus === 'COMPLETED' ||
+          (currentStatus === 'IN_PROGRESS' && existingStatus === 'ACTIVE')) {
+          testRevisionStatusMap[key] = currentStatus;
+        }
       }
     });
+    console.log('Status map sample:', Object.entries(statusMap).slice(0, 5));
   }
 
   // Create a timing map (sum of total_estimate per syllabus_id)
   const timingMap: Record<number, number> = {};
+  const now = new Date();
+
   if (Array.isArray(timings)) {
     timings.forEach(t => {
-      timingMap[t.syllabus_id] = (timingMap[t.syllabus_id] || 0) + (t.total_estimate || 0);
+      let sessionMinutes = Number(t.total_estimate || 0);
+      const isCompleted = statusMap[t.syllabus_id] === 'COMPLETED';
+      
+      if (!t.end_time && t.start_time && !isCompleted) {
+        // If session is still active and topic isn't completed, calculate elapsed time
+        const startTimeStr = t.start_time.endsWith('Z') ? t.start_time : `${t.start_time}Z`;
+        const start = new Date(startTimeStr);
+        if (!isNaN(start.getTime())) {
+          sessionMinutes += Math.max(0, Math.round((now.getTime() - start.getTime()) / (1000 * 60)));
+        }
+      }
+      timingMap[t.syllabus_id] = (timingMap[t.syllabus_id] || 0) + sessionMinutes;
     });
+    console.log('Timing map sample:', Object.entries(timingMap).slice(0, 5));
   }
 
   const result: Record<number, StudyTopicCardData[]> = {};
@@ -50,13 +80,13 @@ export const mapRoadmapToFrontend = (
     result[dayPlan.day] = dayPlan.items.map((item: any, idx: number): StudyTopicCardData => {
       if (item.type === 'TOPIC') {
         const subtopics = Array.isArray(item.topic) ? item.topic : [];
-        const completedCount = subtopics.filter((t: any) => t.is_completed || statusMap[t.id] === 'COMPLETED').length;
-        const inProgressCount = subtopics.filter((t: any) => !t.is_completed && (statusMap[t.id] === 'IN_PROGRESS' || timingMap[t.id] > 0)).length;
-        
+        const completedCount = subtopics.filter((t: any) => statusMap[t.id] === 'COMPLETED').length;
+        const inProgressCount = subtopics.filter((t: any) => statusMap[t.id] === 'IN_PROGRESS' || timingMap[t.id] > 0).length;
+
         // Calculate progress including timing for a consistent % with mobile
         let totalTopicProgress = 0;
         subtopics.forEach((t: any) => {
-          if (t.is_completed || statusMap[t.id] === 'COMPLETED') {
+          if (statusMap[t.id] === 'COMPLETED') {
             totalTopicProgress += 100;
           } else {
             const spent = timingMap[t.id] || 0;
@@ -89,7 +119,7 @@ export const mapRoadmapToFrontend = (
             description: t.description || '',
             timeSpent: Math.round(timingMap[t.id] || 0),
             totalTime: t.minutes || 0,
-            status: (t.is_completed || statusMap[t.id] === 'COMPLETED' ? 'completed' : (statusMap[t.id] === 'IN_PROGRESS' || timingMap[t.id] > 0 ? 'continue' : 'start')) as any,
+            status: (statusMap[t.id] === 'COMPLETED' ? 'completed' : (statusMap[t.id] === 'IN_PROGRESS' || timingMap[t.id] > 0 ? 'continue' : 'start')) as any,
           })),
         };
       } else {
@@ -118,7 +148,7 @@ export const mapRoadmapToFrontend = (
             }
           }
         } else {
-          if (item.is_completed || statusStr === 'COMPLETED') {
+          if (statusStr === 'COMPLETED') {
             statusStr = 'COMPLETED';
             timeSpent = item.minutes || 0;
           }
@@ -175,18 +205,37 @@ export const mapBackendPlanToFrontend = (
     });
 
     result[dayNo] = Object.entries(groupedBySubject).map(([subject, items]): StudyTopicCardData => {
+      // Build a local timing map for this calculation
+      const localTimingMap: Record<number, number> = {};
+      const now = new Date();
+      topicTimings.forEach(t => {
+        let m = Number(t.total_estimate || 0);
+        // Find if this specific syllabus_id is marked as completed in current context
+        const planItem = backendPlans.find(bp => bp.syllabus_id === t.syllabus_id);
+        const isAlreadyDone = planItem?.is_completed || planItem?.plan_status === 'COMPLETED';
+
+        if (!t.end_time && t.start_time && !isAlreadyDone) {
+          const startTimeStr = t.start_time.endsWith('Z') ? t.start_time : `${t.start_time}Z`;
+          const start = new Date(startTimeStr);
+          if (!isNaN(start.getTime())) m += Math.max(0, Math.round((now.getTime() - start.getTime()) / (1000 * 60)));
+        }
+        localTimingMap[t.syllabus_id] = (localTimingMap[t.syllabus_id] || 0) + m;
+      });
+
+      // Priority based status check for items in grouped subject
       const completedCount = items.filter(i => i.is_completed || i.plan_status === 'COMPLETED').length;
-      const inProgressCount = items.filter(i => (i.plan_status === 'IN_PROGRESS' || (topicTimings.filter(tt => tt.syllabus_id === i.syllabus_id).reduce((acc, curr) => acc + (curr.total_estimate || 0), 0) > 0)) && !i.is_completed).length;
-      
+      const inProgressCount = items.filter(i => (i.plan_status === 'IN_PROGRESS' || (localTimingMap[i.syllabus_id] > 0)) && !i.is_completed).length;
+
+      console.log(`Processing subject ${subject}: completed=${completedCount}, inProgress=${inProgressCount}, total=${items.length}`);
+
       let totalItemProgress = 0;
       items.forEach(i => {
-        if (i.is_completed || i.plan_status === 'COMPLETED') {
+        const isCompleted = i.is_completed || i.plan_status === 'COMPLETED';
+        if (isCompleted) {
           totalItemProgress += 100;
         } else {
-          const sumTimings = topicTimings
-            .filter(t => t.syllabus_id === i.syllabus_id)
-            .reduce((acc, curr) => acc + (curr.total_estimate || 0), 0);
-          totalItemProgress += Math.min(90, (sumTimings / (i.minutes || 45)) * 100);
+          const spent = localTimingMap[i.syllabus_id] || 0;
+          totalItemProgress += Math.min(90, (spent / (i.minutes || 45)) * 100);
         }
       });
       const progress = Math.round(totalItemProgress / (items.length || 1));
@@ -207,14 +256,13 @@ export const mapBackendPlanToFrontend = (
         status: overallStatus,
         topics: Array.from(new Set(items.map(i => i.chapter))).map(ch => ({ name: ch, color: 'bg-[#7C79EC]' })),
         subtopics: items.map(i => {
-          const sumTimings = topicTimings
-            .filter(t => t.syllabus_id === i.syllabus_id)
-            .reduce((acc, curr) => acc + (curr.total_estimate || 0), 0);
+          const spent = localTimingMap[i.syllabus_id] || 0;
+          const isCompleted = i.is_completed || i.plan_status === 'COMPLETED';
           return {
             id: i.id.toString(), name: i.topic, description: `Chapter: ${i.chapter}`,
-            timeSpent: Math.round(sumTimings || (i.is_completed ? i.minutes : 0)),
+            timeSpent: Math.round(spent || (isCompleted ? i.minutes : 0)),
             totalTime: i.minutes,
-            status: (i.is_completed || i.plan_status === 'COMPLETED') ? 'completed' as const : (i.plan_status === 'IN_PROGRESS' || sumTimings > 0) ? 'continue' as const : 'start' as const,
+            status: isCompleted ? 'completed' as const : (i.plan_status === 'IN_PROGRESS' || spent > 0) ? 'continue' as const : 'start' as const,
           };
         }),
       };

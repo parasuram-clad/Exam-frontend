@@ -13,7 +13,7 @@ import { CheckCircle2, Lock, AlertTriangle, BarChart2, Zap } from "lucide-react"
 const TestAttempt = () => {
     const { subject, testId } = useParams<{ subject: string; testId: string }>();
     const [searchParams] = useSearchParams();
-    const planId = searchParams.get("planId");
+    const planId = searchParams.get("plan_id");
     const navigate = useNavigate();
     const [startedAt] = useState<string>(new Date().toISOString());
 
@@ -48,7 +48,7 @@ const TestAttempt = () => {
             }
             return null;
         },
-        enabled: !!user?.id && !!testId && (isWeekly || isMonthly || isOverall || isSubject),
+        enabled: !!user?.id && !!testId && (isWeekly || isMonthly || (isOverall && !!planId) || (isSubject && !!planId)),
     });
 
     const questions: Question[] = testData?.questions?.map((q: any) => {
@@ -103,7 +103,7 @@ const TestAttempt = () => {
                 });
             }
             toast.success("Test submitted successfully!");
-            navigate(`/test-series/${subject}/test/${testId}/analytics${(isOverall || isSubject) ? `?planId=${planId}` : ''}`, { replace: true });
+            navigate(`/test-series/${subject}/test/${testId}/analytics${(isOverall || isSubject) ? `?plan_id=${planId}` : ''}`, { replace: true });
         } catch (err: any) {
             console.error("Test submit error:", err);
             toast.error(err.response?.data?.detail || "Failed to submit test.");
@@ -167,7 +167,7 @@ const TestAttempt = () => {
                     <div className="flex flex-col w-full gap-3">
                         {isCompleted ? (
                             <button
-                                onClick={() => navigate(`/test-series/${subject}/test/${testId}/analytics${(isOverall || isSubject) ? `?planId=${planId}` : ''}`, { replace: true })}
+                                onClick={() => navigate(`/test-series/${subject}/test/${testId}/analytics${(isOverall || isSubject) ? `?plan_id=${planId}` : ''}`, { replace: true })}
                                 className="w-full h-12 bg-[#0F172A] text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
                             >
                                 <BarChart2 className="w-4 h-4" />

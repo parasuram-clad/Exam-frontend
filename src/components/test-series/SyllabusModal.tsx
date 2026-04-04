@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Smile, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { testSeriesSubjectService, SubjectRoadmapResponse } from "@/services/testSeriesSubject.service";
+import { testSeriesSubjectService, SubjectRoadmapResponse, SubjectPlan } from "@/services/testSeriesSubject.service";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
@@ -19,30 +19,18 @@ interface SyllabusModalProps {
 export const SyllabusModal = ({ isOpen, onClose, subjectId, subjectPlanId, subjectName, seriesNo, onStartTest }: SyllabusModalProps) => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
-    const [roadmap, setRoadmap] = useState<SubjectRoadmapResponse | null>(null);
+    const [roadmap, setRoadmap] = useState<SubjectPlan | null>(null);
 
     useEffect(() => {
         const fetchRoadmap = async () => {
             if (!isOpen || !subjectId) return;
             try {
                 setLoading(true);
-                try {
-                    const planId = subjectPlanId ?? subjectId;
-                    const data = await testSeriesSubjectService.getRoadmap(planId);
-                    setRoadmap(data);
-                } catch (err: any) {
-                    if (err.response?.status === 404 && user) {
-                        toast.info(`Generating ${subjectName} test plan...`);
-                        await testSeriesSubjectService.generatePlan(
-                            subjectId,
-                            Number(user.target_exam_year || 2026),
-                            user.preferred_language === "ta" ? "Tamil" : "English"
-                        );
-                        const data = await testSeriesSubjectService.getRoadmap(subjectId);
-                        setRoadmap(data);
-                    } else {
-                        throw err;
-                    }
+                const response = await testSeriesSubjectService.getRoadmap();
+                const planId = subjectPlanId ?? subjectId;
+                const matchingRoadmap = response.plans.find(p => p.plan_id === planId);
+                if (matchingRoadmap) {
+                    setRoadmap(matchingRoadmap);
                 }
             } catch (error) {
                 console.error("Failed to fetch subject roadmap:", error);
@@ -212,7 +200,7 @@ export const SyllabusModal = ({ isOpen, onClose, subjectId, subjectPlanId, subje
 
                                     {/* CTA */}
                                     <Button
-                                        onClick={() => onStartTest?.(seriesNo, roadmap.subject_plan_id)}
+                                        onClick={() => onStartTest?.(seriesNo, roadmap.plan_id)}
                                         disabled={isLocked}
                                         className="w-full h-12 sm:h-14 rounded-xl text-sm sm:text-base font-medium transition-all shadow-lg active:scale-[0.98] bg-[#111827] text-white hover:bg-[#1F2937] disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                                     >

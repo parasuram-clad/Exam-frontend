@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import authService from "@/services/auth.service";
 import studyService from "@/services/study.service";
 import { toast } from "sonner";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -369,6 +369,8 @@ const MindMapIcon = () => (
 
 const StudyContent = () => {
   const { topicId, subtopicId } = useParams();
+  const [searchParams] = useSearchParams();
+  const urlPlanId = searchParams.get('plan_id');
   const navigate = useNavigate();
 
   const [sections, setSections] = useState<ContentSection[]>(contentSections);
@@ -427,13 +429,6 @@ const StudyContent = () => {
 
   const parsedSubtopicId = parseInt(subtopicId || "");
 
-  const { data: topicDataResponse } = useQuery({
-    queryKey: ['topic-content', parsedSubtopicId, user?.id],
-    queryFn: () => studyService.getTopicContentBySyllabusId(parsedSubtopicId, user!.id),
-    enabled: !!user?.id && !isNaN(parsedSubtopicId),
-    staleTime: 5 * 60 * 1000,
-  });
-
   const { data: userPlans = [], isLoading: isPlansLoading } = useQuery({
     queryKey: ['study-plans', user?.id],
     queryFn: () => studyService.getUserStudyPlans(user!.id),
@@ -443,16 +438,26 @@ const StudyContent = () => {
 
   const isTopicCompleted = userPlans.some((p: any) => p.syllabus_id === parsedSubtopicId && p.is_completed === true);
 
+  // Get plan_id from: 1. URL search param, 2. The study plan record itself
+  const currentSubscriptionPlanId = urlPlanId ? parseInt(urlPlanId) : (userPlans.find((p: any) => p.syllabus_id === parsedSubtopicId)?.plan_id);
+
+  const { data: topicDataResponse } = useQuery({
+    queryKey: ['topic-content', parsedSubtopicId, user?.id, currentSubscriptionPlanId],
+    queryFn: () => studyService.getTopicContentBySyllabusId(parsedSubtopicId, user!.id, currentSubscriptionPlanId),
+    enabled: !!user?.id && !isNaN(parsedSubtopicId) && !isPlansLoading,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: assessmentHistory, isLoading: isLoadingHistory } = useQuery({
-    queryKey: ['assessment-history', user?.id, parsedSubtopicId],
-    queryFn: () => studyService.getAssessmentHistory(user!.id, parsedSubtopicId),
-    enabled: !!user?.id && !isNaN(parsedSubtopicId),
+    queryKey: ['assessment-history', user?.id, parsedSubtopicId, currentSubscriptionPlanId],
+    queryFn: () => studyService.getAssessmentHistory(user!.id, parsedSubtopicId, currentSubscriptionPlanId),
+    enabled: !!user?.id && !isNaN(parsedSubtopicId) && !isPlansLoading,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: timingHistory = [] } = useQuery({
     queryKey: ['topic-timings', user?.id, parsedSubtopicId],
-    queryFn: () => studyService.getUserTopicTimings(user!.id, parsedSubtopicId),
+    queryFn: () => studyService.getUserTopicTimings(parsedSubtopicId),
     enabled: !!user?.id && !isNaN(parsedSubtopicId),
     staleTime: 5 * 60 * 1000,
   });
@@ -511,12 +516,13 @@ const StudyContent = () => {
 
       if (assessmentSource && assessmentSource.questions && assessmentSource.questions.length > 0) {
         const mappedQuestions = assessmentSource.questions.map((q: any, idx: number) => ({
-          id: q.id || `q-${idx}`,
+          id: q.mcq_id || q.id || `q-${idx}`,
+          mcq_id: q.mcq_id || (typeof q.id === 'number' ? q.id : (String(q.id).match(/\d+/) ? parseInt(String(q.id).match(/\d+/)![0]) : idx + 1)),
           question: q.question,
           subject: topicDataResponse.task.subject || "General Science",
           difficulty: q.difficulty || "Medium",
-          options: q.options,
-          correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : q.correct_answer_index,
+          options: Array.isArray(q.options) ? q.options : [q.options?.A || "", q.options?.B || "", q.options?.C || "", q.options?.D || ""],
+          correct_answer_index: q.correct_answer_index !== undefined ? q.correct_answer_index : q.correctAnswer,
           explanation: q.explanation
         }));
         const finalAssessment = {
@@ -552,7 +558,7 @@ const StudyContent = () => {
 
     const startTiming = async () => {
       try {
-        const timing = await studyService.startTopicTiming(user.id, parsedSubtopicId);
+        const timing = await studyService.startTopicTiming(parsedSubtopicId, currentSubscriptionPlanId);
         if (isActive) {
           setActiveReadingSessionId(timing.id);
           started = true;
@@ -567,8 +573,8 @@ const StudyContent = () => {
 
     return () => {
       isActive = false;
-      if (started && user?.id && !isNaN(parsedSubtopicId)) {
-        studyService.stopTopicTiming(user.id, parsedSubtopicId).catch(() => { });
+      if (started && !isNaN(parsedSubtopicId)) {
+        studyService.stopTopicTiming(parsedSubtopicId, activeReadingSessionId || undefined).catch(() => { });
         queryClient.invalidateQueries({ queryKey: ['topic-timings'] });
       }
     };
@@ -728,15 +734,15 @@ const StudyContent = () => {
 
     // End reading session explicitly
     try {
-      await studyService.stopTopicTiming(user.id, parsedSubtopicId);
+      await studyService.stopTopicTiming(parsedSubtopicId, activeReadingSessionId || undefined);
       queryClient.invalidateQueries({ queryKey: ['topic-timings'] });
     } catch { }
 
     try {
       const response = await studyService.startMCQAttempt({
-        user_id: user.id,
         syllabus_id: parsedSubtopicId,
-        difficulty: "easy"
+        difficulty: "easy",
+        plan_id: currentSubscriptionPlanId
       });
 
       if (response && response.questions) {
@@ -746,7 +752,7 @@ const StudyContent = () => {
           question: q.question,
           subject: topicData?.task?.subject || "General Science",
           difficulty: response.difficulty || "easy",
-          options: [q.options.A, q.options.B, q.options.C, q.options.D],
+          options: Array.isArray(q.options) ? q.options : [q.options?.A, q.options?.B, q.options?.C, q.options?.D],
           correct_answer_index: q.correct_answer_index,
           explanation: q.explanation,
           is_correct: q.is_correct
@@ -764,10 +770,20 @@ const StudyContent = () => {
       setIsAssessmentSubmitted(false);
       setAssessmentStartTime(new Date().toISOString());
     } catch (err: any) {
-      if (err.response?.status === 403) {
-        toast.error(err.response.data.detail || "You have already attempted this topic today.");
-      } else if (err.response?.status === 404) {
+      if (err.response?.status === 404) {
+        // FALLBACK: If /mcq/start fails but we have assessment in the content, use it!
+        if (topicAssessment && topicAssessment.questions?.length > 0) {
+          console.log("Using cached assessment from topic content as fallback");
+          setIsAssessmentStarted(true);
+          setIsAssessmentFinished(false);
+          setTimeLeft(600);
+          setIsAssessmentSubmitted(false);
+          setAssessmentStartTime(new Date().toISOString());
+          return;
+        }
         toast.error("Questions not generated for this topic yet.");
+      } else if (err.response?.status === 403) {
+        toast.error(err.response.data.detail || "You have already attempted this topic today.");
       } else {
         toast.error("Failed to start assessment.");
       }
@@ -795,17 +811,17 @@ const StudyContent = () => {
           mcq_id: mcq_id || 0,
           selected_option: ansIndex !== null ? answerMap[ansIndex] : "A" // fallback to A if skipped
         };
-      }).filter(a => a.mcq_id > 0);
+      }).filter(a => a.mcq_id !== undefined); // Send all even if id is 0 if it's dynamic content
 
       const nextAttemptNo = (assessmentHistory?.total_attempts || 0) + 1;
 
       const response = await studyService.submitMCQAttempt({
-        user_id: user.id,
         syllabus_id: parsedSubtopicId,
         difficulty: results.questions[0]?.difficulty?.toLowerCase() || "easy",
         answers: answers,
         started_at: assessmentStartTime,
-        submitted_at: new Date().toISOString()
+        submitted_at: new Date().toISOString(),
+        plan_id: currentSubscriptionPlanId
       });
 
       // Map backend results back to frontend format
@@ -815,14 +831,14 @@ const StudyContent = () => {
       const ques = response.results.map((r: any, idx: number) => {
         const originalQ = results.questions[idx] || {};
         return {
-          id: r.mcq_id,
-          mcq_id: r.mcq_id,
-          question: r.question,
+          id: r.mcq_id || originalQ.id,
+          mcq_id: r.mcq_id || originalQ.mcq_id,
+          question: r.question || originalQ.question,
           subject: originalQ.subject || "General Science",
           difficulty: originalQ.difficulty || "Medium",
-          options: [r.options?.A || "", r.options?.B || "", r.options?.C || "", r.options?.D || ""],
-          correct_answer_index: r.correct_answer_index,
-          explanation: r.explanation,
+          options: Array.isArray(r.options) ? r.options : [r.options?.A || "", r.options?.B || "", r.options?.C || "", r.options?.D || ""],
+          correct_answer_index: r.correct_answer_index !== undefined ? r.correct_answer_index : originalQ.correct_answer_index,
+          explanation: r.explanation || originalQ.explanation,
           is_correct: r.is_correct
         };
       });
@@ -857,6 +873,13 @@ const StudyContent = () => {
       queryClient.invalidateQueries({ queryKey: ['topic-content', parsedSubtopicId, user.id] });
       queryClient.invalidateQueries({ queryKey: ['assessment-history', user.id, parsedSubtopicId] });
       queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id, parsedSubtopicId] });
+
+      // Stop the reading session timing since the topic is now completed
+      if (activeReadingSessionId) {
+        studyService.stopTopicTiming(parsedSubtopicId, activeReadingSessionId).catch(() => { });
+        setActiveReadingSessionId(null);
+      }
 
     } catch (error) {
       setIsSubmittingAssessment(false);
@@ -1122,7 +1145,7 @@ const StudyContent = () => {
                     if (!viewHistoryAnswers) {
                       if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
                         try {
-                          const result = await studyService.getMCQResult(user.id, parsedSubtopicId);
+                          const result = await studyService.getMCQResult(user.id, parsedSubtopicId, currentSubscriptionPlanId);
                           if (result && result.questions) {
                             const letterToIdx: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
                             const ans = result.questions.map((q: any) => letterToIdx[q.selected_option] ?? null);

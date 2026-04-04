@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { testSeriesSubjectService, SubjectRoadmapResponse, SubjectPlan } from "@/services/testSeriesSubject.service";
+import { testSeriesSubjectService, SubjectRoadmapResponse } from "@/services/testSeriesSubject.service";
 import { SyllabusModal } from "@/components/test-series/SyllabusModal";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -34,64 +34,39 @@ const SubjectRoadmap = () => {
     const { user } = useAuth();
 
     const [loading, setLoading] = useState(true);
-    const [roadmap, setRoadmap] = useState<SubjectPlan | null>(null);
+    const [roadmap, setRoadmap] = useState<SubjectRoadmapResponse | null>(null);
     const [selectedTest, setSelectedTest] = useState<{ seriesNo: number; date: string } | null>(null);
     const [selectedSeriesNo, setSelectedSeriesNo] = useState<number | null>(null);
 
-    const handleInitialize = async () => {
-        if (!subjectId || subjectId === "0") {
-            toast.error("Invalid subject ID. Please go back and try again.");
-            return;
-        }
-
-        try {
-            setLoading(true);
-            // Defaulting to user's exam preferences or generic defaults
-            await testSeriesSubjectService.generatePlan(
-                Number(subjectId),
-                new Date().getFullYear(),
-                "English",
-                "GENERAL"
-            );
-            toast.success("Test series generated successfully!");
-            fetchRoadmap();
-        } catch (error: any) {
-            console.error("Failed to initialize subject roadmap:", error);
-            toast.error(error.response?.data?.detail || "Failed to initialize test series.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const fetchRoadmap = useCallback(async () => {
+        if (!subjectId) return;
+
         try {
             setLoading(true);
-            const response = await testSeriesSubjectService.getRoadmap();
-
-            // Find the roadmap that matches the current subject name
-            const matchingRoadmap = response.plans.find(
-                p => p.subject_name.toLowerCase() === subjectName.toLowerCase()
-            );
-
-            if (matchingRoadmap) {
-                setRoadmap(matchingRoadmap);
-            } else {
-                // Not found. If we have Numeric subjectId (even if it's the planId usually),
-                // we might try to find by ID, but name is more reliable for newly initialized.
-                // If not found in and roadmap, we might need to initialize.
-                // Wait, if it's not found, maybe initialize? 
-                // BUT, initializing requires an ID for subject_configuration.
-                // In my case, available subjects from backend have no plan_id until generated.
-                // So clicking on "History" navigates to roadmap?name=History.
-                // If no plan, matchingRoadmap is null. 
-                // We should initialize here.
+            try {
+                const data = await testSeriesSubjectService.getRoadmap(Number(subjectId));
+                setRoadmap(data);
+            } catch (err: any) {
+                if (err.response?.status === 404 && user) {
+                    toast.info(`Initializing ${subjectName} roadmap...`);
+                    await testSeriesSubjectService.generatePlan(
+                        Number(subjectId),
+                        Number(user.target_exam_year || 2026),
+                        user.preferred_language === "ta" ? "Tamil" : "English"
+                    );
+                    const data = await testSeriesSubjectService.getRoadmap(Number(subjectId));
+                    setRoadmap(data);
+                } else {
+                    throw err;
+                }
             }
         } catch (error) {
             console.error("Failed to fetch subject roadmap:", error);
+            // toast.error("Failed to load test series roadmap");
         } finally {
             setLoading(false);
         }
-    }, [subjectName]);
+    }, [subjectId, user, subjectName]);
 
     // Handle auto-refresh when window gains focus
     useEffect(() => {
@@ -105,7 +80,7 @@ const SubjectRoadmap = () => {
 
     const handleStartTest = () => {
         if (!selectedTest || !roadmap) return;
-        navigate(`/test-series/subject/test/${selectedTest.seriesNo}?plan_id=${roadmap.plan_id}`);
+        navigate(`/test-series/subject/test/${selectedTest.seriesNo}?planId=${roadmap.subject_plan_id}`);
     };
 
     return (
@@ -136,7 +111,7 @@ const SubjectRoadmap = () => {
                     <div className="flex-1 relative z-10 text-center md:text-left">
                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/40 backdrop-blur-md rounded-full text-[10px] sm:text-[11px] font-bold text-emerald-700 uppercase tracking-widest mb-4 border border-emerald-200/30">
                             <Sparkles className="w-3 h-3" />
-                            {roadmap ? `${roadmap.roadmap?.filter(t => t.obtained_marks !== null).length || 0}/${roadmap.total_series} Tests Completed` : "Loading Roadmap..."}
+                            {roadmap ? `${roadmap.roadmap.filter(t => t.obtained_marks !== null).length}/${roadmap.total_series} Tests Completed` : "Loading Roadmap..."}
                         </div>
                         <h1 className="text-2xl md:text-3xl font-bold text-[#0F172A] mb-2 tracking-tight leading-tight">
                             Master your {subjectName} <br className="hidden sm:block" /> skills with practice.
@@ -148,11 +123,11 @@ const SubjectRoadmap = () => {
                         <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
                             <div className="flex items-center gap-2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/40">
                                 <FileText className="w-4 h-4 text-emerald-600" />
-                                <span className="text-xs font-bold text-slate-700">{roadmap?.test_details?.total_questions || 0} Questions</span>
+                                <span className="text-xs font-bold text-slate-700">{roadmap?.test_details.total_questions || 0} Questions</span>
                             </div>
                             <div className="flex items-center gap-2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/40">
                                 <Timer className="w-4 h-4 text-emerald-600" />
-                                <span className="text-xs font-bold text-slate-700">{(roadmap?.test_details?.duration_hours || 0) * 60}m Duration</span>
+                                <span className="text-xs font-bold text-slate-700">{(roadmap?.test_details.duration_hours || 0) * 60}m Duration</span>
                             </div>
                         </div>
                     </div>
@@ -170,31 +145,18 @@ const SubjectRoadmap = () => {
                 </motion.div>
 
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20">
-                        <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mb-4" />
-                        <p className="text-slate-500 font-medium">Fetching roadmap...</p>
+                    <div className="flex flex-col items-center justify-center py-24 gap-4">
+                        <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
+                        <p className="text-slate-500 font-medium">Preparing your personalized roadmap...</p>
                     </div>
-                ) : !roadmap ? (
-                    <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
-                        <Library className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-bold text-slate-900 mb-1">No Roadmap Available</h3>
-                        <p className="text-slate-500 text-sm mb-6">You haven't generated a test series for this subject yet.</p>
-                        <Button 
-                            onClick={handleInitialize}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-8"
-                        >
-                            <Sparkles className="w-4 h-4 mr-2" />
-                            Generate Test Series
-                        </Button>
-                    </div>
-                ) : (
+                ) : roadmap ? (
                     <div className="space-y-4">
                         <div className="px-1 mb-8">
                             <h2 className="text-lg font-bold text-slate-900 mb-1">Available Tests</h2>
                             <p className="text-xs text-slate-400 tracking-wide font-medium uppercase">Step by step practice for your success</p>
                         </div>
 
-                        {/* Roadmap Grid */}
+                        {/* Roadmap List */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             {roadmap.roadmap.map((test, index) => (
                                 <motion.div
@@ -209,7 +171,7 @@ const SubjectRoadmap = () => {
                                             : "hover:border-emerald-200 hover:shadow-[0_25px_50px_rgba(0,0,0,0.06)] scale-100 hover:scale-[1.02]"
                                     )}
                                 >
-                                    {/* Top Row: Icon + Title + Status */}
+                                    {/* Top Row: Icon + Title + Score */}
                                     <div className="flex items-start justify-between mb-2">
                                         <div className="flex items-center gap-3">
                                             <div className={cn(
@@ -230,7 +192,7 @@ const SubjectRoadmap = () => {
                                                 </h3>
                                                 <p className={cn(
                                                     "text-[10px] font-bold mt-1 px-2 py-0.5 rounded-md inline-block uppercase tracking-wider",
-                                                    test.obtained_marks !== null
+                                                    test.obtained_marks !== null 
                                                         ? "bg-emerald-100 text-emerald-700" 
                                                         : test.status === "LOCKED"
                                                             ? "bg-slate-100 text-slate-400"
@@ -255,7 +217,7 @@ const SubjectRoadmap = () => {
                                             <div className="text-right">
                                                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest leading-none">Score</p>
                                                 <p className="text-lg text-slate-800 mt-1 font-bold">
-                                                    {test.obtained_marks}<span className="text-slate-400 text-sm">/{test.total_marks || roadmap.test_details.total_marks}</span>
+                                                    {test.obtained_marks}<span className="text-slate-400 text-sm">/{roadmap.test_details.total_marks || roadmap.test_details.total_questions}</span>
                                                 </p>
                                             </div>
                                         ) : test.status === "LOCKED" && test.test_date && (
@@ -270,8 +232,9 @@ const SubjectRoadmap = () => {
                                         )}
                                     </div>
 
-                                    {/* Test Details row */}
-                                    <div className="flex items-center justify-between mb-4 mt-4 overflow-hidden">
+
+                                    {/* Test Details row – single line, no wrap */}
+                                    <div className="flex items-center justify-between mb-4 overflow-hidden">
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <span className="text-sm">🧠</span>
                                             <span className="text-[11px] text-slate-500 whitespace-nowrap">{roadmap.test_details.marking_scheme.correct} Mark/Q</span>
@@ -281,12 +244,12 @@ const SubjectRoadmap = () => {
                                             <span className="text-[11px] text-slate-500 whitespace-nowrap">{roadmap.test_details.total_questions} Qs</span>
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className="text-sm">⏱️</span>
+                                            <span className="text-sm">📝</span>
                                             <span className="text-[11px] text-slate-500 whitespace-nowrap">{roadmap.test_details.duration_hours * 60}m</span>
                                         </div>
                                     </div>
 
-                                    {/* Action button */}
+                                    {/* Action button: View Analysis (if finished) OR View Details (if pending) */}
                                     <div className="flex flex-col gap-2 mt-auto">
                                         <Button
                                             disabled={test.status === "LOCKED"}
@@ -294,7 +257,7 @@ const SubjectRoadmap = () => {
                                                 if (test.access === "REQUIRES_SUBSCRIPTION") {
                                                     navigate("/upgrade-plan");
                                                 } else if (test.obtained_marks !== null) {
-                                                    navigate(`/test-series/subject/test/${test.series_no}/analytics?plan_id=${roadmap.plan_id}`);
+                                                    navigate(`/test-series/subject/test/${test.series_no}/analytics?planId=${roadmap.subject_plan_id}`);
                                                 } else {
                                                     setSelectedSeriesNo(test.series_no);
                                                 }
@@ -319,19 +282,29 @@ const SubjectRoadmap = () => {
                             ))}
                         </div>
                     </div>
+                ) : (
+                    <div className="bg-white rounded-[32px] p-16 text-center border border-dashed border-slate-200 shadow-sm">
+                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Info className="w-10 h-10 text-slate-200" />
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-900 mb-2">No tests found</h2>
+                        <p className="text-slate-500 mb-8 max-w-xs mx-auto">We couldn't find any tests for this subject. Your roadmap might be under construction.</p>
+                        <Button onClick={() => navigate(-1)} className="rounded-xl px-8 h-12">Go Back</Button>
+                    </div>
                 )}
             </div>
 
+            {/* Syllabus Modal – shows single test details from backend */}
             <SyllabusModal
                 isOpen={selectedSeriesNo !== null}
                 onClose={() => setSelectedSeriesNo(null)}
-                subjectId={roadmap?.plan_id ?? (isNaN(Number(subjectId)) ? 0 : Number(subjectId))}
-                subjectPlanId={roadmap?.plan_id}
+                subjectId={Number(subjectId)}
+                subjectPlanId={roadmap?.subject_plan_id}
                 subjectName={subjectName}
                 seriesNo={selectedSeriesNo ?? 1}
                 onStartTest={(seriesNo, subjectPlanId) => {
                     setSelectedSeriesNo(null);
-                    navigate(`/test-series/subject/test/${seriesNo}?plan_id=${subjectPlanId}`);
+                    navigate(`/test-series/subject/test/${seriesNo}?planId=${subjectPlanId}`);
                 }}
             />
         </DashboardLayout>

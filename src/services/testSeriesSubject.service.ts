@@ -28,8 +28,8 @@ export interface SubjectRoadmapEntry {
   total_marks?: number | null;
 }
 
-export interface SubjectRoadmapResponse {
-  subject_plan_id: number;
+export interface SubjectPlan {
+  plan_id: number;
   subject_name: string;
   exam_type: string;
   sub_division: string;
@@ -48,6 +48,18 @@ export interface SubjectRoadmapResponse {
   roadmap: SubjectRoadmapEntry[];
 }
 
+export interface SubjectRoadmapResponse {
+  access: Array<{
+    exam_type: string;
+    sub_division: string;
+    plan_type: string;
+    subject_name: string;
+    plan_id: number;
+    subscribed: boolean;
+  }>;
+  plans: SubjectPlan[];
+}
+
 export const testSeriesSubjectService = {
   async generatePlan(subjectId: number, year: number, language: string, learnerType: string = "GENERAL") {
     const response = await apiClient.post("/test-series/subject/generate-plan", {
@@ -59,16 +71,14 @@ export const testSeriesSubjectService = {
     return response.data;
   },
 
-  async getRoadmap(subjectPlanId: number): Promise<SubjectRoadmapResponse> {
-    const response = await apiClient.get<SubjectRoadmapResponse>("/test-series/subject/roadmap", {
-      params: { subject_plan_id: subjectPlanId },
-    });
+  async getRoadmap(): Promise<SubjectRoadmapResponse> {
+    const response = await apiClient.get<SubjectRoadmapResponse>("/test-series/subject/roadmap");
     return response.data;
   },
 
-  async getQuestions(subjectPlanId: number, seriesNo: number) {
+  async getQuestions(plan_id: number, seriesNo: number) {
     const response = await apiClient.get("/test-series/subject/questions", {
-      params: { subject_plan_id: subjectPlanId, series_no: seriesNo },
+      params: { plan_id, series_no: seriesNo },
     });
     return response.data;
   },
@@ -78,16 +88,16 @@ export const testSeriesSubjectService = {
     return response.data;
   },
 
-  async getResult(subjectPlanId: number, seriesNo: number) {
+  async getResult(plan_id: number, seriesNo: number) {
     const response = await apiClient.get("/test-series/subject/result", {
-      params: { subject_plan_id: subjectPlanId, series_no: seriesNo },
+      params: { plan_id, series_no: seriesNo },
     });
     return response.data;
   },
 
-  async getHistory(subjectPlanId: number) {
+  async getHistory(plan_id: number) {
     const response = await apiClient.get("/test-series/subject/history", {
-      params: { subject_plan_id: subjectPlanId },
+      params: { plan_id },
     });
     return response.data;
   },

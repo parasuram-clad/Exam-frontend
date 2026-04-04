@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Globe, Target, BookOpen, ChevronDown, Calendar, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+import { Globe, Target, BookOpen, ChevronDown, Calendar, Zap, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 // Asset imports (passed as props or imported here if possible)
 import modalTopLeft from "@/assets/study-plan/top-left-mid.png";
@@ -276,7 +276,7 @@ export const StudySetupModal = ({
             >
               {isGenerating ? (
                 <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Generating...
                 </span>
               ) : "Create My Smart Plan"}

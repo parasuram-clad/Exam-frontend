@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Timer, FileText, Landmark } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
@@ -9,7 +10,7 @@ import testImage from "@/assets/test-1.png";
 
 export interface TestSet {
     id: string;
-    planId: number;
+    plan_id: number;
     name: string;
     duration: string;
     questions: number;
@@ -79,9 +80,11 @@ export const TestSetsView = ({ testSets }: TestSetsViewProps) => {
     };
 
     const handleStartTest = () => {
-        if (selectedSet) {
-            navigate(`/test-series/overall/test/${selectedSet.id}?planId=${selectedSet.planId}`);
+        if (selectedSet && selectedSet.plan_id > 0) {
+            navigate(`/test-series/overall/test/${selectedSet.id}?plan_id=${selectedSet.plan_id}`);
             setSelectedSet(null);
+        } else if (selectedSet) {
+            toast.error("Please generate or select an active test series plan first.");
         }
     };
 
@@ -194,13 +197,13 @@ export const TestSetsView = ({ testSets }: TestSetsViewProps) => {
                         onClick={(e) => {
                             e.stopPropagation();
                             if (set.score) {
-                                navigate(`/test-series/overall/test/${set.id}/analytics?planId=${set.planId}`);
+                                navigate(`/test-series/overall/test/${set.id}/analytics?plan_id=${set.plan_id}`);
                             } else {
                                 handleSetClick(set);
                             }
                         }}
                     >
-                        {set.score ? "View Analysis" : set.status === "LOCKED" ? "Coming Soon" : "View Details"}
+                        {set.score ? "View Analysis" : set.status === "LOCKED" ? "Coming Soon" : "Attempt Test"}
                     </Button>
                 </div>
             ))}

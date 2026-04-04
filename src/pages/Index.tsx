@@ -12,7 +12,7 @@ import { prefetchAllUserData } from "@/services/prefetch";
 import { useAuth } from "@/context/AuthContext";
 import { BASE_URL } from "@/config/env";
 import { Button } from "@/components/ui/button";
-import { Bell, ChevronLeft, ChevronRight, Calendar, FileText, Trophy } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, Calendar, FileText, Trophy, Loader2 } from "lucide-react";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -138,7 +138,6 @@ const Index = () => {
 
     try {
       setIsGenerating(true);
-      setIsSetupModalOpen(false);
       const dailyHours = parseInt(setupData.studyGoal.replace(/[^0-9]/g, '')) || 4;
       await authService.updateProfile(user!.id, {
         full_name: setupData.name,
@@ -166,9 +165,9 @@ const Index = () => {
       ]);
 
       toast.success("Study plan generated successfully!");
+      setIsSetupModalOpen(false); // Only close after successful generation
     } catch (err) {
       toast.error("Failed to generate study plan.");
-      setIsSetupModalOpen(true);
     } finally {
       setIsGenerating(false);
     }
@@ -641,9 +640,15 @@ const Index = () => {
                 </div>
                 <Button 
                   onClick={() => setIsSetupModalOpen(true)}
+                  disabled={isGenerating}
                   className="rounded-xl px-8 h-12 bg-[#1a2b4b] text-white hover:bg-[#1a2b4b]/90 shadow-lg shadow-[#1a2b4b]/10"
                 >
-                  Set Up My Plan
+                  {isGenerating ? (
+                    <span className="flex items-center gap-2">
+                       <Loader2 className="w-4 h-4 animate-spin" />
+                       Generating...
+                    </span>
+                  ) : "Set Up My Plan"}
                 </Button>
               </motion.div>
             ) : (

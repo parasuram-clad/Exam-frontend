@@ -84,7 +84,7 @@ const TestAnalytics = () => {
     const [searchParams] = useSearchParams();
     const weekNoStr = searchParams.get('week');
     const weekNo = weekNoStr ? parseInt(weekNoStr) : null;
-    const planIdStr = searchParams.get('planId');
+    const planIdStr = searchParams.get('plan_id');
     const planId = planIdStr ? parseInt(planIdStr) : null;
 
     const navigate = useNavigate();
@@ -104,13 +104,13 @@ const TestAnalytics = () => {
             planId
         ],
         queryFn: async () => {
-            if (subject === 'weekly') {
+            if (subject === 'weekly' || subject === 'subject-weekly') {
                 const wNo = weekNo || parseInt(testId || "1");
-                return await studyService.getWeeklyTestResult(user!.id, wNo);
-            } else if (subject === 'monthly') {
+                return await studyService.getWeeklyTestResult(user!.id, wNo, planId || undefined);
+            } else if (subject === 'monthly' || subject === 'subject-monthly') {
                 const mNoStr = searchParams.get('month');
                 const mNo = mNoStr ? parseInt(mNoStr) : parseInt(testId || "1");
-                return await studyService.getMonthlyTestResult(user!.id, mNo);
+                return await studyService.getMonthlyTestResult(user!.id, mNo, planId || undefined);
             } else if (isOverall) {
                 return await testSeriesOverallService.getResult(parseInt(testId || "0"), planId || 0);
             } else if (isSubject) {
@@ -118,7 +118,10 @@ const TestAnalytics = () => {
             }
             return null;
         },
-        enabled: !!user?.id && (subject === 'weekly' || subject === 'monthly' || isOverall || isSubject),
+        enabled: !!user?.id && (
+            (subject?.includes('weekly') || subject?.includes('monthly')) || 
+            ((isOverall || isSubject) && !!planId)
+        ),
     });
 
     const { data: dashboardData, refetch: refetchDashboard } = useQuery({

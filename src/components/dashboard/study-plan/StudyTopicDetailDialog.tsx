@@ -1,6 +1,6 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { prefetchTopic } from "@/services/prefetch";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -32,6 +32,7 @@ interface StudyTopicDetailDialogProps {
   user: any;
   onSubtopicClick: (topicId: string, subtopicId: string) => void;
   getSubjectIconFallback: (subject: string) => string;
+  isFetching?: boolean;
 }
 
 export const StudyTopicDetailDialog = ({
@@ -41,7 +42,8 @@ export const StudyTopicDetailDialog = ({
   topicTimings,
   user,
   onSubtopicClick,
-  getSubjectIconFallback
+  getSubjectIconFallback,
+  isFetching = false
 }: StudyTopicDetailDialogProps) => {
   const queryClient = useQueryClient();
 
@@ -51,8 +53,8 @@ export const StudyTopicDetailDialog = ({
         {selectedTopic && (
           <div className="p-5 sm:p-8 overflow-y-auto flex-1">
             <div className="flex items-center gap-3 mb-6">
-              <button 
-                onClick={() => onOpenChange(false)} 
+              <button
+                onClick={() => onOpenChange(false)}
                 className="p-2 hover:bg-muted rounded-full transition-colors shrink-0"
               >
                 <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -78,10 +80,12 @@ export const StudyTopicDetailDialog = ({
 
                 let liveTimeSpent = subtopic.timeSpent;
 
-                if (activeTiming && activeTiming.start_time) {
-                  const startTimeStr = activeTiming.start_time.endsWith('Z') ? activeTiming.start_time : `${activeTiming.start_time}Z`;
-                  const ongoingMinutes = Math.floor((new Date().getTime() - new Date(startTimeStr).getTime()) / (1000 * 60));
-                  liveTimeSpent += ongoingMinutes;
+                // subtopic.timeSpent already includes snapshot of ongoingTime from mapping.ts 
+                // but if there's an active timing for a non-completed topic, ensure we show it or update it.
+                if (activeTiming && activeTiming.id && subtopic.status !== "completed" && !subtopic.timeSpent && activeTiming.start_time) {
+                   const startTimeStr = activeTiming.start_time.endsWith('Z') ? activeTiming.start_time : `${activeTiming.start_time}Z`;
+                   const ongoingMinutes = Math.floor((new Date().getTime() - new Date(startTimeStr).getTime()) / (1000 * 60));
+                   liveTimeSpent = ongoingMinutes;
                 }
 
                 return (
@@ -93,12 +97,18 @@ export const StudyTopicDetailDialog = ({
                       </div>
                       <Button
                         onClick={() => onSubtopicClick(selectedTopic.id, subtopic.id)}
+                        disabled={isFetching}
                         onMouseEnter={() => {
                           if (user?.id) prefetchTopic(queryClient, subtopic.id, user.id);
                         }}
-                        className="bg-card hover:bg-card/90 text-foreground px-6 rounded-xl font-medium shrink-0"
+                        className="bg-card hover:bg-card/90 text-foreground px-6 rounded-xl font-medium shrink-0 disabled:opacity-70"
                       >
-                        {subtopic.status === "continue" ? "Continue" : subtopic.status === "completed" ? "View Analytics" : "Start Now"}
+                        {isFetching ? (
+                          <span className="flex items-center gap-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Please Wait...
+                          </span>
+                        ) : subtopic.status === "continue" ? "Continue" : subtopic.status === "completed" ? "View Analytics" : "Start Now"}
                       </Button>
                     </div>
                     <div>

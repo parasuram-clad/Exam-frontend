@@ -67,7 +67,7 @@ const SubjectRoadmap = () => {
         try {
             setLoading(true);
             const response = await testSeriesSubjectService.getRoadmap();
-
+            
             // Find the roadmap that matches the current subject name
             const matchingRoadmap = response.plans.find(
                 p => p.subject_name.toLowerCase() === subjectName.toLowerCase()
@@ -188,135 +188,101 @@ const SubjectRoadmap = () => {
                         </Button>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        <div className="px-1 mb-8">
-                            <h2 className="text-lg font-bold text-slate-900 mb-1">Available Tests</h2>
-                            <p className="text-xs text-slate-400 tracking-wide font-medium uppercase">Step by step practice for your success</p>
-                        </div>
+                    <div className="relative py-10 px-4">
+                        {/* Connecting Line */}
+                        <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-100 via-emerald-200 to-emerald-100 -translate-x-1/2 hidden md:block" />
 
-                        {/* Roadmap Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            {roadmap.roadmap.map((test, index) => (
-                                <motion.div
-                                    key={test.series_no}
-                                    initial={{ opacity: 0, y: 15 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.05 }}
-                                    className={cn(
-                                        "group bg-white rounded-xl p-8 border border-slate-100 transition-all duration-300 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden flex flex-col min-h-[220px]",
-                                        test.status === "LOCKED"
-                                            ? "opacity-60 grayscale cursor-not-allowed"
-                                            : "hover:border-emerald-200 hover:shadow-[0_25px_50px_rgba(0,0,0,0.06)] scale-100 hover:scale-[1.02]"
-                                    )}
-                                >
-                                    {/* Top Row: Icon + Title + Status */}
-                                    <div className="flex items-start justify-between mb-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn(
-                                                "w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 shrink-0",
-                                                test.status === "LOCKED" || test.access === "REQUIRES_SUBSCRIPTION"
-                                                    ? "bg-slate-50 text-slate-400"
-                                                    : "bg-sky-50 text-sky-600 shadow-sm"
-                                            )}>
-                                                {test.access === "REQUIRES_SUBSCRIPTION" ? (
-                                                    <Lock className="w-5 h-5 shadow-sm" />
-                                                ) : (
-                                                    <BookOpen className="w-6 h-6" />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <h3 className="text-base font-bold text-slate-800 tracking-tight leading-tight">
-                                                    Test Set {test.series_no}
-                                                </h3>
-                                                <p className={cn(
-                                                    "text-[10px] font-bold mt-1 px-2 py-0.5 rounded-md inline-block uppercase tracking-wider",
-                                                    test.obtained_marks !== null
-                                                        ? "bg-emerald-100 text-emerald-700" 
-                                                        : test.status === "LOCKED"
-                                                            ? "bg-slate-100 text-slate-400"
-                                                            : test.access === "REQUIRES_SUBSCRIPTION"
-                                                                ? "bg-[#eff7db] text-[#0F172A]"
-                                                                : "bg-sky-50 text-sky-600"
-                                                )}>
-                                                    {test.obtained_marks !== null 
-                                                        ? "Completed" 
-                                                        : test.status === "LOCKED" 
-                                                            ? "Locked"
-                                                            : test.access === "REQUIRES_SUBSCRIPTION" 
-                                                                ? "Premium"
-                                                                : "Unlocked"
+                        <div className="space-y-12 relative z-10">
+                            {roadmap.roadmap.map((test, index) => {
+                                const isCompleted = test.status === "COMPLETED";
+                                const isLocked = test.status === "LOCKED";
+                                const isEven = index % 2 === 0;
+
+                                return (
+                                    <motion.div
+                                        key={index}
+                                        initial={{ opacity: 0, x: isEven ? -20 : 20 }}
+                                        whileInView={{ opacity: 1, x: 0 }}
+                                        viewport={{ once: true }}
+                                        className={cn(
+                                            "flex flex-col md:flex-row items-center gap-8 md:gap-0",
+                                            isEven ? "md:flex-row" : "md:flex-row-reverse"
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            "w-full md:w-[45%] flex",
+                                            isEven ? "md:justify-end" : "md:justify-start"
+                                        )}>
+                                            <div
+                                                onClick={() => {
+                                                    if (test.access === "REQUIRES_SUBSCRIPTION") {
+                                                        navigate("/upgrade-plan");
+                                                    } else if (test.obtained_marks !== null) {
+                                                        navigate(`/test-series/subject/test/${test.series_no}/analytics?plan_id=${roadmap.plan_id}`);
+                                                    } else {
+                                                        setSelectedSeriesNo(test.series_no);
                                                     }
-                                                </p>
-                                            </div>
-                                        </div>
+                                                }}
+                                                className={cn(
+                                                    "w-full sm:max-w-md bg-white rounded-2xl p-5 border shadow-sm transition-all duration-300 cursor-pointer group",
+                                                    isLocked ? "bg-slate-50/50 border-slate-100 opacity-75" : "hover:shadow-md hover:border-emerald-200 border-slate-100",
+                                                    isCompleted && "border-emerald-100"
+                                                )}
+                                            >
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <span className={cn(
+                                                        "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                                        isCompleted ? "bg-emerald-50 text-emerald-600" :
+                                                            isLocked ? "bg-slate-100 text-slate-400" :
+                                                                "bg-amber-50 text-amber-600"
+                                                    )}>
+                                                        {isCompleted ? "Completed" : isLocked ? "Locked" : "Next Up"}
+                                                    </span>
+                                                    {test.obtained_marks !== null && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                                                            <span className="text-xs font-bold text-slate-700">
+                                                                {test.obtained_marks}/{test.total_marks || roadmap.test_details.total_marks}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                                        {/* Score Display / Unlock Info (Top Right) */}
-                                        {test.obtained_marks !== null ? (
-                                            <div className="text-right">
-                                                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest leading-none">Score</p>
-                                                <p className="text-lg text-slate-800 mt-1 font-bold">
-                                                    {test.obtained_marks}<span className="text-slate-400 text-sm">/{test.total_marks || roadmap.test_details.total_marks}</span>
-                                                </p>
-                                            </div>
-                                        ) : test.status === "LOCKED" && test.test_date && (
-                                            <div className="text-right">
-                                                <div className="bg-slate-50 border border-slate-100 flex flex-col items-end px-2 py-1 rounded-md">
-                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight leading-none mb-1">Unlocks</p>
-                                                    <p className="text-[11px] font-bold text-slate-600 leading-none">
+                                                <h3 className="text-base font-bold text-slate-900 mb-2 group-hover:text-emerald-600 transition-colors">
+                                                    Test Set - {String(test.series_no).padStart(2, '0')}
+                                                </h3>
+
+                                                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-slate-400 font-medium">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Calendar className="w-3.5 h-3.5" />
                                                         {new Date(test.test_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                    </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <BookOpen className="w-3.5 h-3.5" />
+                                                        {test.syllabus?.topics.length || 0} Topics
+                                                    </div>
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
+                                        </div>
 
-                                    {/* Test Details row */}
-                                    <div className="flex items-center justify-between mb-4 mt-4 overflow-hidden">
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className="text-sm">🧠</span>
-                                            <span className="text-[11px] text-slate-500 whitespace-nowrap">{roadmap.test_details.marking_scheme.correct} Mark/Q</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className="text-sm">📖</span>
-                                            <span className="text-[11px] text-slate-500 whitespace-nowrap">{roadmap.test_details.total_questions} Qs</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className="text-sm">⏱️</span>
-                                            <span className="text-[11px] text-slate-500 whitespace-nowrap">{roadmap.test_details.duration_hours * 60}m</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Action button */}
-                                    <div className="flex flex-col gap-2 mt-auto">
-                                        <Button
-                                            disabled={test.status === "LOCKED"}
-                                            onClick={() => {
-                                                if (test.access === "REQUIRES_SUBSCRIPTION") {
-                                                    navigate("/upgrade-plan");
-                                                } else if (test.obtained_marks !== null) {
-                                                    navigate(`/test-series/subject/test/${test.series_no}/analytics?plan_id=${roadmap.plan_id}`);
-                                                } else {
-                                                    setSelectedSeriesNo(test.series_no);
+                                        <div className="relative flex items-center justify-center md:w-[10%]">
+                                            <div className={cn(
+                                                "w-10 h-10 rounded-full flex items-center justify-center relative z-10 transition-transform duration-500 group-hover:scale-110 shadow-sm",
+                                                isCompleted ? "bg-emerald-500 text-white" :
+                                                    isLocked ? "bg-slate-100 text-slate-400 border border-slate-200" :
+                                                        "bg-white border-2 border-emerald-500 text-emerald-600 animate-pulse"
+                                            )}>
+                                                {isCompleted ? <CheckCircle2 className="w-6 h-6" /> :
+                                                    isLocked ? <Lock className="w-4 h-4" /> :
+                                                        <PlayCircle className="w-6 h-6" />
                                                 }
-                                            }}
-                                            className={cn(
-                                                "w-full h-10 rounded-lg text-sm font-medium transition-all active:scale-[0.98] shadow-sm",
-                                                test.access === "REQUIRES_SUBSCRIPTION"
-                                                    ? "bg-[#eff7db] text-[#0F172A] hover:bg-[#C7DD64] border border-[#C7DD66]/30 shadow-none"
-                                                    : "bg-[#0F172A] text-white hover:bg-[#1E293B]",
-                                                test.status === "LOCKED" && "bg-slate-200 text-slate-400 shadow-none pointer-events-none"
-                                            )}
-                                        >
-                                            {test.access === "REQUIRES_SUBSCRIPTION"
-                                                ? "Upgrade Plan"
-                                                : test.obtained_marks !== null
-                                                    ? "View Analysis"
-                                                    : "Attempt Test"
-                                            }
-                                        </Button>
-                                    </div>
-                                </motion.div>
-                            ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="hidden md:block md:w-[45%]" />
+                                    </motion.div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}

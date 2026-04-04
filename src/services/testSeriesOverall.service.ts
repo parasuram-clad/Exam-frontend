@@ -31,29 +31,38 @@ export interface RoadmapEntry {
   syllabus: any[];
 }
 
+export interface OverallPlan {
+  plan_id: number;
+  exam_type: string;
+  sub_division: string;
+  year: number;
+  language: string;
+  start_date: string;
+  total_days: number;
+  total_series: number;
+  plan_version: number;
+  test_details: {
+    total_questions: number;
+    total_marks: number;
+    duration_hours: number;
+    marking_scheme: {
+      correct: number;
+      incorrect: number;
+      unattempted: number;
+    };
+  };
+  roadmap: RoadmapEntry[];
+}
+
 export interface OverallRoadmapResponse {
-  user_id: number;
-  total_plans: number;
-  plans: Array<{
-    overall_plan_id: number;
+  access: Array<{
     exam_type: string;
     sub_division: string;
-    year: number;
-    language: string;
-    start_date: string;
-    total_series: number;
-    roadmap: RoadmapEntry[];
-    test_details: {
-      total_questions: number;
-      total_marks: number;
-      duration_hours: number;
-      marking_scheme: {
-        correct: number;
-        incorrect: number;
-        unattempted: number;
-      };
-    };
+    plan_type: string;
+    plan_id: number;
+    subscribed: boolean;
   }>;
+  plans: OverallPlan[];
 }
 
 export const testSeriesOverallService = {
@@ -67,9 +76,9 @@ export const testSeriesOverallService = {
     return response.data;
   },
 
-  async getQuestions(series_no: number, overall_plan_id: number) {
+  async getQuestions(series_no: number, plan_id: number) {
     const response = await apiClient.get("/test-series/overall/questions", {
-      params: { series_no, overall_plan_id },
+      params: { series_no, plan_id },
     });
     return response.data;
   },
@@ -79,16 +88,16 @@ export const testSeriesOverallService = {
     return response.data;
   },
 
-  async getResult(series_no: number, overall_plan_id: number) {
+  async getResult(series_no: number, plan_id: number) {
     const response = await apiClient.get("/test-series/overall/result", {
-      params: { series_no, overall_plan_id },
+      params: { series_no, plan_id },
     });
     return response.data;
   },
 
-  async getHistory(overall_plan_id: number) {
+  async getHistory(plan_id: number) {
     const response = await apiClient.get("/test-series/overall/history", {
-      params: { overall_plan_id },
+      params: { plan_id },
     });
     return response.data;
   },
