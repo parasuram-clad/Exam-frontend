@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { differenceInCalendarDays, parseISO, startOfDay, isValid } from "date-fns";
+import { differenceInCalendarDays, parseISO, startOfDay, isValid, format as formatDate } from "date-fns";
 
 interface StudyBannerCountdownProps {
   daysLeft: number;
@@ -31,6 +31,12 @@ export const StudyBannerCountdown = ({
   };
 
   const daysLeft = getDaysLeft();
+  
+  const isExam = !!(examEndDate && examEndDate === user?.dashboard?.exam_calendar?.exam_date);
+  const displayLabel = isExam 
+    ? `Days Left for ${user?.exam_type ? `${user.exam_type} ${user.sub_division || ''}`.trim() : "Exam"}`
+    : "Days Left to Complete Plan";
+
   const suffix = (d: number) => {
     if (d > 3 && d < 21) return 'th';
     switch (d % 10) {
@@ -70,12 +76,12 @@ export const StudyBannerCountdown = ({
           <div className="flex items-center gap-2">
             <span className="text-xl sm:text-2xl md:text-3xl font-medium text-accent">{daysLeft}</span>
             <span className="text-primary-foreground text-sm sm:text-base md:text-xl font-medium">
-              Days Left for {user?.exam_type ? `${user.exam_type} ${user.sub_division || ''}`.trim() : "Exam"}
+              {displayLabel}
             </span>
           </div>
           {examEndDate && isValid(parseISO(examEndDate)) && (
             <span className="text-accent/80 text-xs sm:text-sm font-medium">
-              Exam Date: {new Date(examEndDate).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {isExam ? "Exam Date" : "Target Date"}: {formatDate(parseISO(examEndDate), 'MMMM d, yyyy')}
             </span>
           )}
         </div>

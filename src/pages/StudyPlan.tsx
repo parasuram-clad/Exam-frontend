@@ -65,6 +65,7 @@ const StudyPlan = () => {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const prevSelectedSubject = useRef<string | null>(null);
   const prevViewMode = useRef<'overall' | 'subject'>('overall');
+  const prevCurrentProgressDay = useRef<number>(1);
 
   const currentPlan = useMemo(() => {
     const result = (viewMode === 'overall')
@@ -255,11 +256,20 @@ const StudyPlan = () => {
         const mappedPlans = mapRoadmapToFrontend(relevantDays, [], topicTimings, wHistory, mHistory);
         setDynamicDayWisePlans(mappedPlans);
         const currentDay = calculateCurrentProgressDay(mappedPlans, totalRoadmapDays);
+        
+        // Always update activeDay if context changed
         if (selectedSubject !== prevSelectedSubject.current || viewMode !== prevViewMode.current) {
           setActiveDay(currentDay);
           prevSelectedSubject.current = selectedSubject;
           prevViewMode.current = viewMode;
+        } else {
+          // If we are on the currentProgressDay and it just completed, move to next!
+          const prevDay = prevCurrentProgressDay.current;
+          if (currentDay > prevDay && activeDay === prevDay) {
+            setActiveDay(currentDay);
+          }
         }
+        prevCurrentProgressDay.current = currentDay;
       } else {
         setDynamicDayWisePlans({});
       }
@@ -274,21 +284,20 @@ const StudyPlan = () => {
     const timingMap: Record<number, number> = {};
     const now = new Date();
     const statusMap: Record<number, boolean> = {};
-    if (roadmapData?.plan) {
-      roadmapData.plan.forEach(p => {
-        p.days.forEach(d => {
-          d.items.forEach(item => {
-            if (item.type === 'TOPIC' && item.topic) {
-              item.topic.forEach((t: any) => { if (t.is_completed || t.plan_status === 'COMPLETED') statusMap[t.id] = true; });
-            } else if (item.is_completed || item.plan_status === 'COMPLETED') {
-              statusMap[item.identifier || item.title || 0] = true;
-            }
-          });
+    if (currentPlan) {
+      currentPlan.days.forEach(d => {
+        d.items.forEach(item => {
+          if (item.type === 'TOPIC' && item.topic) {
+            item.topic.forEach((t: any) => { if (t.is_completed || t.plan_status === 'COMPLETED') statusMap[t.id] = true; });
+          } else if (item.is_completed || item.plan_status === 'COMPLETED') {
+            statusMap[item.identifier || item.title || 0] = true;
+          }
         });
       });
     }
 
     topicTimings.forEach((tValue: TopicTiming) => {
+      if (currentPlan?.plan_id && tValue.plan_id !== currentPlan.plan_id) return;
       let m = Number(tValue.total_estimate || 0);
       if (!tValue.end_time && tValue.start_time && !statusMap[tValue.syllabus_id]) {
         const startTimeStr = tValue.start_time.endsWith('Z') ? tValue.start_time : `${tValue.start_time}Z`;
@@ -499,19 +508,19 @@ const StudyPlan = () => {
       </div>
 
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8 pb-10 pt-4" >
-        {features?.overall_performance && (
-          <motion.div variants={itemVariants}>
-            <StudyBannerCountdown 
-              daysLeft={daysLeft} 
-              examEndDate={features?.exam_calendar ? (dashboardData?.exam_calendar?.exam_date || overallPlanDate) : undefined} 
-              user={user} 
-              overallProgress={bannerProgress} 
-              currentProgressDay={bannerDay} 
-              progressLabel={bannerLabel} 
-              hideProgressBar={viewMode === 'subject' && !selectedSubject} 
-            />
-          </motion.div>
-        )}
+
+        <motion.div variants={itemVariants}>
+          <StudyBannerCountdown
+            daysLeft={daysLeft}
+            examEndDate={dashboardData?.exam_calendar?.exam_date || overallPlanDate}
+            user={user}
+            overallProgress={bannerProgress}
+            currentProgressDay={bannerDay}
+            progressLabel={bannerLabel}
+            hideProgressBar={viewMode === 'subject' && !selectedSubject}
+          />
+        </motion.div>
+
         {(!roadmapData?.plan || roadmapData.plan.length === 0) ? (
           <motion.div variants={itemVariants} className="w-full bg-card rounded-2xl p-12 border border-dashed flex flex-col items-center justify-center text-center space-y-6">
             <div className="p-6 bg-primary/10 rounded-full"><BookOpen className="w-12 h-12 text-primary" /></div>

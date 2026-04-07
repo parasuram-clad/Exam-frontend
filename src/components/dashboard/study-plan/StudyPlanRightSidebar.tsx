@@ -433,11 +433,15 @@ export const StudyPlanRightSidebar = ({
                       <div className="flex items-center gap-3">
                         <div className={cn(
                           "p-1 rounded-xl border flex items-center justify-center shrink-0",
-                          item.badge_color === "red" ? "bg-destructive/5 border-destructive/10" : "bg-orange-500/5 border-orange-500/10"
+                          item.accuracy < 40 ? "bg-red-500/5 border-red-500/10" : 
+                          item.accuracy < 70 ? "bg-orange-500/5 border-orange-500/10" : 
+                          "bg-green-500/5 border-green-500/10"
                         )}>
                           <span className={cn(
                             "text-[9px] font-medium whitespace-nowrap",
-                            item.badge_color === "red" ? "text-destructive" : "text-orange-600"
+                            item.accuracy < 40 ? "text-red-500" : 
+                            item.accuracy < 70 ? "text-orange-600" : 
+                            "text-green-600"
                           )}>
                             {Math.round(item.accuracy)}% Acc
                           </span>

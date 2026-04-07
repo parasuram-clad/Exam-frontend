@@ -114,17 +114,18 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
 
         // Collect all target items for this subject
         const allItems: any[] = [];
-        roadmapData.plan.forEach((plan: any) => {
-            if (plan.plan_type === 'SUBJECT' && plan.subject_name === subject) {
-                plan.days.forEach((d: any) => allItems.push(...(d.items || [])));
-            } else if (plan.plan_type === 'OVERALL') {
-                plan.days.forEach((d: any) => {
-                    d.items.forEach((item: any) => {
-                        if (item.type === 'TOPIC' && item.subject === subject) allItems.push(item);
-                    });
+        
+        // If we have a specific SUBJECT plan for this subject, use ONLY its items.
+        // If not, we fallback to filtering topics from the OVERALL plan (virtual subject mode).
+        if (subjectPlan) {
+            subjectPlan.days.forEach((d: any) => allItems.push(...(d.items || [])));
+        } else if (overallPlan) {
+            overallPlan.days.forEach((d: any) => {
+                d.items.forEach((item: any) => {
+                    if (item.type === 'TOPIC' && item.subject === subject) allItems.push(item);
                 });
-            }
-        });
+            });
+        }
 
         if (allItems.length === 0) return 0;
 
@@ -132,12 +133,9 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
         const timingMap: Record<number, number> = {};
         const now = new Date();
         topicTimings.forEach(t => {
-            // A timing record is relevant if it belongs to the subject's specific plan
-            // OR if it belongs to the overall plan (only as a fallback if no subject-specific plan exists or if we want shared progress)
-            // For "proper" subject-wise display, we prioritize the subject plan ID if available.
-            const isRelevant = subjectPlanId
-                ? t.plan_id === subjectPlanId
-                : t.plan_id === overallPlanId;
+            // A timing record is relevant if it belongs to the target plan we are showing
+            const targetPlanId = subjectPlanId || overallPlanId;
+            const isRelevant = t.plan_id === targetPlanId;
 
             if (isRelevant) {
                 let m = Number(t.total_estimate || 0);

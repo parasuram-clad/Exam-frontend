@@ -161,13 +161,26 @@ const MyProgress = () => {
     if (entry.status === "completed") completedDays.add(entry.day);
   });
 
+  const getAccuracyColor = (accuracy: number) => {
+    if (accuracy < 40) return "text-red-500";
+    if (accuracy < 70) return "text-orange-500";
+    return "text-green-500";
+  };
+
+  const getBadgeClasses = (accuracy: number) => {
+    if (accuracy < 40) return "border-red-200 bg-red-50 text-red-600";
+    if (accuracy < 70) return "border-orange-200 bg-orange-50 text-orange-600";
+    return "border-green-200 bg-green-50 text-green-600";
+  };
+
   // Areas to improve — use backend data directly
   const areasToImprove = (dashboardData?.areas_to_improve?.areas || []).map((area: any) => ({
     title: area.subject,
     subtitle: area.topic,
+    accuracyVal: area.accuracy,
     accuracy: `${Math.round(area.accuracy)}% Acc`,
-    color: area.badge_color === "red" ? "text-red-500" : "text-orange-500",
-    image: area.subject_image, // ✅ NEW
+    color: getAccuracyColor(area.accuracy),
+    image: area.subject_image,
   }));
 
   // Limit to 4 if not expanded
@@ -177,9 +190,10 @@ const MyProgress = () => {
   const strongAreas = (dashboardData?.strong_areas?.areas || []).map((area: any) => ({
     title: area.subject,
     subtitle: area.topic,
+    accuracyVal: area.accuracy,
     accuracy: `${Math.round(area.accuracy)}% Acc`,
-    color: "text-green-500",
-    image: area.subject_image, // ✅ NEW
+    color: getAccuracyColor(area.accuracy),
+    image: area.subject_image,
   }));
 
   const displayedStrongAreas = isStrongExpanded ? strongAreas : strongAreas.slice(0, 4);
@@ -621,7 +635,7 @@ const MyProgress = () => {
                         </div>
                         <Badge
                           variant="outline"
-                          className="font-semibold border-green-200 bg-green-50 text-green-600"
+                          className={cn("font-semibold", getBadgeClasses(area.accuracyVal))}
                         >
                           {area.accuracy}
                         </Badge>
@@ -682,11 +696,7 @@ const MyProgress = () => {
                         </div>
                         <Badge
                           variant="outline"
-                          className={cn(
-                            "font-semibold",
-                            area.color === "text-red-500" && "border-red-200 bg-red-50 text-red-600",
-                            area.color === "text-orange-500" && "border-orange-200 bg-orange-50 text-orange-600"
-                          )}
+                          className={cn("font-semibold", getBadgeClasses(area.accuracyVal))}
                         >
                           {area.accuracy}
                         </Badge>

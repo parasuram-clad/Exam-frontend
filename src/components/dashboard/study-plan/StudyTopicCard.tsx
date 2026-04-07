@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { StudyTopicCardData as StudyTopicCardType, getSubjectIconFallback } from "./constants";
 import { format } from "date-fns";
+import { Lock } from "lucide-react";
 
 interface StudyTopicCardProps {
   topic: StudyTopicCardType;
@@ -87,15 +88,34 @@ export const StudyTopicCard = ({
       transition={{ delay: index * 0.08 }}
       className="bg-card rounded-2xl p-4 border border-border shadow-sm flex flex-col h-[230px] snap-center relative"
     >
-      {/* Locked overlay */}
-      {/* {isLocked && (
-        <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] rounded-2xl z-10 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-2">
-            <Lock className="w-6 h-6 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground font-medium">Locked</span>
+      {/* Locked Overlay Design */}
+      {isLocked && (
+        <div className="absolute inset-0 z-20 overflow-hidden rounded-2xl">
+          {/* Glass-morphic background with stronger blur on edges */}
+          <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px] transition-all duration-500" />
+          
+          {/* Center Content Container */}
+          <div className="relative h-full w-full flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300">
+            {/* Lock Icon with Animated Background */}
+            <div className="relative mb-3">
+              <div className="absolute inset-0 bg-muted/80 rounded-full blur-xl scale-150 animate-pulse" />
+              <div className="relative w-12 h-12 bg-background/80 border border-border shadow-md rounded-full flex items-center justify-center">
+                <Lock className="w-5 h-5 text-muted-foreground" />
+              </div>
+            </div>
+
+            {/* Locked Text & Reason */}
+            <div className="space-y-1">
+              <p className="text-[14px] font-bold text-foreground/90 tracking-tight">Day Locked</p>
+              <p className="text-[10px] text-muted-foreground font-medium leading-tight max-w-[140px]">
+                {isPrevAssessmentMissing 
+                  ? "Finish your weekly assessment to unlock this day" 
+                  : `This day will unlock when you reach Day ${activeDay}`}
+              </p>
+            </div>
           </div>
         </div>
-      )} */}
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-2 gap-2">

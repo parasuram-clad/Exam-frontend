@@ -46,7 +46,7 @@ export function StreakWidget({ streakDays, onToggle, isExpanded = false, calenda
     const lastCompIdx = weekDays.map((day, idx) => ({ completed: day.completed, idx }))
       .filter((item) => item.completed)
       .pop()?.idx;
-    
+
     // If we have any completed days, the line should extend to at least today/last completed
     if (lastCompIdx !== undefined) {
       return Math.max(lastCompIdx, todayIndex !== -1 ? todayIndex : 0);
@@ -123,7 +123,7 @@ export function StreakWidget({ streakDays, onToggle, isExpanded = false, calenda
                 }}
               />
             )}
-            
+
             {/* Highlight for completed segments */}
             {lastCompletedIndex !== undefined && (
               <div
