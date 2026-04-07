@@ -113,8 +113,8 @@ export function Sidebar({ isOpen, onToggle, activePath }: SidebarProps) {
                   <SelectValue placeholder="Select Plan" />
                 </SelectTrigger>
                 <SelectContent>
-                  {user.dashboard.contexts.map((ctx) => (
-                    <SelectItem key={ctx.context_id} value={ctx.context_id} className="text-xs font-medium">
+                  {user.dashboard.contexts.map((ctx, index) => (
+                    <SelectItem key={`${ctx.context_id}-${index}`} value={ctx.context_id} className="text-xs font-medium">
                       {ctx.label}
                     </SelectItem>
                   ))}

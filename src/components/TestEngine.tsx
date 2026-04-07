@@ -33,6 +33,7 @@ interface TestEngineProps {
     subtitle?: string;
     showHeader?: boolean;
     transparentBg?: boolean;
+    isSubmitting?: boolean;
 }
 
 const TestEngine = ({
@@ -43,13 +44,21 @@ const TestEngine = ({
     title = "Test",
     subtitle = "Assessment",
     showHeader = true,
-    transparentBg = false
+    transparentBg = false,
+    isSubmitting = false
 }: TestEngineProps) => {
     const [currentQuestion, setCurrentQuestion] = useState(0);
     const [answers, setAnswers] = useState<Record<number, Answer>>({});
     const [visitedQuestions, setVisitedQuestions] = useState<Set<number>>(new Set([0]));
     const [timeSpent, setTimeSpent] = useState(0);
     const [showSubmitModal, setShowSubmitModal] = useState(false);
+
+    // Automatically close modal when submission starts
+    useEffect(() => {
+        if (isSubmitting) {
+            setShowSubmitModal(false);
+        }
+    }, [isSubmitting]);
 
     useEffect(() => {
         setVisitedQuestions(prev => new Set([...prev, currentQuestion]));
@@ -144,6 +153,16 @@ const TestEngine = ({
             "min-h-full transition-all duration-300",
             transparentBg ? "bg-transparent" : "bg-[#F5F5F7]"
         )}>
+            {/* Global Loader for Submission */}
+            {isSubmitting && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                        <p className="text-xl font-bold">Submitting Test...</p>
+                        <p className="text-muted-foreground">Please do not refresh or navigate away.</p>
+                    </div>
+                </div>
+            )}
             {/* Header */}
             {showHeader && (
                 <div className="bg-white border-b border-border sticky top-0 z-50">

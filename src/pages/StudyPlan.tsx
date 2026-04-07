@@ -52,6 +52,7 @@ const StudyPlan = () => {
   const { user, currentContext, currentContextId, setCurrentContextId } = useAuth();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Derive the active study context. If current is not a study plan, fallback to first available study plan.
   const studyContext = useMemo(() => {
     if (currentContext?.plan_type === 'OVERALL' || currentContext?.plan_type === 'SUBJECT') {
       return currentContext;
@@ -59,6 +60,7 @@ const StudyPlan = () => {
     return user?.dashboard?.contexts?.find(c => c.plan_type === 'OVERALL' || c.plan_type === 'SUBJECT');
   }, [currentContext, user?.dashboard?.contexts]);
 
+  // Combined Roadmap and Progress data - we no longer need a separate user-plans fetch
   const { data: roadmapData, isLoading: roadmapLoading } = useQuery<RoadmapResponse>({
     queryKey: ['roadmap', user?.id, studyContext?.plan_id],
     queryFn: () => studyService.getUserRoadmap(user!.id, studyContext?.plan_id),
@@ -223,56 +225,7 @@ const StudyPlan = () => {
     }
   }, [hasOverallPlanData, hasSubjectPlanData]);
 
-  const [isWeeklyTestModalOpen, setIsWeeklyTestModalOpen] = useState(false);
-  const testBlocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      isWeeklyTestModalOpen && currentLocation.pathname !== nextLocation.pathname
-  );
-  const [weeklyTestQuestions, setWeeklyTestQuestions] = useState<TestQuestion[]>([]);
-  const [currentWeeklyTestId, setCurrentWeeklyTestId] = useState<number | null>(null);
-  const [currentWeekNo, setCurrentWeekNo] = useState<number | null>(null);
-  const [currentMonthNo, setCurrentMonthNo] = useState<number | null>(null);
-  const [currentTestType, setCurrentTestType] = useState<"WEEKLY" | "MONTHLY" | null>(null);
   const [isFetchingQuestions, setIsFetchingQuestions] = useState(false);
-  const [testStartTime, setTestStartTime] = useState<number | null>(null);
-
-  const testSubmitMutation = useMutation({
-    mutationFn: (data: any) => {
-      const { testType, planType, ...payload } = data;
-      const pId = currentPlan?.plan_id;
-      const submitPayload = { ...payload, plan_id: pId };
-
-      if (planType === 'SUBJECT') {
-        return testType === 'MONTHLY'
-          ? studyService.submitSubjectMonthlyTest(submitPayload as any)
-          : studyService.submitSubjectWeeklyTest(submitPayload as any);
-      }
-      return testType === 'MONTHLY'
-        ? studyService.submitMonthlyTest(submitPayload as any)
-        : studyService.submitWeeklyTest(submitPayload as any);
-    },
-    onSuccess: (_, variables) => {
-      const { testType, planType } = variables;
-      toast.success(`${testType === 'MONTHLY' ? 'Monthly' : 'Weekly'} test submitted successfully!`);
-      setIsWeeklyTestModalOpen(false);
-      const testId = currentWeeklyTestId;
-      const week = currentWeekNo;
-      const month = currentMonthNo;
-      const pId = currentPlan?.plan_id;
-      const planParam = pId ? `&plan_id=${pId}` : '';
-      if (planType === 'SUBJECT') {
-        if (testType === 'MONTHLY') navigate(`/test-series/subject-monthly/test/${testId}/analytics?month=${month}${planParam}`);
-        else navigate(`/test-series/subject-weekly/test/${testId}/analytics?week=${week}${planParam}`);
-      } else {
-        if (testType === 'MONTHLY') navigate(`/test-series/monthly/test/${testId}/analytics?month=${month}${planParam}`);
-        else navigate(`/test-series/weekly/test/${testId}/analytics?week=${week}${planParam}`);
-      }
-    },
-    onError: (error: any) => {
-      toast.error(getErrorMessage(error, "Failed to submit test"));
-    }
-  });
-
   const calculateCurrentProgressDay = (dayWisePlans: Record<number, StudyTopicCardData[]>, totalDays: number) => {
     const days = Object.keys(dayWisePlans).map(Number).sort((a, b) => a - b);
     if (days.length > 0) {
@@ -305,7 +258,7 @@ const StudyPlan = () => {
       const totalRoadmapDays = currentPlan?.total_days || (relevantDays.length > 0 ? Math.max(...relevantDays.map(d => d.day)) : 120);
 
       if (relevantDays.length > 0) {
-        const mappedPlans = mapRoadmapToFrontend(relevantDays, [], topicTimings, wHistory, mHistory, roadmapData.plan);
+        const mappedPlans = mapRoadmapToFrontend(relevantDays, [], topicTimings, wHistory, mHistory);
         setDynamicDayWisePlans(mappedPlans);
         const currentDay = calculateCurrentProgressDay(mappedPlans, totalRoadmapDays);
         if (selectedSubject !== prevSelectedSubject.current || viewMode !== prevViewMode.current) {
@@ -467,30 +420,27 @@ const StudyPlan = () => {
     if (selectedTopic?.subtopics) {
       const subtopic = selectedTopic.subtopics.find(st => st.id === subtopicId);
       if (subtopic?.isTest) {
-        setIsFetchingQuestions(true);
-        try {
-          const type = subtopic.testType || 'WEEKLY';
-          const pType = currentPlan?.plan_type || 'OVERALL';
-          const wNo = subtopic.weekNo || Math.ceil(activeDay / 7);
-          const mNo = subtopic.monthNo || Math.ceil(activeDay / 30);
-          if (subtopic.status === 'completed') {
-            const planParam = currentPlan?.plan_id ? `&plan_id=${currentPlan.plan_id}` : '';
-            if (type === 'MONTHLY') navigate(`/test-series/${pType === 'SUBJECT' ? 'subject-monthly' : 'monthly'}/test/0/analytics?month=${mNo}${planParam}`);
-            else navigate(`/test-series/${pType === 'SUBJECT' ? 'subject-weekly' : 'weekly'}/test/0/analytics?week=${wNo}${planParam}`);
-            setIsDialogOpen(false); return;
-          }
-          const pId = currentPlan?.plan_id || 0;
-          const resp = await (pType === 'SUBJECT' ? (type === 'MONTHLY' ? studyService.getSubjectMonthlyTestQuestions(pId, mNo) : studyService.getSubjectWeeklyTestQuestions(pId, wNo)) : (type === 'MONTHLY' ? studyService.getMonthlyTestQuestions(user!.id, mNo, pId) : studyService.getWeeklyTestQuestions(user!.id, wNo, pId)));
-          const qns = resp.questions.map((q: any) => ({ id: q.mcq_id, question: q.question, options: Object.values(q.options), correctAnswer: 0, category: type === "MONTHLY" ? "Monthly" : "Weekly", difficulty: "Medium" }));
-          setWeeklyTestQuestions(qns);
-          setCurrentWeeklyTestId(resp.weekly_test_id || resp.subject_weekly_test_id || resp.subject_monthly_test_id || resp.monthly_test_id);
-          setCurrentWeekNo(resp.week_no || wNo);
-          setCurrentMonthNo(resp.month_no || mNo);
-          setCurrentTestType(type);
-          setTestStartTime(Date.now());
-          setIsWeeklyTestModalOpen(true);
+        const type = subtopic.testType || 'WEEKLY';
+        const pType = currentPlan?.plan_type || 'OVERALL';
+        const wNo = subtopic.weekNo || Math.ceil(activeDay / 7);
+        const mNo = subtopic.monthNo || Math.ceil(activeDay / 30);
+        const planParam = currentPlan?.plan_id ? `&plan_id=${currentPlan.plan_id}` : '';
+
+        if (subtopic.status === 'completed') {
+          if (type === 'MONTHLY') navigate(`/test-series/${pType === 'SUBJECT' ? 'subject-monthly' : 'monthly'}/test/${mNo}/analytics?month=${mNo}${planParam}`);
+          else navigate(`/test-series/${pType === 'SUBJECT' ? 'subject-weekly' : 'weekly'}/test/${wNo}/analytics?week=${wNo}${planParam}`);
           setIsDialogOpen(false);
-        } catch { toast.error("Failed to fetch questions"); } finally { setIsFetchingQuestions(false); }
+          return;
+        }
+
+        // Navigate to standalone TestAttempt page
+        const testRouteSegment = pType === 'SUBJECT'
+          ? (type === 'MONTHLY' ? 'subject-monthly' : 'subject-weekly')
+          : (type === 'MONTHLY' ? 'monthly' : 'weekly');
+
+        const testIdValue = type === 'MONTHLY' ? mNo : wNo;
+        navigate(`/test-series/${testRouteSegment}/test/${testIdValue}?${planParam.slice(1)}`);
+        setIsDialogOpen(false);
         return;
       }
       if (subtopic?.planRowId && (subtopic.status === 'start' || !subtopic.status)) {
@@ -572,15 +522,6 @@ const StudyPlan = () => {
       </motion.div>
       <StudyTopicDetailDialog isOpen={isDialogOpen} onOpenChange={setIsDialogOpen} selectedTopic={selectedTopic} topicTimings={topicTimings} user={user} onSubtopicClick={handleSubtopicClick} getSubjectIconFallback={getSubjectIconFallback} isFetching={isFetchingQuestions} />
       <StudySetupModal isOpen={isSetupModalOpen} onOpenChange={setIsSetupModalOpen} isGenerating={isGenerating} setupData={setupData} setSetupData={setSetupData} onGenerate={handleGeneratePlan} />
-      <WeeklyTestModal
-        onSubmit={(ans) => {
-          if (!user?.id || !currentWeeklyTestId) return;
-          const letters = ['A', 'B', 'C', 'D', 'E'];
-          const answers = Object.entries(ans).map(([idx, a]: [string, any]) => ({ mcq_id: weeklyTestQuestions[parseInt(idx)].id, selected_option: a.selectedOption !== null ? letters[a.selectedOption] : '' }));
-          const tType = currentTestType || "WEEKLY"; const pType = currentPlan?.plan_type || "OVERALL";
-          testSubmitMutation.mutate({ testType: tType, planType: pType, [tType === 'MONTHLY' ? (pType === 'SUBJECT' ? 'subject_monthly_test_id' : 'monthly_test_id') : (pType === 'SUBJECT' ? 'subject_weekly_test_id' : 'weekly_test_id')]: currentWeeklyTestId, answers, started_at: testStartTime ? new Date(testStartTime).toISOString() : new Date().toISOString(), submitted_at: new Date().toISOString() });
-        }}
-      />
     </DashboardLayout>
   );
 };

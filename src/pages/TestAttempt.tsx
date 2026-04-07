@@ -14,6 +14,7 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
+    DialogDescription,
 } from "@/components/ui/dialog";
 
 
@@ -39,6 +40,8 @@ const TestAttempt = () => {
 
     const isWeekly = subject?.toLowerCase() === 'weekly';
     const isMonthly = subject?.toLowerCase() === 'monthly';
+    const isSubjectWeekly = subject?.toLowerCase() === 'subject-weekly';
+    const isSubjectMonthly = subject?.toLowerCase() === 'subject-monthly';
     const isOverall = subject?.toLowerCase() === 'overall' || subject?.toLowerCase() === 'general';
     const isSubject = subject?.toLowerCase() === 'subject';
 
@@ -50,17 +53,21 @@ const TestAttempt = () => {
 
     const { data: testData, isLoading, error } = useQuery({
         queryKey: [
-            isWeekly ? 'weekly-test' : isMonthly ? 'monthly-test' : isOverall ? 'overall-test' : 'subject-test', 
-            user?.id, 
+            isWeekly || isSubjectWeekly ? 'weekly-test' : isMonthly || isSubjectMonthly ? 'monthly-test' : isOverall ? 'overall-test' : 'subject-test',
+            user?.id,
             testId,
             planId
         ],
         queryFn: async () => {
             if (!user?.id || !testId) return null;
             if (isWeekly) {
-                return studyService.getWeeklyTestQuestions(user.id, parseInt(testId));
+                return studyService.getWeeklyTestQuestions(user.id, parseInt(testId), parseInt(planId || "0"));
             } else if (isMonthly) {
-                return studyService.getMonthlyTestQuestions(user.id, parseInt(testId));
+                return studyService.getMonthlyTestQuestions(user.id, parseInt(testId), parseInt(planId || "0"));
+            } else if (isSubjectWeekly) {
+                return studyService.getSubjectWeeklyTestQuestions(parseInt(planId || "0"), parseInt(testId));
+            } else if (isSubjectMonthly) {
+                return studyService.getSubjectMonthlyTestQuestions(parseInt(planId || "0"), parseInt(testId));
             } else if (isOverall) {
                 return testSeriesOverallService.getQuestions(parseInt(testId), parseInt(planId || "0"));
             } else if (isSubject) {
@@ -68,7 +75,7 @@ const TestAttempt = () => {
             }
             return null;
         },
-        enabled: !!user?.id && !!testId && (isWeekly || isMonthly || (isOverall && !!planId) || (isSubject && !!planId)),
+        enabled: !!user?.id && !!testId && (isWeekly || isMonthly || isSubjectWeekly || isSubjectMonthly || (isOverall && !!planId) || (isSubject && !!planId)),
     });
 
     const questions: Question[] = testData?.questions?.map((q: any) => {
@@ -81,8 +88,11 @@ const TestAttempt = () => {
         };
     }) || [];
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const handleComplete = async (answers: Record<number, Answer>) => {
         if (!user?.id || !testId) return;
+        setIsSubmitting(true);
 
         const answerMap = ["A", "B", "C", "D"];
         const formattedAnswers = Object.values(answers)
@@ -96,7 +106,7 @@ const TestAttempt = () => {
             if (isOverall) {
                 const attemptId = testData.test_series_attempt_id || testData.attempt_id || testData.id;
                 if (!attemptId) throw new Error("Attempt ID not found in test data");
-                
+
                 await testSeriesOverallService.submitTest({
                     test_series_attempt_id: Number(attemptId),
                     answers: formattedAnswers,
@@ -131,11 +141,42 @@ const TestAttempt = () => {
                     submitted_at: new Date().toISOString(),
                     plan_id: planId ? parseInt(planId) : undefined
                 });
+            } else if (isSubjectWeekly) {
+                const testIdValue = testData.subject_weekly_test_id || testData.id || parseInt(testId);
+                await studyService.submitSubjectWeeklyTest({
+                    subject_weekly_test_id: Number(testIdValue),
+                    answers: formattedAnswers,
+                    started_at: startedAt,
+                    submitted_at: new Date().toISOString(),
+                    plan_id: planId ? parseInt(planId) : undefined
+                });
+            } else if (isSubjectMonthly) {
+                const testIdValue = testData.subject_monthly_test_id || testData.id || parseInt(testId);
+                await studyService.submitSubjectMonthlyTest({
+                    subject_monthly_test_id: Number(testIdValue),
+                    answers: formattedAnswers,
+                    started_at: startedAt,
+                    submitted_at: new Date().toISOString(),
+                    plan_id: planId ? parseInt(planId) : undefined
+                });
             }
+
+            setShouldBlock(false); // Disable blocker before navigation
+
             toast.success("Test submitted successfully!");
-            navigate(`/test-series/${subject}/test/${testId}/analytics${(isOverall || isSubject) ? `?plan_id=${planId}` : ''}`, { replace: true });
+
+            // Short delay to show the success state before navigating
+            setTimeout(() => {
+                const params = new URLSearchParams();
+                if (planId) params.set("plan_id", planId);
+
+                const finalUrl = `/test-series/${subject}/test/${testId}/analytics${params.toString() ? `?${params.toString()}` : ""}`;
+                navigate(finalUrl, { replace: true });
+            }, 1000);
+
         } catch (err: any) {
             console.error("Test submit error:", err);
+            setIsSubmitting(false);
             toast.error(err.response?.data?.detail || err.message || "Failed to submit test.");
         }
     };
@@ -170,7 +211,7 @@ const TestAttempt = () => {
                 <div className="flex flex-col items-center justify-center space-y-4">
                     <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                     <p className="text-muted-foreground font-medium">
-                        Preparing your {isWeekly ? 'Weekly' : isMonthly ? 'Monthly' : (isOverall || isSubject) ? 'Series' : ''} Test...
+                        Preparing your {subject?.toLowerCase().includes('weekly') ? 'Weekly' : subject?.toLowerCase().includes('monthly') ? 'Monthly' : (isOverall || isSubject) ? 'Series' : ''} Test...
                     </p>
                 </div>
             </div>
@@ -215,7 +256,10 @@ const TestAttempt = () => {
                     <div className="flex flex-col w-full gap-3">
                         {isCompleted ? (
                             <button
-                                onClick={() => navigate(`/test-series/${subject}/test/${testId}/analytics${(isOverall || isSubject) ? `?plan_id=${planId}` : ''}`, { replace: true })}
+                                onClick={() => {
+                                    setShouldBlock(false);
+                                    navigate(`/test-series/${subject}/test/${testId}/analytics${(isOverall || isSubject) ? `?plan_id=${planId}` : ''}`, { replace: true });
+                                }}
                                 className="w-full h-12 bg-[#0F172A] text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
                             >
                                 <BarChart2 className="w-4 h-4" />
@@ -232,7 +276,10 @@ const TestAttempt = () => {
                         ) : null}
 
                         <button 
-                            onClick={() => navigate(-1)} 
+                            onClick={() => {
+                                setShouldBlock(false);
+                                navigate(-1);
+                            }} 
                             className="w-full h-12 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all"
                         >
                             {isLocked || isSubscriptionRequired ? "Go Back" : "Try Again"}
@@ -248,7 +295,10 @@ const TestAttempt = () => {
             <div className="min-h-screen flex items-center justify-center bg-[#F5F5F7]">
                 <div className="flex flex-col items-center justify-center space-y-4">
                     <p className="text-muted-foreground font-medium text-lg">No questions found for this test.</p>
-                    <button onClick={() => navigate(-1)} className="text-primary hover:underline">Go Back</button>
+                    <button onClick={() => {
+                        setShouldBlock(false);
+                        navigate(-1);
+                    }} className="text-primary hover:underline">Go Back</button>
                 </div>
             </div>
         );
@@ -260,7 +310,8 @@ const TestAttempt = () => {
                 questions={questions}
                 onComplete={handleComplete}
                 onExit={handleExit}
-                title={isWeekly ? `Week ${testId} Test` : isMonthly ? `Month ${testId} Test` : `Practice Test - ${testId}`}
+                isSubmitting={isSubmitting}
+                title={isWeekly || isSubjectWeekly ? `Weekly Test - ${testId}` : isMonthly || isSubjectMonthly ? `Monthly Test - ${testId}` : `Practice Test - ${testId}`}
                 subtitle={testData?.total_questions ? `${testData.total_questions} Questions` : "Assessment"}
                 initialTime={testData?.duration_hours ? testData.duration_hours * 3600 : 7200}
             />
@@ -269,6 +320,7 @@ const TestAttempt = () => {
             <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
                 <DialogContent className="sm:max-w-md rounded-3xl p-6 sm:p-8 border-none shadow-2xl">
                     <DialogTitle className="sr-only">Exit Test Confirmation</DialogTitle>
+                    <DialogDescription className="sr-only">Confirm if you want to exit the test and lose progress.</DialogDescription>
                     <div className="text-center space-y-6">
                         <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto">
                             <AlertTriangle className="w-10 h-10" />

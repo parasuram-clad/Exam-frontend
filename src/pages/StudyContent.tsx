@@ -858,46 +858,27 @@ const StudyContent = () => {
       toast.success("Assessment submitted successfully!");
 
       // Stop the reading/study session timing since the topic is now fully completed (including MCQ)
-      if (activeReadingSessionId) {
-        try {
-          await studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId);
-          setActiveReadingSessionId(null);
-        } catch (e) {
-          // If already stopped or 404, we can safely ignore
-          console.log("Topic timing session already stopped or not found");
-        }
+      try {
+        await studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId);
+        setActiveReadingSessionId(null);
+      } catch (e) {
+        console.error("Failed to stop topic timing properly", e);
       }
 
       // Update study plan status to COMPLETED
       const planToUpdateId = topicDataResponse?.task?.plan_row_id || (urlPlanRowId ? parseInt(urlPlanRowId) : null);
       if (planToUpdateId) {
         try {
-          // Send multiple status fields to be exhaustive and ensure backend picks it up
           await studyService.updateStudyPlan(planToUpdateId, {
             plan_status: 'COMPLETED',
-            status: 'COMPLETED',
             is_completed: true
-          } as any);
-
-          // Optimistically update the topic content cache
-          queryClient.setQueryData(['topic-content', parsedSubtopicId, user.id, currentSubscriptionPlanId], (oldData: any) => {
-            if (!oldData) return oldData;
-            return {
-              ...oldData,
-              task: {
-                ...oldData.task,
-                status: 'COMPLETED',
-                plan_status: 'COMPLETED',
-                is_completed: true
-              }
-            };
           });
         } catch (e) {
           console.error("Failed to update study plan status", e);
         }
       }
 
-      // Invalidate queries to refresh progress and history globally
+      // Invalidate queries to refresh progress and history
       queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id] });
       queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id, currentSubscriptionPlanId] });
       queryClient.invalidateQueries({ queryKey: ['study-plans', user.id] });

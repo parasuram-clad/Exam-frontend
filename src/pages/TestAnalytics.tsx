@@ -224,6 +224,16 @@ const TestAnalytics = () => {
         ? new Date(resultData.submitted_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
         : new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
+    const handleBack = () => {
+        if (subject?.toLowerCase().includes('weekly') || subject?.toLowerCase().includes('monthly')) {
+            const params = new URLSearchParams();
+            if (planId) params.set("plan_id", planId.toString());
+            navigate(`/study-plan${params.toString() ? `?${params.toString()}` : ""}`, { replace: true });
+        } else {
+            navigate("/test-series", { replace: true });
+        }
+    };
+
     if (resultLoading || !user) {
         return (
             <DashboardLayout
@@ -246,7 +256,7 @@ const TestAnalytics = () => {
             >
                 <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
                     <p className="text-muted-foreground font-medium text-lg">No results found for this test.</p>
-                    <Button onClick={() => navigate(-1)} variant="outline" className="rounded-xl">Go Back</Button>
+                    <Button onClick={handleBack} variant="outline" className="rounded-xl">Go Back</Button>
                 </div>
             </DashboardLayout>
         );
@@ -293,7 +303,7 @@ const TestAnalytics = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 lg:mb-10">
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => navigate(-1)}
+                                onClick={handleBack}
                                 className="p-1.5 hover:bg-muted/50 rounded-full transition-colors flex-shrink-0"
                             >
                                 <ArrowLeft className="w-5 h-5 text-muted-foreground" />

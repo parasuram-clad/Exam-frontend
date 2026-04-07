@@ -7,64 +7,50 @@ export const mapRoadmapToFrontend = (
   backendPlans: StudyPlanResponse[],
   timings: TopicTiming[],
   weeklyHistory: any[],
-  monthlyHistory: any[],
-  allPlans?: any[]
+  monthlyHistory: any[]
 ): Record<number, StudyTopicCardData[]> => {
   console.log('mapRoadmapToFrontend called with:', {
     roadmapDaysCount: roadmapPlan?.length,
     backendPlansCount: backendPlans?.length,
-    timingsCount: timings?.length,
-    allPlansCount: allPlans?.length
+    timingsCount: timings?.length
   });
 
   // Create status and row ID maps for quick lookup
-  const statusMap: Record<number | string, string> = {};
+  const statusMap: Record<number, string> = {};
   const testRevisionStatusMap: Record<string, string> = {};
   const planRowIdMap: Record<number | string, number> = {};
 
-  // Build the status map from all available plans if provided, or just the current roadmapPlan
-  const plansToScan = allPlans || (roadmapPlan ? [ { days: roadmapPlan } ] : []);
-  
-  plansToScan.forEach((plan: any) => {
-    if (plan?.days) {
-      plan.days.forEach((dayPlan: any) => {
-        if (dayPlan?.items) {
-          dayPlan.items.forEach((item: any) => {
-            if (item.type === 'TOPIC') {
-              const subtopics = Array.isArray(item.topic) ? item.topic : [];
-              subtopics.forEach((t: any) => {
-                const isItemDone = t.is_completed === true || t.is_completed === 1 || t.is_completed === "true" || t.plan_status?.toUpperCase() === 'COMPLETED' || t.status?.toUpperCase() === 'COMPLETED';
-                const currentStatus = isItemDone ? 'COMPLETED' : (t.plan_status?.toUpperCase() || t.status?.toUpperCase() || 'ACTIVE');
-                
-                // Priority for COMPLETED status
-                if (t.plan_row_id) {
-                  if (currentStatus === 'COMPLETED' || statusMap[t.plan_row_id] !== 'COMPLETED') {
-                    statusMap[t.plan_row_id] = currentStatus;
-                  }
-                  planRowIdMap[t.id] = t.plan_row_id;
-                }
-                
-                // Also track by syllabus_id (t.id) to share status across plans
-                if (currentStatus === 'COMPLETED' || statusMap[t.id] !== 'COMPLETED') {
+  if (Array.isArray(roadmapPlan)) {
+    roadmapPlan.forEach(dayPlan => {
+      if (dayPlan?.items) {
+        dayPlan.items.forEach((item: any) => {
+          if (item.type === 'TOPIC') {
+            const subtopics = Array.isArray(item.topic) ? item.topic : [];
+            subtopics.forEach((t: any) => {
+              const currentStatus = t.is_completed ? 'COMPLETED' : (t.plan_status || 'ACTIVE');
+              // Use plan_row_id as key if available for precision
+              if (t.plan_row_id) {
+                statusMap[t.plan_row_id] = currentStatus;
+                planRowIdMap[t.id] = t.plan_row_id;
+              } else {
+                // Fallback to t.id (syllabus_id) only if COMPLETED (don't overwrite COMPLETED with ACTIVE)
+                if (currentStatus === 'COMPLETED' || !statusMap[t.id]) {
                   statusMap[t.id] = currentStatus;
                 }
-              });
-            } else {
-              const isItemDone = item.is_completed === true || item.is_completed === 1 || item.is_completed === "true" || item.plan_status?.toUpperCase() === 'COMPLETED' || item.status?.toUpperCase() === 'COMPLETED';
-              const currentStatus = isItemDone ? 'COMPLETED' : (item.plan_status?.toUpperCase() || item.status?.toUpperCase() || 'ACTIVE');
-              const key = item.plan_row_id || item.identifier || item.title || '';
-              if (key) {
-                if (currentStatus === 'COMPLETED' || testRevisionStatusMap[key] !== 'COMPLETED') {
-                  testRevisionStatusMap[key] = currentStatus;
-                }
-                if (item.plan_row_id) planRowIdMap[item.identifier || item.title || ''] = item.plan_row_id;
               }
+            });
+          } else {
+            const currentStatus = item.is_completed ? 'COMPLETED' : (item.plan_status || 'ACTIVE');
+            const key = item.plan_row_id || item.identifier || item.title || '';
+            if (key) {
+              testRevisionStatusMap[key] = currentStatus;
+              if (item.plan_row_id) planRowIdMap[item.identifier || item.title || ''] = item.plan_row_id;
             }
-          });
-        }
-      });
-    }
-  });
+          }
+        });
+      }
+    });
+  }
 
   // Create a timing map (sum of total_estimate per syllabus_id)
   const timingMap: Record<number, number> = {};

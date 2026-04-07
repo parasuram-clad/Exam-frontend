@@ -112,41 +112,32 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
         const subjectPlanId = subjectPlan?.plan_id;
         const overallPlanId = overallPlan?.plan_id;
 
-        // Collect all unique topics by syllabus ID to avoid double counting across Overall and Subject plans
-        const uniqueTopicsMap = new Map<number, { isCompleted: boolean; minutes: number }>();
-
+        // Collect all target items for this subject
+        const allItems: any[] = [];
         roadmapData.plan.forEach((plan: any) => {
-            const isRelevantPlan = (plan.plan_type === 'SUBJECT' && plan.subject_name === subject) || (plan.plan_type === 'OVERALL');
-            
-            if (isRelevantPlan) {
-                plan.days.forEach((day: any) => {
-                    day.items.forEach((item: any) => {
-                        // For TOPIC types, check if it's the target subject
-                        if (item.type === 'TOPIC' && item.subject === subject && item.topic) {
-                            item.topic.forEach((t: any) => {
-                                const isDone = t.is_completed === true || t.is_completed === 1 || t.is_completed === "true" || t.plan_status?.toUpperCase() === 'COMPLETED' || t.status?.toUpperCase() === 'COMPLETED';
-                                const existing = uniqueTopicsMap.get(t.id);
-                                if (!existing || isDone) {
-                                    uniqueTopicsMap.set(t.id, { 
-                                        isCompleted: isDone || (existing?.isCompleted || false), 
-                                        minutes: t.minutes || 45 
-                                    });
-                                }
-                            });
-                        }
+            if (plan.plan_type === 'SUBJECT' && plan.subject_name === subject) {
+                plan.days.forEach((d: any) => allItems.push(...(d.items || [])));
+            } else if (plan.plan_type === 'OVERALL') {
+                plan.days.forEach((d: any) => {
+                    d.items.forEach((item: any) => {
+                        if (item.type === 'TOPIC' && item.subject === subject) allItems.push(item);
                     });
                 });
             }
         });
 
-        if (uniqueTopicsMap.size === 0) return 0;
+        if (allItems.length === 0) return 0;
 
         // Create a context-aware timing map
         const timingMap: Record<number, number> = {};
         const now = new Date();
         topicTimings.forEach(t => {
-            // A timing record is relevant if it belongs to the subject's specific plan OR if it belongs to the overall plan
-            const isRelevant = (subjectPlanId && t.plan_id === subjectPlanId) || (overallPlanId && t.plan_id === overallPlanId);
+            // A timing record is relevant if it belongs to the subject's specific plan
+            // OR if it belongs to the overall plan (only as a fallback if no subject-specific plan exists or if we want shared progress)
+            // For "proper" subject-wise display, we prioritize the subject plan ID if available.
+            const isRelevant = subjectPlanId
+                ? t.plan_id === subjectPlanId
+                : t.plan_id === overallPlanId;
 
             if (isRelevant) {
                 let m = Number(t.total_estimate || 0);
@@ -160,17 +151,25 @@ export const SubjectPlanView: React.FC<SubjectPlanViewProps> = ({
         });
 
         let totalProgressWeight = 0;
-        uniqueTopicsMap.forEach((data, syllabusId) => {
-            if (data.isCompleted) {
-                totalProgressWeight += 100;
-            } else {
-                const spent = timingMap[syllabusId] || 0;
-                const planned = data.minutes;
-                totalProgressWeight += Math.min(90, (spent / (planned || 1)) * 100);
+        let count = 0;
+
+        allItems.forEach(item => {
+            if (item.type === 'TOPIC' && item.topic) {
+                item.topic.forEach((t: any) => {
+                    count++;
+                    if (t.is_completed || t.plan_status === 'COMPLETED') {
+                        totalProgressWeight += 100;
+                    } else {
+                        const spent = timingMap[t.id] || 0;
+                        const planned = t.minutes || 45;
+                        totalProgressWeight += Math.min(90, (spent / (planned || 1)) * 100);
+                    }
+                });
             }
         });
 
-        return Math.round(totalProgressWeight / uniqueTopicsMap.size);
+        const progress = count === 0 ? 0 : Math.round(totalProgressWeight / count);
+        return progress;
     };
 
     const isSubscribed = (subject: string) => {

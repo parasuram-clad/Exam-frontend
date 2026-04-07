@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { prefetchTopic } from "@/services/prefetch";
@@ -51,6 +51,8 @@ export const StudyTopicDetailDialog = ({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[85vh] overflow-hidden p-0 bg-background rounded-2xl sm:rounded-3xl flex flex-col">
+        <DialogTitle className="sr-only">Topic Details - {selectedTopic?.title || 'Details'}</DialogTitle>
+        <DialogDescription className="sr-only">Detailed breakdown of subtopics and progress for {selectedTopic?.title || 'this topic'}.</DialogDescription>
         {selectedTopic && (
           <div className="p-5 sm:p-8 overflow-y-auto flex-1">
             <div className="flex items-center gap-3 mb-6">
