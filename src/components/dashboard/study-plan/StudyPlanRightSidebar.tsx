@@ -50,6 +50,8 @@ interface StudyPlanRightSidebarProps {
   planDays: DayCycleItem[];
   notes?: StudyNote[];
   areasToImprove?: any[];
+  features?: any;
+  examDate?: string;
 }
 
 export const StudyPlanRightSidebar = ({
@@ -58,7 +60,9 @@ export const StudyPlanRightSidebar = ({
   selectedDate,
   planDays,
   notes = [],
-  areasToImprove = []
+  areasToImprove = [],
+  features,
+  examDate
 }: StudyPlanRightSidebarProps) => {
   const [noteSearch, setNoteSearch] = useState("");
   const [localNotes, setLocalNotes] = useState<any[]>([]);
@@ -345,6 +349,7 @@ export const StudyPlanRightSidebar = ({
             onDateClick={onDateClick}
             selectedDate={selectedDate}
             planDays={planDays}
+            examDate={examDate}
           />
 
           <div className="bg-card rounded-xl p-5 border border-border shadow-sm">
@@ -388,60 +393,62 @@ export const StudyPlanRightSidebar = ({
             </div>
           </div>
 
-          <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-medium text-lg text-foreground">Areas to Improve</h3>
-              <button
-                onClick={() => navigate("/progress")}
-                className="p-1.5 rounded-lg hover:bg-muted transition-all text-muted-foreground hover:text-primary"
-                title="View Detailed Progress"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-4 sm:space-y-6">
-              {(!areasToImprove || areasToImprove.length === 0) ? (
-                <p className="text-xs text-muted-foreground text-center py-4">Great job! No weak areas found.</p>
-              ) : (
-                areasToImprove.slice(0, 3).map((item: any) => (
-                  <div
-                    key={item.syllabus_id}
-                    className="flex items-center justify-between group cursor-pointer"
-                    onClick={() => navigate("/progress")}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-secondary/30 flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105">
-                        {item.subject_image ? (
-                          <img src={getMediaUrl(item.subject_image)} alt={item.subject} className="w-6 h-6" />
-                        ) : (
-                          <Target className="w-5 h-5 text-primary/70" />
-                        )}
+          {features?.areas_to_improve && (
+            <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-medium text-lg text-foreground">Areas to Improve</h3>
+                <button
+                  onClick={() => navigate("/progress")}
+                  className="p-1.5 rounded-lg hover:bg-muted transition-all text-muted-foreground hover:text-primary"
+                  title="View Detailed Progress"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-4 sm:space-y-6">
+                {(!areasToImprove || areasToImprove.length === 0) ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">Great job! No weak areas found.</p>
+                ) : (
+                  areasToImprove.slice(0, 3).map((item: any) => (
+                    <div
+                      key={item.syllabus_id}
+                      className="flex items-center justify-between group cursor-pointer"
+                      onClick={() => navigate("/progress")}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-secondary/30 flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105">
+                          {item.subject_image ? (
+                            <img src={getMediaUrl(item.subject_image)} alt={item.subject} className="w-6 h-6" />
+                          ) : (
+                            <Target className="w-5 h-5 text-primary/70" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-[11px] sm:text-[12px] text-foreground leading-tight group-hover:text-primary transition-colors">
+                            {item.subject}
+                          </h4>
+                          <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 sm:mt-1 font-medium">{item.topic}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-medium text-[11px] sm:text-[12px] text-foreground leading-tight group-hover:text-primary transition-colors">
-                          {item.subject}
-                        </h4>
-                        <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 sm:mt-1 font-medium">{item.topic}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "p-1 rounded-xl border flex items-center justify-center shrink-0",
-                        item.badge_color === "red" ? "bg-destructive/5 border-destructive/10" : "bg-orange-500/5 border-orange-500/10"
-                      )}>
-                        <span className={cn(
-                          "text-[9px] font-medium whitespace-nowrap",
-                          item.badge_color === "red" ? "text-destructive" : "text-orange-600"
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "p-1 rounded-xl border flex items-center justify-center shrink-0",
+                          item.badge_color === "red" ? "bg-destructive/5 border-destructive/10" : "bg-orange-500/5 border-orange-500/10"
                         )}>
-                          {Math.round(item.accuracy)}% Acc
-                        </span>
+                          <span className={cn(
+                            "text-[9px] font-medium whitespace-nowrap",
+                            item.badge_color === "red" ? "text-destructive" : "text-orange-600"
+                          )}>
+                            {Math.round(item.accuracy)}% Acc
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
 

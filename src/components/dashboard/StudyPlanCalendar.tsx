@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
     format,
@@ -32,11 +32,12 @@ interface StudyPlanCalendarProps {
     onDateClick?: (date: Date) => void;
     selectedDate?: Date;
     planDays?: DayCycleItem[];
+    examDate?: string;
 }
 
 import { ClipboardList, RotateCcw } from "lucide-react";
 
-export function StudyPlanCalendar({ onDateClick, selectedDate, planDays = [] }: StudyPlanCalendarProps) {
+export function StudyPlanCalendar({ onDateClick, selectedDate, planDays = [], examDate }: StudyPlanCalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const today = startOfDay(new Date());
 
@@ -108,38 +109,48 @@ export function StudyPlanCalendar({ onDateClick, selectedDate, planDays = [] }: 
                         <div key={index} className="flex items-center justify-center relative h-8 w-full">
                             {isSelectedMonth ? (
                                 <button
-                                    onClick={() => planItem && onDateClick?.(checkDay)}
-                                    // Removed disabled={!planItem} to let user interact with all dates if they want, 
-                                    // but we highlight specifically the plan items
+                                    onClick={() => (planItem || (examDate && isSameDay(checkDay, new Date(examDate)))) && onDateClick?.(checkDay)}
                                     className={cn(
-                                        "w-7 h-7 flex items-center justify-center rounded-full text-xs font-medium transition-all duration-200 relative",
-                                        !planItem && isToday && "text-[#72C146] border border-[#72C146]/30",
-                                        !planItem && !isToday && "text-slate-200 cursor-not-allowed opacity-50",
+                                        "w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 relative",
+                                        
+                                        // Base state for dates NOT in plan
+                                        !planItem && !isToday && !isSelected && "text-slate-200 cursor-not-allowed opacity-50",
+                                        !planItem && isToday && !isSelected && "text-[#72C146] border border-[#72C146]/30",
 
+                                        // Dates IN plan (Interactive)
                                         planItem && !isSelected && !isToday && !isCompleted && "text-[#1a2b4b] hover:bg-primary/5",
 
                                         // Completed status
                                         isCompleted && !isSelected && !isToday && "bg-[#1a2b4b] text-white",
 
+                                        // Exam Date (Override visibility/activity)
+                                        examDate && isSameDay(checkDay, new Date(examDate)) && !isSelected && "opacity-100 cursor-pointer border-2 border-rose-200 text-rose-600",
+
                                         // Today status (Override if it's today)
                                         isToday && !isSelected && "bg-[#72C146] text-white shadow-[0_4px_10px_rgba(114,193,70,0.3)]",
 
                                         // Selected status (High priority)
-                                        isSelected && "bg-accent text-accent-foreground shadow-lg ring-2 ring-accent/30 scale-110 z-10"
+                                        isSelected && "bg-accent text-accent-foreground shadow-lg ring-2 ring-accent/30 scale-105 z-10"
                                     )}
                                 >
-                                    <div className="flex flex-col items-center">
-                                        <span className="leading-none">{format(day, "d")}</span>
+                                    <span className="text-[11px] font-bold leading-none">{format(day, "d")}</span>
+                                    <div className="absolute -bottom-1.5 left-0 right-0 flex items-center justify-center gap-[1px]">
                                         {planItem?.isAssessment && (
                                             <ClipboardList className={cn(
-                                                "w-[8px] h-[8px] mt-[1px]",
-                                                isSelected || isToday || isCompleted ? "text-white/80" : "text-primary"
+                                                "w-[7px] h-[7px]",
+                                                isSelected || isToday || isCompleted ? "text-primary/70" : "text-primary"
                                             )} />
                                         )}
                                         {planItem?.isRevision && (
                                             <RotateCcw className={cn(
-                                                "w-[8px] h-[8px] mt-[1px]",
-                                                isSelected || isToday || isCompleted ? "text-white/80" : "text-orange-500"
+                                                "w-[7px] h-[7px]",
+                                                isSelected || isToday || isCompleted ? "text-orange-400" : "text-orange-500"
+                                            )} />
+                                        )}
+                                        {examDate && isSameDay(checkDay, new Date(examDate)) && (
+                                            <Flag className={cn(
+                                                "w-[7px] h-[7px]",
+                                                isSelected || isToday || isCompleted ? "text-rose-400" : "text-rose-500",
                                             )} />
                                         )}
                                     </div>
@@ -155,18 +166,22 @@ export function StudyPlanCalendar({ onDateClick, selectedDate, planDays = [] }: 
             <div className="h-[1px] bg-slate-50 w-full mb-6" />
 
             {/* Legend */}
-            <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#1a2b4b]" />
-                    <span className="text-[11px] font-medium text-slate-400">Completed</span>
+            <div className="flex items-center justify-between gap-1 px-0.5">
+                <div className="flex items-center gap-1 min-w-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#1a2b4b] shrink-0" />
+                    <span className="text-[9px] font-medium text-slate-400 truncate">Completed</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#72C146]" />
-                    <span className="text-[11px] font-medium text-slate-400">Today</span>
+                <div className="flex items-center gap-1 min-w-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#72C146] shrink-0" />
+                    <span className="text-[9px] font-medium text-slate-400 truncate">Today</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-accent" />
-                    <span className="text-[11px] font-medium text-slate-400">Selected</span>
+                <div className="flex items-center gap-1 min-w-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                    <span className="text-[9px] font-medium text-slate-400 truncate">Selected</span>
+                </div>
+                <div className="flex items-center gap-1 min-w-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                    <span className="text-[9px] font-medium text-slate-400 truncate">Exam</span>
                 </div>
             </div>
         </div>

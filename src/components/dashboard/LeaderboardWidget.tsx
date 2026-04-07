@@ -116,9 +116,9 @@ export function LeaderboardWidget({ data = defaultLeaderboardData }: Leaderboard
           <div className="pb-3 text-right">Acc.</div>
         </div>
 
-        {/* Entries (Grouped in col-span-4 to use flex/grid for rows) */}
+        {/* Entries (Top 5) */}
         <div className="col-span-4 space-y-2.5">
-          {data.slice(0, 5).map((entry) => (
+          {data.slice(0, 3).map((entry) => (
             <Link
               key={entry.rank}
               to="/profile"
@@ -163,6 +163,52 @@ export function LeaderboardWidget({ data = defaultLeaderboardData }: Leaderboard
               </div>
             </Link>
           ))}
+
+          {/* User's rank if not in top 3 */}
+          {(() => {
+            const userInTop3 = data.slice(0, 3).some(e => e.isYou);
+            const userEntry = data.find(e => e.isYou);
+
+            if (!userInTop3 && userEntry) {
+              return (
+                <>
+                  <div className="flex justify-center py-0.5 opacity-30">
+                    <div className="h-1 w-1 rounded-full bg-foreground mx-0.5" />
+                    <div className="h-1 w-1 rounded-full bg-foreground mx-0.5" />
+                    <div className="h-1 w-1 rounded-full bg-foreground mx-0.5" />
+                  </div>
+                  <Link
+                    to="/profile"
+                    className="grid grid-cols-[1.4rem_1fr_2.4rem_3.2rem] items-center rounded-xl p-2 transition-all gap-2 cursor-pointer bg-blue-50/80 border border-blue-100 shadow-sm"
+                  >
+                    <div className="flex justify-start items-center pl-0.5">
+                      <RankMedal rank={userEntry.rank} />
+                    </div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Avatar className="w-6 h-6 flex-shrink-0">
+                        <AvatarImage src={userEntry.avatar} />
+                        <AvatarFallback className={cn("text-[0.6rem] font-bold text-white bg-slate-500")}>
+                          {userEntry.initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[0.68rem] font-semibold text-foreground leading-tight py-0.5">
+                          {userEntry.name} (You)
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right text-[0.65rem] font-bold text-muted-foreground/80 pr-0.5">
+                      {userEntry.marks}
+                    </div>
+                    <div className="text-right text-[0.65rem] font-bold text-foreground">
+                      {userEntry.accuracy}
+                    </div>
+                  </Link>
+                </>
+              );
+            }
+            return null;
+          })()}
         </div>
       </div>
 

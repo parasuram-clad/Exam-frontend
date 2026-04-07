@@ -52,19 +52,11 @@ const StudyPlan = () => {
   const { user, currentContext, currentContextId, setCurrentContextId } = useAuth();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Derive the active study context. If current is not a study plan, fallback to first available study plan.
-  const studyContext = useMemo(() => {
-    if (currentContext?.plan_type === 'OVERALL' || currentContext?.plan_type === 'SUBJECT') {
-      return currentContext;
-    }
-    return user?.dashboard?.contexts?.find(c => c.plan_type === 'OVERALL' || c.plan_type === 'SUBJECT');
-  }, [currentContext, user?.dashboard?.contexts]);
-
   // Combined Roadmap and Progress data - we no longer need a separate user-plans fetch
   const { data: roadmapData, isLoading: roadmapLoading } = useQuery<RoadmapResponse>({
-    queryKey: ['roadmap', user?.id, studyContext?.plan_id],
-    queryFn: () => studyService.getUserRoadmap(user!.id, studyContext?.plan_id),
-    enabled: !!user?.id,
+    queryKey: ['roadmap', user?.id, currentContext?.plan_id],
+    queryFn: () => studyService.getUserRoadmap(user!.id, currentContext!.plan_id),
+    enabled: !!user?.id && !!currentContext?.plan_id,
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
@@ -127,11 +119,13 @@ const StudyPlan = () => {
   });
 
   const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
-    queryKey: ['dashboard', user?.id, studyContext?.plan_id],
-    queryFn: () => studyService.getDashboardData(user!.id, studyContext?.plan_id),
-    enabled: !!user?.id,
+    queryKey: ['dashboard', user?.id, currentContext?.plan_id],
+    queryFn: () => studyService.getDashboardData(user!.id, currentContext?.plan_id),
+    enabled: !!user?.id && !!currentContext?.plan_id,
     staleTime: 5 * 60 * 1000,
   });
+
+  const features = dashboardData?.context?.features;
 
   const loading = roadmapLoading || dashboardLoading;
 
@@ -166,16 +160,16 @@ const StudyPlan = () => {
   }, [user]);
 
   useEffect(() => {
-    if (studyContext && !selectedTopic) {
-      if (studyContext.plan_type === 'OVERALL') {
+    if (currentContext && !selectedTopic) {
+      if (currentContext.plan_type === 'OVERALL') {
         setViewMode('overall');
         setSelectedSubject(null);
-      } else {
+      } else if (currentContext.plan_type === 'SUBJECT') {
         setViewMode('subject');
-        setSelectedSubject(studyContext.subject_name || studyContext.label);
+        setSelectedSubject(currentContext.subject_name || currentContext.label);
       }
     }
-  }, [studyContext?.context_id, selectedTopic]);
+  }, [currentContext?.context_id, selectedTopic]);
 
   useEffect(() => {
     if (selectedSubject) {
@@ -409,7 +403,10 @@ const StudyPlan = () => {
       const hours = parseInt(setupData.studyGoal.replace(/[^0-9]/g, '')) || 4;
       await authService.updateProfile(user.id, { full_name: setupData.name, exam_type: setupData.examType, sub_division: setupData.subDivision.join(", "), target_exam_year: parseInt(setupData.targetYear), learner_type: setupData.learnerType, preferred_language: setupData.medium === 'tamil' ? 'ta' : 'en' });
       await studyService.generateStudyPlan({ user_id: user.id, exam_type: setupData.examType, sub_division: setupData.subDivision.join(", "), year: parseInt(setupData.targetYear), learner_type: setupData.learnerType, daily_study_hours: hours, language: setupData.medium === 'tamil' ? 'Tamil' : 'English' });
-      await queryClient.invalidateQueries({ queryKey: ['roadmap', user.id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['roadmap', user.id] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard', user.id] }),
+      ]);
       setActiveDay(1);
       toast.success("Study plan generated successfully!");
       setIsSetupModalOpen(false);
@@ -471,7 +468,8 @@ const StudyPlan = () => {
           user={user} avatarUrl={avatarUrl} initials={(user?.full_name || "A").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
           onDateClick={(date) => { const ds = format(date, 'yyyy-MM-dd'); const dm = currentPlan?.days?.find(d => d.date === ds); if (dm) setActiveDay(dm.day); }}
           selectedDate={currentPlan?.days?.find(d => d.day === activeDay)?.date ? new Date(currentPlan.days.find(d => d.day === activeDay)!.date) : new Date()}
-          planDays={dynamicDayCycle} notes={allNotes} areasToImprove={dashboardData?.areas_to_improve?.areas || []}
+          planDays={dynamicDayCycle} notes={allNotes} areasToImprove={dashboardData?.areas_to_improve?.areas || []} features={features}
+          examDate={features?.exam_calendar ? dashboardData?.exam_calendar?.exam_date : undefined}
         />
       )}
     >
@@ -501,7 +499,19 @@ const StudyPlan = () => {
       </div>
 
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8 pb-10 pt-4" >
-        <motion.div variants={itemVariants}><StudyBannerCountdown daysLeft={daysLeft} examEndDate={dashboardData?.exam_calendar?.exam_date || overallPlanDate} user={user} overallProgress={bannerProgress} currentProgressDay={bannerDay} progressLabel={bannerLabel} hideProgressBar={viewMode === 'subject' && !selectedSubject} /></motion.div>
+        {features?.overall_performance && (
+          <motion.div variants={itemVariants}>
+            <StudyBannerCountdown 
+              daysLeft={daysLeft} 
+              examEndDate={features?.exam_calendar ? (dashboardData?.exam_calendar?.exam_date || overallPlanDate) : undefined} 
+              user={user} 
+              overallProgress={bannerProgress} 
+              currentProgressDay={bannerDay} 
+              progressLabel={bannerLabel} 
+              hideProgressBar={viewMode === 'subject' && !selectedSubject} 
+            />
+          </motion.div>
+        )}
         {(!roadmapData?.plan || roadmapData.plan.length === 0) ? (
           <motion.div variants={itemVariants} className="w-full bg-card rounded-2xl p-12 border border-dashed flex flex-col items-center justify-center text-center space-y-6">
             <div className="p-6 bg-primary/10 rounded-full"><BookOpen className="w-12 h-12 text-primary" /></div>

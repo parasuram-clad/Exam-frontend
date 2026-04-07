@@ -89,18 +89,7 @@ const TestSeries = () => {
   const navigate = useNavigate();
   const { user, currentContext } = useAuth();
 
-  // Derive the active test context. If current context doesn't likely have tests, fallback to a test-series plan.
-  const testContext = useMemo(() => {
-    if (currentContext?.plan_type?.includes('TEST_SERIES')) {
-      return currentContext;
-    }
-    // Preferred fallback: a dedicated test series plan
-    const tsPlan = user?.dashboard?.contexts?.find(c => c.plan_type?.includes('TEST_SERIES'));
-    if (tsPlan) return tsPlan;
-    
-    // Last fallback: use the current context anyway (it might have tests)
-    return currentContext;
-  }, [currentContext, user?.dashboard?.contexts]);
+  // Removed testContext fallback to ensure the page reflects the sidebar selection directly.
 
   const [activeTab, setActiveTab] = useState<"subject" | "sets">("sets");
 
@@ -111,11 +100,18 @@ const TestSeries = () => {
     user?.dashboard?.contexts?.some(c => c.plan_type === 'SUBJECT_TEST_SERIES'), [user]);
   const showTabs = hasOverallTests && hasSubjectTests;
 
-  // Sync activeTab with available plans when they load
+  // Sync activeTab with current context type if it's a test series
   useEffect(() => {
-    if (hasOverallTests && !hasSubjectTests) setActiveTab("sets");
-    else if (!hasOverallTests && hasSubjectTests) setActiveTab("subject");
-  }, [hasOverallTests, hasSubjectTests]);
+    if (currentContext?.plan_type === 'OVERALL_TEST_SERIES') {
+      setActiveTab("sets");
+    } else if (currentContext?.plan_type === 'SUBJECT_TEST_SERIES') {
+      setActiveTab("subject");
+    } else if (hasOverallTests && !hasSubjectTests) {
+      setActiveTab("sets");
+    } else if (!hasOverallTests && hasSubjectTests) {
+      setActiveTab("subject");
+    }
+  }, [currentContext?.plan_type, hasOverallTests, hasSubjectTests]);
 
   const [roadmap, setRoadmap] = useState<OverallRoadmapResponse['plans'][0] | null>(null);
   const [subjects, setSubjects] = useState<TestSubject[]>([]);
@@ -199,15 +195,16 @@ const TestSeries = () => {
     try {
       setLoading(true);
 
-      // 1. Fetch Overall Roadmap using either the dedicated OVERALL_TEST_SERIES plan ID or derived fallback
-      const overallPlan = user?.dashboard?.contexts?.find(c => c.plan_type === 'OVERALL_TEST_SERIES');
-      const targetOverallId = overallPlan?.plan_id || (testContext?.plan_type === 'OVERALL_TEST_SERIES' ? testContext.plan_id : undefined);
-
+      // 1. Fetch Overall Roadmap
+      const targetOverallId = currentContext?.plan_type === 'OVERALL_TEST_SERIES' 
+        ? currentContext.plan_id 
+        : user?.dashboard?.contexts?.find(c => c.plan_type === 'OVERALL_TEST_SERIES')?.plan_id;
+  
       if (targetOverallId || hasOverallTests) {
         const roadmaps = await testSeriesOverallService.getRoadmap(targetOverallId);
         if (roadmaps.plans && roadmaps.plans.length > 0) {
           setRoadmap(roadmaps.plans[0]);
-        } else if (hasOverallTests) {
+        } else if (hasOverallTests && activeTab === "sets") {
            setIsModalOpen(true);
         }
       }
@@ -247,7 +244,7 @@ const TestSeries = () => {
       setLoading(false);
       setSubjectsLoading(false);
     }
-  }, [user, testContext, hasOverallTests, hasSubjectTests]);
+  }, [user, currentContext, hasOverallTests, hasSubjectTests, activeTab]);
 
   // Handle auto-refresh when window gains focus
   useEffect(() => {

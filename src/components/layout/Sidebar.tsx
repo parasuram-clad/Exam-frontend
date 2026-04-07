@@ -17,6 +17,9 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import studyService from "@/services/study.service";
+import { Loader2, Sparkles } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -107,19 +110,29 @@ export function Sidebar({ isOpen, onToggle, activePath }: SidebarProps) {
 
           {/* Context Switcher */}
           {user?.dashboard?.contexts && user.dashboard.contexts.length > 0 && (
-            <div className="mt-2">
-              <Select value={currentContextId} onValueChange={setCurrentContextId}>
-                <SelectTrigger className="w-full bg-muted/50 border-none h-11 rounded-xl text-xs font-semibold hover:bg-muted transition-colors">
-                  <SelectValue placeholder="Select Plan" />
-                </SelectTrigger>
-                <SelectContent>
-                  {user.dashboard.contexts.map((ctx, index) => (
-                    <SelectItem key={`${ctx.context_id}-${index}`} value={ctx.context_id} className="text-xs font-medium">
-                      {ctx.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="mt-2 space-y-3">
+              <div className="relative group">
+                <Select value={currentContextId} onValueChange={setCurrentContextId}>
+                  <SelectTrigger className="w-full bg-muted/50 border border-border/50 h-11 rounded-xl text-xs font-semibold hover:bg-muted transition-all duration-300">
+                    <SelectValue placeholder="Select Plan" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-border shadow-xl">
+                    {user.dashboard.contexts.map((ctx, index) => (
+                      <SelectItem key={`${ctx.context_id}-${index}`} value={ctx.context_id} className="text-xs font-medium cursor-pointer">
+                        {ctx.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Plan Features List */}
+              {/* {user?.id && (
+                <PlanFeaturesSummary 
+                  planId={user.dashboard?.contexts?.find(c => c.context_id === currentContextId)?.plan_id} 
+                  userId={user.id} 
+                />
+              )} */}
             </div>
           )}
         </div>
@@ -183,6 +196,45 @@ export function Sidebar({ isOpen, onToggle, activePath }: SidebarProps) {
 
       </aside>
     </>
+  );
+}
+
+function PlanFeaturesSummary({ planId, userId }: { planId?: number; userId: number }) {
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ['dashboard-features', userId, planId],
+    queryFn: () => studyService.getDashboardData(userId, planId),
+    enabled: !!planId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const features = dashboardData?.context?.features;
+
+  if (isLoading) return <div className="h-4 w-20 bg-muted/30 animate-pulse rounded" />;
+  if (!features) return null;
+
+  const activeFeatures = Object.entries(features)
+    .filter(([_, enabled]) => enabled === true)
+    .map(([key]) => key.split('_').map(word => {
+      if (word === "mcqs") return "MCQs";
+      return word[0].toUpperCase() + word.slice(1);
+    }).join(' '));
+
+  if (activeFeatures.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1 px-1">
+      {activeFeatures.slice(0, 5).map(f => (
+        <span key={f} className="inline-flex items-center gap-1 text-[9px] font-bold text-muted-foreground/60 bg-muted/20 px-1.5 py-0.5 rounded-md border border-border/10">
+          <Sparkles className="w-2.5 h-2.5 text-primary/30" />
+          {f}
+        </span>
+      ))}
+      {activeFeatures.length > 5 && (
+        <span className="text-[9px] font-bold text-muted-foreground/40 px-1">
+          +{activeFeatures.length - 5}
+        </span>
+      )}
+    </div>
   );
 }
 

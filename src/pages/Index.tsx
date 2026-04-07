@@ -81,6 +81,13 @@ const Index = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: dashboardData } = useQuery({
+    queryKey: ['dashboard', user?.id, currentContext?.plan_id],
+    queryFn: () => studyService.getDashboardData(user!.id, currentContext?.plan_id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   // useMediaQuery to detect desktop (xl breakpoint)
@@ -150,6 +157,7 @@ const Index = () => {
         queryClient.invalidateQueries({ queryKey: ['user-me'] }),
         queryClient.invalidateQueries({ queryKey: ['study-plans', user!.id] }),
         queryClient.invalidateQueries({ queryKey: ['roadmap', user!.id] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard', user!.id] }),
       ]);
 
       toast.success("Study plan generated successfully!");
@@ -189,7 +197,7 @@ const Index = () => {
     if (welcomeParam && isNewUser && !hasShownWelcome) {
       setIsWelcomeModalOpen(true);
       localStorage.setItem(storageKey, "true");
-      
+
       // Clean up the URL
       const newParams = new URLSearchParams(searchParams);
       newParams.delete("welcome");
@@ -218,7 +226,7 @@ const Index = () => {
     if (roadmap?.plan && roadmap.plan.length > 0) {
       const overallPlan = roadmap.plan.find(p => p.plan_type === 'OVERALL') || roadmap.plan[0];
       const sortedDays = [...overallPlan.days].sort((a, b) => a.day - b.day);
-      
+
       const firstIncomplete = sortedDays.find(day => {
         return !day.items.every(item => {
           if (item.type === 'TOPIC') {
@@ -279,7 +287,7 @@ const Index = () => {
 
         buttonLabel = progress === 100 ? "Review"
           : (completedCount > 0 || inProgressCount > 0) ? "Continue Learning"
-          : "Start Now";
+            : "Start Now";
       } else if (item.type === 'TEST') {
         subtitle = "Test available";
         topics = [item.description || "Weekly Revision Test"];
@@ -495,6 +503,7 @@ const Index = () => {
             <p className="text-[#1a2b4b] text-sm md:text-lg font-medium">
               Let's learn something new today!
             </p>
+
           </div>
 
           {/* Decorative Liquid Animated Blobs */}
@@ -619,15 +628,15 @@ const Index = () => {
                     Set up your personalized exam preparation roadmap to start tracking your daily progress.
                   </p>
                 </div>
-                <Button 
+                <Button
                   onClick={() => setIsSetupModalOpen(true)}
                   disabled={isGenerating}
                   className="rounded-xl px-8 h-12 bg-[#1a2b4b] text-white hover:bg-[#1a2b4b]/90 shadow-lg shadow-[#1a2b4b]/10"
                 >
                   {isGenerating ? (
                     <span className="flex items-center gap-2">
-                       <Loader2 className="w-4 h-4 animate-spin" />
-                       Generating...
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating...
                     </span>
                   ) : "Set Up My Plan"}
                 </Button>
@@ -672,8 +681,8 @@ const Index = () => {
                         className={cn(
                           "h-full rounded-full transition-all duration-700",
                           item.progress >= 100 ? "bg-emerald-500" :
-                          item.progress > 0 ? "bg-primary" :
-                          "bg-muted-foreground/20"
+                            item.progress > 0 ? "bg-primary" :
+                              "bg-muted-foreground/20"
                         )}
                         style={{ width: `${Math.min(100, item.progress || 0)}%` }}
                       />
@@ -890,13 +899,13 @@ const Index = () => {
         </motion.div>
 
       </motion.div>
-      <StudySetupModal 
-        isOpen={isSetupModalOpen} 
-        onOpenChange={setIsSetupModalOpen} 
-        isGenerating={isGenerating} 
-        setupData={setupData} 
-        setSetupData={setSetupData} 
-        onGenerate={handleGeneratePlan} 
+      <StudySetupModal
+        isOpen={isSetupModalOpen}
+        onOpenChange={setIsSetupModalOpen}
+        isGenerating={isGenerating}
+        setupData={setupData}
+        setSetupData={setSetupData}
+        onGenerate={handleGeneratePlan}
       />
     </DashboardLayout>
   );
