@@ -574,7 +574,12 @@ const StudyContent = () => {
     return () => {
       isActive = false;
       if (started && !isNaN(parsedSubtopicId)) {
-        studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId).catch(() => { });
+        studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId).catch((e: any) => {
+          // Silently ignore 404 (no active session) — not a blocking error
+          if (e?.response?.status !== 404) {
+            console.error("Failed to stop topic timing on unmount", e);
+          }
+        });
         queryClient.invalidateQueries({ queryKey: ['topic-timings'] });
       }
     };
@@ -861,12 +866,19 @@ const StudyContent = () => {
       try {
         await studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId);
         setActiveReadingSessionId(null);
-      } catch (e) {
-        console.error("Failed to stop topic timing properly", e);
+      } catch (e: any) {
+        // 404 means no active session was found (e.g. already stopped or never started) — not a blocking error
+        const status = e?.response?.status;
+        if (status !== 404) {
+          console.error("Failed to stop topic timing properly", e);
+        }
+        setActiveReadingSessionId(null);
       }
 
       // Update study plan status to COMPLETED
-      const planToUpdateId = topicDataResponse?.task?.plan_row_id || (urlPlanRowId ? parseInt(urlPlanRowId) : null);
+      // Prefer urlPlanRowId (set by roadmap navigation) — it is always the canonical row.
+      // Fall back to topicDataResponse?.task?.plan_row_id only when URL param is absent.
+      const planToUpdateId = (urlPlanRowId ? parseInt(urlPlanRowId) : null) || topicDataResponse?.task?.plan_row_id;
       if (planToUpdateId) {
         try {
           await studyService.updateStudyPlan(planToUpdateId, {
@@ -883,6 +895,7 @@ const StudyContent = () => {
       queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id, currentSubscriptionPlanId] });
       queryClient.invalidateQueries({ queryKey: ['study-plans', user.id] });
       queryClient.invalidateQueries({ queryKey: ['roadmap', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['roadmap', user.id, currentSubscriptionPlanId] });
       queryClient.invalidateQueries({ queryKey: ['topic-content', parsedSubtopicId, user.id] });
       queryClient.invalidateQueries({ queryKey: ['assessment-history', user.id, parsedSubtopicId] });
 

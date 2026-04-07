@@ -252,7 +252,7 @@ const studyService = {
     /**
      * Update study plan status
      */
-    updateStudyPlan: async (planId: number, payload: { plan_status?: string, minutes?: number }) => {
+    updateStudyPlan: async (planId: number, payload: { plan_status?: string, minutes?: number, is_completed?: boolean }) => {
         const response = await apiClient.put(`/study-plan/${planId}`, payload);
         return response.data;
     },
