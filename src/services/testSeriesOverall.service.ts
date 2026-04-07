@@ -71,8 +71,10 @@ export const testSeriesOverallService = {
     return response.data;
   },
 
-  async getRoadmap(): Promise<OverallRoadmapResponse> {
-    const response = await apiClient.get<OverallRoadmapResponse>("/test-series/overall/roadmap");
+  async getRoadmap(planId?: number): Promise<OverallRoadmapResponse> {
+    const response = await apiClient.get<OverallRoadmapResponse>("/test-series/overall/roadmap", {
+      params: { plan_id: planId }
+    });
     return response.data;
   },
 

@@ -1,4 +1,4 @@
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, useBlocker } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import TestEngine, { Question, Answer } from "@/components/TestEngine";
@@ -9,6 +9,13 @@ import authService from "@/services/auth.service";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, Lock, AlertTriangle, BarChart2, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogTitle,
+} from "@/components/ui/dialog";
+
 
 const TestAttempt = () => {
     const { subject, testId } = useParams<{ subject: string; testId: string }>();
@@ -16,6 +23,19 @@ const TestAttempt = () => {
     const planId = searchParams.get("plan_id");
     const navigate = useNavigate();
     const [startedAt] = useState<string>(new Date().toISOString());
+    const [showExitDialog, setShowExitDialog] = useState(false);
+    const [shouldBlock, setShouldBlock] = useState(true);
+
+    const blocker = useBlocker(
+        ({ currentLocation, nextLocation }) =>
+            shouldBlock && currentLocation.pathname !== nextLocation.pathname
+    );
+
+    useEffect(() => {
+        if (blocker.state === "blocked") {
+            setShowExitDialog(true);
+        }
+    }, [blocker]);
 
     const isWeekly = subject?.toLowerCase() === 'weekly';
     const isMonthly = subject?.toLowerCase() === 'monthly';
@@ -74,45 +94,73 @@ const TestAttempt = () => {
 
         try {
             if (isOverall) {
+                const attemptId = testData.test_series_attempt_id || testData.attempt_id || testData.id;
+                if (!attemptId) throw new Error("Attempt ID not found in test data");
+                
                 await testSeriesOverallService.submitTest({
-                    test_series_attempt_id: testData.test_series_attempt_id,
+                    test_series_attempt_id: Number(attemptId),
                     answers: formattedAnswers,
                     started_at: startedAt,
                     submitted_at: new Date().toISOString()
                 });
             } else if (isSubject) {
+                const attemptId = testData.test_series_attempt_id || testData.attempt_id || testData.id;
+                if (!attemptId) throw new Error("Attempt ID not found in test data");
+
                 await testSeriesSubjectService.submitTest({
-                    test_series_attempt_id: testData.test_series_attempt_id,
+                    test_series_attempt_id: Number(attemptId),
                     answers: formattedAnswers,
                     started_at: startedAt,
                     submitted_at: new Date().toISOString()
                 });
             } else if (isWeekly) {
+                const testIdValue = testData.weekly_test_id || testData.id || parseInt(testId);
                 await studyService.submitWeeklyTest({
-                    weekly_test_id: parseInt(testId),
+                    weekly_test_id: Number(testIdValue),
                     answers: formattedAnswers,
                     started_at: startedAt,
-                    submitted_at: new Date().toISOString()
+                    submitted_at: new Date().toISOString(),
+                    plan_id: planId ? parseInt(planId) : undefined
                 });
             } else if (isMonthly) {
+                const testIdValue = testData.monthly_test_id || testData.id || parseInt(testId);
                 await studyService.submitMonthlyTest({
-                    monthly_test_id: parseInt(testId),
+                    monthly_test_id: Number(testIdValue),
                     answers: formattedAnswers,
                     started_at: startedAt,
-                    submitted_at: new Date().toISOString()
+                    submitted_at: new Date().toISOString(),
+                    plan_id: planId ? parseInt(planId) : undefined
                 });
             }
             toast.success("Test submitted successfully!");
             navigate(`/test-series/${subject}/test/${testId}/analytics${(isOverall || isSubject) ? `?plan_id=${planId}` : ''}`, { replace: true });
         } catch (err: any) {
             console.error("Test submit error:", err);
-            toast.error(err.response?.data?.detail || "Failed to submit test.");
+            toast.error(err.response?.data?.detail || err.message || "Failed to submit test.");
         }
     };
 
     const handleExit = () => {
-        if (window.confirm("Are you sure you want to exit? Your progress will not be saved.")) {
-            navigate("/test-series");
+        setShowExitDialog(true);
+    };
+
+    const confirmExit = () => {
+        setShouldBlock(false);
+        setShowExitDialog(false);
+        // Use a timeout to ensure state is updated before proceeding
+        setTimeout(() => {
+            if (blocker.state === "blocked") {
+                blocker.proceed();
+            } else {
+                navigate("/test-series");
+            }
+        }, 0);
+    };
+
+    const cancelExit = () => {
+        setShowExitDialog(false);
+        if (blocker.state === "blocked") {
+            blocker.reset();
         }
     };
 
@@ -207,14 +255,49 @@ const TestAttempt = () => {
     }
 
     return (
-        <TestEngine
-            questions={questions}
-            onComplete={handleComplete}
-            onExit={handleExit}
-            title={`${isWeekly ? 'Weekly' : isMonthly ? 'Monthly' : 'Practice'} Test - ${testId}`}
-            subtitle={testData?.total_questions ? `${testData.total_questions} Questions` : "Assessment"}
-            initialTime={testData?.duration_hours ? testData.duration_hours * 3600 : 7200}
-        />
+        <div className="relative">
+            <TestEngine
+                questions={questions}
+                onComplete={handleComplete}
+                onExit={handleExit}
+                title={isWeekly ? `Week ${testId} Test` : isMonthly ? `Month ${testId} Test` : `Practice Test - ${testId}`}
+                subtitle={testData?.total_questions ? `${testData.total_questions} Questions` : "Assessment"}
+                initialTime={testData?.duration_hours ? testData.duration_hours * 3600 : 7200}
+            />
+
+            {/* Exit Confirmation Dialog */}
+            <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+                <DialogContent className="sm:max-w-md rounded-3xl p-6 sm:p-8 border-none shadow-2xl">
+                    <DialogTitle className="sr-only">Exit Test Confirmation</DialogTitle>
+                    <div className="text-center space-y-6">
+                        <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto">
+                            <AlertTriangle className="w-10 h-10" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold">Exit Test?</h3>
+                            <p className="text-muted-foreground mt-2">
+                                Are you sure you want to exit? Your progress will not be saved and you will lose any unsaved answers.
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-center gap-3 pt-2">
+                            <Button
+                                variant="outline"
+                                onClick={cancelExit}
+                                className="flex-1 h-12 rounded-xl text-sm font-semibold border-2"
+                            >
+                                Continue Test
+                            </Button>
+                            <Button
+                                onClick={confirmExit}
+                                className="flex-1 h-12 rounded-xl text-sm font-semibold bg-rose-500 hover:bg-rose-600 text-white"
+                            >
+                                Exit Anyway
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </div>
     );
 };
 

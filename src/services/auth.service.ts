@@ -6,6 +6,26 @@ export interface TokenResponse {
     token_type: string;
 }
 
+export interface UserContext {
+    context_id: string;
+    plan_id: number;
+    exam_type: string;
+    sub_division: string;
+    plan_type: string;
+    subject_name: string | null;
+    label: string;
+    has_subscription: boolean;
+    subscription_status: string;
+    access_expires: string | null;
+    features: Record<string, boolean>;
+}
+
+export interface UserDashboardData {
+    status: string;
+    user_id: number;
+    contexts: UserContext[];
+}
+
 export interface UserMe {
     id: number;
     username: string;
@@ -46,6 +66,7 @@ export interface UserMe {
     study_medium: string | null;
     is_superuser: boolean;
     is_staff: boolean;
+    dashboard?: UserDashboardData;
 }
 
 const authService = {

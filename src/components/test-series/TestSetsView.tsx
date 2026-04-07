@@ -27,6 +27,7 @@ export interface TestSet {
     syllabus: string[];
     syllabus_detailed?: any[];
     status?: "LOCKED" | "UNLOCKED" | "COMPLETED";
+    access?: "FREE" | "SUBSCRIBED" | "REQUIRES_SUBSCRIPTION";
     planned_date?: string;
 }
 
@@ -98,6 +99,17 @@ export const TestSetsView = ({ testSets }: TestSetsViewProps) => {
                         set.status !== "LOCKED" ? "hover:shadow-md" : "opacity-80"
                     )}
                 >
+                    {/* Premium Badge */}
+                    {set.access === "REQUIRES_SUBSCRIPTION" && (
+                        <div className="absolute top-2 right-2 z-20 bg-[#eff7db] text-[#4a5d23] px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm border border-[#dce9b9]">
+                            <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                            </svg>
+                            PREMIUM
+                        </div>
+                    )}
+
                     {/* Locked Overlay */}
                     {set.status === "LOCKED" && (
                         <div className="absolute inset-0 z-10 bg-slate-50/10 backdrop-blur-[1px] flex flex-col items-center justify-center pointer-events-none">
@@ -186,25 +198,38 @@ export const TestSetsView = ({ testSets }: TestSetsViewProps) => {
                     </div>
 
                     {/* Action */}
-                    <Button
-                        className={cn(
-                            "w-full h-10 rounded-[10px] text-sm font-medium border-0 transition-all active:scale-[0.98] mt-auto relative z-20",
-                            set.status === "LOCKED"
-                                ? "bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100"
-                                : "bg-[#0F172A] text-white hover:bg-[#1E293B]"
-                        )}
-                        disabled={set.status === "LOCKED"}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (set.score) {
-                                navigate(`/test-series/overall/test/${set.id}/analytics?plan_id=${set.plan_id}`);
-                            } else {
-                                handleSetClick(set);
-                            }
-                        }}
-                    >
-                        {set.score ? "View Analysis" : set.status === "LOCKED" ? "Coming Soon" : "Attempt Test"}
-                    </Button>
+                    {set.access === "REQUIRES_SUBSCRIPTION" ? (
+                        <Button
+                            className="w-full h-10 rounded-[10px] text-sm font-bold bg-[#eff7db] text-[#0F172A] hover:bg-[#C7DD64] transition-all active:scale-[0.98] mt-auto relative z-20 flex items-center justify-center gap-2 "
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/upgrade-plan');
+                            }}
+                        >
+
+                            Upgrade Plan
+                        </Button>
+                    ) : (
+                        <Button
+                            className={cn(
+                                "w-full h-10 rounded-[10px] text-sm font-medium border-0 transition-all active:scale-[0.98] mt-auto relative z-20",
+                                set.status === "LOCKED"
+                                    ? "bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100"
+                                    : "bg-[#0F172A] text-white hover:bg-[#1E293B]"
+                            )}
+                            disabled={set.status === "LOCKED"}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (set.score) {
+                                    navigate(`/test-series/overall/test/${set.id}/analytics?plan_id=${set.plan_id}`);
+                                } else {
+                                    handleSetClick(set);
+                                }
+                            }}
+                        >
+                            {set.score ? "View Analysis" : set.status === "LOCKED" ? "Coming Soon" : "Attempt Test"}
+                        </Button>
+                    )}
                 </div>
             ))}
 

@@ -7,43 +7,64 @@ export const mapRoadmapToFrontend = (
   backendPlans: StudyPlanResponse[],
   timings: TopicTiming[],
   weeklyHistory: any[],
-  monthlyHistory: any[]
+  monthlyHistory: any[],
+  allPlans?: any[]
 ): Record<number, StudyTopicCardData[]> => {
   console.log('mapRoadmapToFrontend called with:', {
     roadmapDaysCount: roadmapPlan?.length,
     backendPlansCount: backendPlans?.length,
-    timingsCount: timings?.length
+    timingsCount: timings?.length,
+    allPlansCount: allPlans?.length
   });
 
-  // Create a status map for quick lookup
-  const statusMap: Record<number, string> = {};
+  // Create status and row ID maps for quick lookup
+  const statusMap: Record<number | string, string> = {};
   const testRevisionStatusMap: Record<string, string> = {};
+  const planRowIdMap: Record<number | string, number> = {};
 
-  if (Array.isArray(backendPlans)) {
-    console.log('Building statusMap from backendPlans...');
-    backendPlans.forEach(p => {
-      const currentStatus = p.is_completed ? 'COMPLETED' : (p.plan_status || 'ACTIVE');
-
-      if (p.syllabus_id) {
-        const existingStatus = statusMap[p.syllabus_id];
-        // Priority: COMPLETED (3) > IN_PROGRESS (2) > ACTIVE (1)
-        if (!existingStatus ||
-          currentStatus === 'COMPLETED' ||
-          (currentStatus === 'IN_PROGRESS' && existingStatus === 'ACTIVE')) {
-          statusMap[p.syllabus_id] = currentStatus;
+  // Build the status map from all available plans if provided, or just the current roadmapPlan
+  const plansToScan = allPlans || (roadmapPlan ? [ { days: roadmapPlan } ] : []);
+  
+  plansToScan.forEach((plan: any) => {
+    if (plan?.days) {
+      plan.days.forEach((dayPlan: any) => {
+        if (dayPlan?.items) {
+          dayPlan.items.forEach((item: any) => {
+            if (item.type === 'TOPIC') {
+              const subtopics = Array.isArray(item.topic) ? item.topic : [];
+              subtopics.forEach((t: any) => {
+                const isItemDone = t.is_completed === true || t.is_completed === 1 || t.is_completed === "true" || t.plan_status?.toUpperCase() === 'COMPLETED' || t.status?.toUpperCase() === 'COMPLETED';
+                const currentStatus = isItemDone ? 'COMPLETED' : (t.plan_status?.toUpperCase() || t.status?.toUpperCase() || 'ACTIVE');
+                
+                // Priority for COMPLETED status
+                if (t.plan_row_id) {
+                  if (currentStatus === 'COMPLETED' || statusMap[t.plan_row_id] !== 'COMPLETED') {
+                    statusMap[t.plan_row_id] = currentStatus;
+                  }
+                  planRowIdMap[t.id] = t.plan_row_id;
+                }
+                
+                // Also track by syllabus_id (t.id) to share status across plans
+                if (currentStatus === 'COMPLETED' || statusMap[t.id] !== 'COMPLETED') {
+                  statusMap[t.id] = currentStatus;
+                }
+              });
+            } else {
+              const isItemDone = item.is_completed === true || item.is_completed === 1 || item.is_completed === "true" || item.plan_status?.toUpperCase() === 'COMPLETED' || item.status?.toUpperCase() === 'COMPLETED';
+              const currentStatus = isItemDone ? 'COMPLETED' : (item.plan_status?.toUpperCase() || item.status?.toUpperCase() || 'ACTIVE');
+              const key = item.plan_row_id || item.identifier || item.title || '';
+              if (key) {
+                if (currentStatus === 'COMPLETED' || testRevisionStatusMap[key] !== 'COMPLETED') {
+                  testRevisionStatusMap[key] = currentStatus;
+                }
+                if (item.plan_row_id) planRowIdMap[item.identifier || item.title || ''] = item.plan_row_id;
+              }
+            }
+          });
         }
-      } else if (p.topic) {
-        const key = p.topic;
-        const existingStatus = testRevisionStatusMap[key];
-        if (!existingStatus ||
-          currentStatus === 'COMPLETED' ||
-          (currentStatus === 'IN_PROGRESS' && existingStatus === 'ACTIVE')) {
-          testRevisionStatusMap[key] = currentStatus;
-        }
-      }
-    });
-    console.log('Status map sample:', Object.entries(statusMap).slice(0, 5));
-  }
+      });
+    }
+  });
 
   // Create a timing map (sum of total_estimate per syllabus_id)
   const timingMap: Record<number, number> = {};
@@ -52,8 +73,8 @@ export const mapRoadmapToFrontend = (
   if (Array.isArray(timings)) {
     timings.forEach(t => {
       let sessionMinutes = Number(t.total_estimate || 0);
-      const isCompleted = statusMap[t.syllabus_id] === 'COMPLETED';
-      
+      const isCompleted = (t.plan_id ? statusMap[t.plan_id] === 'COMPLETED' : false) || statusMap[t.syllabus_id] === 'COMPLETED';
+
       if (!t.end_time && t.start_time && !isCompleted) {
         // If session is still active and topic isn't completed, calculate elapsed time
         const startTimeStr = t.start_time.endsWith('Z') ? t.start_time : `${t.start_time}Z`;
@@ -80,13 +101,21 @@ export const mapRoadmapToFrontend = (
     result[dayPlan.day] = dayPlan.items.map((item: any, idx: number): StudyTopicCardData => {
       if (item.type === 'TOPIC') {
         const subtopics = Array.isArray(item.topic) ? item.topic : [];
-        const completedCount = subtopics.filter((t: any) => statusMap[t.id] === 'COMPLETED').length;
-        const inProgressCount = subtopics.filter((t: any) => statusMap[t.id] === 'IN_PROGRESS' || timingMap[t.id] > 0).length;
+        const completedCount = subtopics.filter((t: any) =>
+          (t.plan_row_id && statusMap[t.plan_row_id] === 'COMPLETED') ||
+          (!t.plan_row_id && statusMap[t.id] === 'COMPLETED')
+        ).length;
+
+        const inProgressCount = subtopics.filter((t: any) => {
+          const status = t.plan_row_id ? (statusMap[t.plan_row_id] || statusMap[t.id]) : statusMap[t.id];
+          return status === 'IN_PROGRESS' || timingMap[t.id] > 0;
+        }).length;
 
         // Calculate progress including timing for a consistent % with mobile
         let totalTopicProgress = 0;
         subtopics.forEach((t: any) => {
-          if (statusMap[t.id] === 'COMPLETED') {
+          const status = t.plan_row_id ? (statusMap[t.plan_row_id] || statusMap[t.id]) : statusMap[t.id];
+          if (status === 'COMPLETED') {
             totalTopicProgress += 100;
           } else {
             const spent = timingMap[t.id] || 0;
@@ -119,13 +148,14 @@ export const mapRoadmapToFrontend = (
             description: t.description || '',
             timeSpent: Math.round(timingMap[t.id] || 0),
             totalTime: t.minutes || 0,
-            status: (statusMap[t.id] === 'COMPLETED' ? 'completed' : (statusMap[t.id] === 'IN_PROGRESS' || timingMap[t.id] > 0 ? 'continue' : 'start')) as any,
+            status: ((t.plan_row_id && statusMap[t.plan_row_id] === 'COMPLETED') || (!t.plan_row_id && statusMap[t.id] === 'COMPLETED') ? 'completed' : ((t.plan_row_id ? (statusMap[t.plan_row_id] === 'IN_PROGRESS' || statusMap[t.id] === 'IN_PROGRESS') : statusMap[t.id] === 'IN_PROGRESS') || timingMap[t.id] > 0 ? 'continue' : 'start')) as any,
+            planRowId: t.plan_row_id,
           })),
         };
       } else {
         // Handle TEST/REVISION
         const itemIdentifier = item.identifier || item.title || '';
-        let statusStr = testRevisionStatusMap[itemIdentifier] || 'start';
+        let statusStr = (item.plan_row_id ? testRevisionStatusMap[item.plan_row_id] : null) || testRevisionStatusMap[itemIdentifier] || 'start';
         const weekNo = Math.ceil(dayPlan.day / 7);
 
         let timeSpent = 0;
@@ -170,6 +200,7 @@ export const mapRoadmapToFrontend = (
             timeSpent: timeSpent,
             totalTime: totalTime,
             status: (statusStr === 'COMPLETED' ? 'completed' : statusStr === 'IN_PROGRESS' ? 'continue' : 'start') as any,
+            planRowId: item.plan_row_id,
             isTest: item.type === 'TEST',
             testType: item.identifier?.startsWith('MONTH_') ? 'MONTHLY' : 'WEEKLY',
             weeklyTestId: item.weekly_test_id,

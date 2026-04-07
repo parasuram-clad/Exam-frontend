@@ -31,6 +31,7 @@ import { useQuery } from "@tanstack/react-query";
 import authService, { UserMe } from "@/services/auth.service";
 import studyService from "@/services/study.service";
 import { useAuth } from "@/context/AuthContext";
+import { useMemo } from "react";
 
 // Color palette for subject arcs
 const SUBJECT_COLORS = [
@@ -93,12 +94,20 @@ const WrappedTick = (props: any) => {
 const MyProgress = () => {
   const [viewDate, setViewDate] = useState(new Date());
   const today = new Date();
-  const { user } = useAuth();
+  const { user, currentContext } = useAuth();
 
-  // Fetch dashboard data
+  // Derive the active study context. If current is not a study plan, fallback to first available study plan.
+  const studyContext = useMemo(() => {
+    if (currentContext?.plan_type === 'OVERALL' || currentContext?.plan_type === 'SUBJECT') {
+      return currentContext;
+    }
+    return user?.dashboard?.contexts?.find(c => c.plan_type === 'OVERALL' || c.plan_type === 'SUBJECT');
+  }, [currentContext, user?.dashboard?.contexts]);
+
+  // Fetch dashboard data using the studyContext
   const { data: dashboardData, isLoading, isError } = useQuery({
-    queryKey: ["dashboard", user?.id],
-    queryFn: () => studyService.getDashboardData(user!.id),
+    queryKey: ["dashboard", user?.id, studyContext?.plan_id],
+    queryFn: () => studyService.getDashboardData(user!.id, studyContext?.plan_id),
     enabled: !!user?.id,
   });
 

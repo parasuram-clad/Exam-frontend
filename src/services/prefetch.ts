@@ -28,15 +28,7 @@ export const prefetchAllUserData = async (queryClient: QueryClient, user?: UserM
         const userId = currentUser.id;
 
         // 2. Parallel pre-fetching of essential data for all main pages
-
         await Promise.allSettled([
-            // Study Plan data
-            queryClient.prefetchQuery({
-                queryKey: ['study-plans', userId],
-                queryFn: () => studyService.getUserStudyPlans(userId),
-                staleTime: 1000 * 60 * 5,
-            }),
-
             // Roadmap / Progress data
             queryClient.prefetchQuery({
                 queryKey: ['roadmap', userId],
@@ -72,29 +64,6 @@ export const prefetchAllUserData = async (queryClient: QueryClient, user?: UserM
             }),
         ]);
 
-        // 3. Deeper pre-fetching: Get active topics from the study plan
-        try {
-            const plans = await queryClient.fetchQuery({
-                queryKey: ['study-plans', userId],
-                queryFn: () => studyService.getUserStudyPlans(userId),
-                staleTime: 1000 * 60 * 5,
-            });
-
-            if (plans && Array.isArray(plans)) {
-                const activePlans = plans
-                    .filter(p => (p.plan_status === 'START' || p.plan_status === 'CONTINUE' || p.plan_status === 'IN_PROGRESS') && p.syllabus_id)
-                    .slice(0, 10); // Prefetch more topics
-
-                if (activePlans.length > 0) {
-                    await Promise.allSettled(
-                        activePlans.map(plan => prefetchTopic(queryClient, plan.syllabus_id!, userId))
-                    );
-                }
-            }
-        } catch (planError) {
-            console.warn("Could not prefetch specific topics:", planError);
-        }
-
     } catch (error) {
         console.error("❌ Failed to preload app data:", error);
     }
@@ -113,5 +82,3 @@ export const prefetchTopic = (queryClient: QueryClient, syllabusId: number | str
         staleTime: 1000 * 60 * 15, // Content is stable, 15m cache is safe
     });
 };
-
-

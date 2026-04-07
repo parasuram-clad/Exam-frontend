@@ -9,8 +9,7 @@ interface StudyTopicCardProps {
   index: number;
   activeDay: number;
   currentProgressDay: number;
-  roadmapData: any;
-  userPlans: any[];
+  roadmapData: any; // expects a plan object with days array
   user: any;
   handleViewDetails: (topic: StudyTopicCardType) => void;
   prefetchTopic: (queryClient: any, id: number | string, userId: number) => void;
@@ -28,7 +27,6 @@ export const StudyTopicCard = ({
   activeDay,
   currentProgressDay,
   roadmapData,
-  userPlans,
   user,
   handleViewDetails,
   prefetchTopic,
@@ -41,8 +39,9 @@ export const StudyTopicCard = ({
   const previousAssessmentDay = Math.floor((activeDay - 1) / 7) * 7;
   let isPrevAssessmentMissing = false;
   if (previousAssessmentDay > 0 && activeDay > previousAssessmentDay) {
-    const assessmentRows = userPlans.filter(p => p.day_no === previousAssessmentDay);
-    isPrevAssessmentMissing = assessmentRows.length > 0 && !assessmentRows.every(p => p.is_completed === true);
+    const prevDay = roadmapData?.days?.find((d: any) => d.day === previousAssessmentDay);
+    const assessmentItems = prevDay?.items?.filter((item: any) => item.type === 'TEST') || [];
+    isPrevAssessmentMissing = assessmentItems.length > 0 && !assessmentItems.every((item: any) => item.is_completed === true);
   }
 
   const isLocked = (isFuture && activeDay > currentProgressDay) || isPrevAssessmentMissing;

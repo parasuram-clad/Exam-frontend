@@ -17,6 +17,7 @@ export interface Subtopic {
   weeklyTestId?: number;
   weekNo?: number;
   monthNo?: number;
+  planRowId?: number;
 }
 
 export interface StudyTopicCardData {

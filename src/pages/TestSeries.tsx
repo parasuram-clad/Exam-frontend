@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import authService, { UserMe } from "@/services/auth.service";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -87,8 +87,36 @@ const TestSeriesSidebar = ({ user, attempts, activeTab }: { user: UserMe | null,
 
 const TestSeries = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, currentContext } = useAuth();
+
+  // Derive the active test context. If current context doesn't likely have tests, fallback to a test-series plan.
+  const testContext = useMemo(() => {
+    if (currentContext?.plan_type?.includes('TEST_SERIES')) {
+      return currentContext;
+    }
+    // Preferred fallback: a dedicated test series plan
+    const tsPlan = user?.dashboard?.contexts?.find(c => c.plan_type?.includes('TEST_SERIES'));
+    if (tsPlan) return tsPlan;
+    
+    // Last fallback: use the current context anyway (it might have tests)
+    return currentContext;
+  }, [currentContext, user?.dashboard?.contexts]);
+
   const [activeTab, setActiveTab] = useState<"subject" | "sets">("sets");
+
+  // Determine purchased test plan types
+  const hasOverallTests = useMemo(() => 
+    user?.dashboard?.contexts?.some(c => c.plan_type === 'OVERALL_TEST_SERIES'), [user]);
+  const hasSubjectTests = useMemo(() => 
+    user?.dashboard?.contexts?.some(c => c.plan_type === 'SUBJECT_TEST_SERIES'), [user]);
+  const showTabs = hasOverallTests && hasSubjectTests;
+
+  // Sync activeTab with available plans when they load
+  useEffect(() => {
+    if (hasOverallTests && !hasSubjectTests) setActiveTab("sets");
+    else if (!hasOverallTests && hasSubjectTests) setActiveTab("subject");
+  }, [hasOverallTests, hasSubjectTests]);
+
   const [roadmap, setRoadmap] = useState<OverallRoadmapResponse['plans'][0] | null>(null);
   const [subjects, setSubjects] = useState<TestSubject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,17 +198,23 @@ const TestSeries = () => {
 
     try {
       setLoading(true);
-      // 1. Fetch Overall Roadmap
-      const roadmaps = await testSeriesOverallService.getRoadmap();
 
-      if (roadmaps.plans && roadmaps.plans.length > 0) {
-        setRoadmap(roadmaps.plans[0]);
-      } else {
-        // No plan exists. Let user generate it explicitly via modal
-        setIsModalOpen(true);
+      // 1. Fetch Overall Roadmap using either the dedicated OVERALL_TEST_SERIES plan ID or derived fallback
+      const overallPlan = user?.dashboard?.contexts?.find(c => c.plan_type === 'OVERALL_TEST_SERIES');
+      const targetOverallId = overallPlan?.plan_id || (testContext?.plan_type === 'OVERALL_TEST_SERIES' ? testContext.plan_id : undefined);
+
+      if (targetOverallId || hasOverallTests) {
+        const roadmaps = await testSeriesOverallService.getRoadmap(targetOverallId);
+        if (roadmaps.plans && roadmaps.plans.length > 0) {
+          setRoadmap(roadmaps.plans[0]);
+        } else if (hasOverallTests) {
+           setIsModalOpen(true);
+        }
       }
 
       // 2. Fetch Available Subjects for Subject-Wise View
+      const subjectPlan = user?.dashboard?.contexts?.find(c => c.plan_type === 'SUBJECT_TEST_SERIES');
+      
       if (user.exam_type && user.sub_division) {
         setSubjectsLoading(true);
         const response = await testSeriesSubjectService.getAvailableSubjects(
@@ -213,7 +247,7 @@ const TestSeries = () => {
       setLoading(false);
       setSubjectsLoading(false);
     }
-  }, [user]);
+  }, [user, testContext, hasOverallTests, hasSubjectTests]);
 
   // Handle auto-refresh when window gains focus
   useEffect(() => {
@@ -257,6 +291,7 @@ const TestSeries = () => {
       total: test.total_marks || roadmap!.test_details.total_marks
     } : undefined,
     status: test.status,
+    access: test.access,
     planned_date: test.test_date
   }));
 
@@ -322,31 +357,33 @@ const TestSeries = () => {
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-100/30 rounded-full blur-2xl pointer-events-none" />
       </motion.div>
 
-      <div className="flex items-center gap-4 mb-8 bg-slate-100/50 p-1.5 rounded-2xl w-fit">
-        <button
-          onClick={() => setActiveTab("sets")}
-          className={cn(
-            "px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300",
-            activeTab === "sets"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-          )}
-        >
-          Test Sets
-        </button>
+      {showTabs && (
+        <div className="flex items-center gap-4 mb-8 bg-slate-100/50 p-1.5 rounded-2xl w-fit">
+          <button
+            onClick={() => setActiveTab("sets")}
+            className={cn(
+              "px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300",
+              activeTab === "sets"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            Test Sets
+          </button>
 
-        <button
-          onClick={() => setActiveTab("subject")}
-          className={cn(
-            "px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300",
-            activeTab === "subject"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-          )}
-        >
-          Subject-Wise
-        </button>
-      </div>
+          <button
+            onClick={() => setActiveTab("subject")}
+            className={cn(
+              "px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300",
+              activeTab === "subject"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            Subject-Wise
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">

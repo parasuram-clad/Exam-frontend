@@ -243,12 +243,11 @@ const TestEngine = ({
                                     </Button>
 
                                     <Button
-                                        onClick={handleNext}
-                                        disabled={currentQuestion === questions.length - 1}
+                                        onClick={currentQuestion === questions.length - 1 ? handleSubmit : handleNext}
                                         className="flex-1 sm:flex-none gap-1 sm:gap-2 bg-[#0F172A] hover:bg-[#1E293B] text-white shadow-md h-11 sm:h-10 text-xs sm:text-sm font-semibold rounded-xl order-1 sm:order-3"
                                     >
-                                        Save & Next
-                                        <ChevronRight className="w-4 h-4" />
+                                        {currentQuestion === questions.length - 1 ? "Submit" : "Save & Next"}
+                                        {currentQuestion !== questions.length - 1 && <ChevronRight className="w-4 h-4" />}
                                     </Button>
 
                                     <Button
@@ -261,7 +260,7 @@ const TestEngine = ({
                                                 : "border-2 border-border text-slate-700 hover:bg-slate-50"
                                         )}
                                     >
-                                        Mark for Review & Next
+                                        {currentQuestion === questions.length - 1 ? "Mark for Review" : "Mark for Review & Next"}
                                     </Button>
                                 </div>
                             </div>

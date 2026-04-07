@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import authService from "@/services/auth.service";
 import studyService from "@/services/study.service";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ import { cn, getErrorMessage, getMediaUrl } from "@/lib/utils";
 import { DailyQuizModal, QUIZ_QUESTIONS } from "@/components/dashboard/DailyQuizModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/AuthContext";
 
 // Types from StudyInterface
 type Mode = "reading" | "study" | "revision";
@@ -371,6 +372,7 @@ const StudyContent = () => {
   const { topicId, subtopicId } = useParams();
   const [searchParams] = useSearchParams();
   const urlPlanId = searchParams.get('plan_id');
+  const urlPlanRowId = searchParams.get('plan_row_id');
   const navigate = useNavigate();
 
   const [sections, setSections] = useState<ContentSection[]>(contentSections);
@@ -411,11 +413,15 @@ const StudyContent = () => {
 
   const queryClient = useQueryClient();
 
-  const { data: user } = useQuery({
-    queryKey: ['user-me'],
-    queryFn: () => authService.getCurrentUser(),
-    staleTime: Infinity,
-  });
+  const { user, currentContext, currentContextId } = useAuth();
+
+  // Derive the active study context. If current is not a study plan, fallback to first available study plan.
+  const studyContext = useMemo(() => {
+    if (currentContext?.plan_type === 'OVERALL' || currentContext?.plan_type === 'SUBJECT') {
+      return currentContext;
+    }
+    return user?.dashboard?.contexts?.find(c => c.plan_type === 'OVERALL' || c.plan_type === 'SUBJECT');
+  }, [currentContext, user?.dashboard?.contexts]);
 
   const { data: allNotes = [] } = useQuery({
     queryKey: ['user-notes', user?.id],
@@ -429,29 +435,23 @@ const StudyContent = () => {
 
   const parsedSubtopicId = parseInt(subtopicId || "");
 
-  const { data: userPlans = [], isLoading: isPlansLoading } = useQuery({
-    queryKey: ['study-plans', user?.id],
-    queryFn: () => studyService.getUserStudyPlans(user!.id),
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-  });
+  // Resolve the subscription plan ID first to use in query
+  const currentSubscriptionPlanId = urlPlanId ? parseInt(urlPlanId) : studyContext?.plan_id;
 
-  const isTopicCompleted = userPlans.some((p: any) => p.syllabus_id === parsedSubtopicId && p.is_completed === true);
-
-  // Get plan_id from: 1. URL search param, 2. The study plan record itself
-  const currentSubscriptionPlanId = urlPlanId ? parseInt(urlPlanId) : (userPlans.find((p: any) => p.syllabus_id === parsedSubtopicId)?.plan_id);
-
-  const { data: topicDataResponse } = useQuery({
+  // Get topic data response next
+  const { data: topicDataResponse, isLoading: isTopicLoading } = useQuery({
     queryKey: ['topic-content', parsedSubtopicId, user?.id, currentSubscriptionPlanId],
     queryFn: () => studyService.getTopicContentBySyllabusId(parsedSubtopicId, user!.id, currentSubscriptionPlanId),
-    enabled: !!user?.id && !isNaN(parsedSubtopicId) && !isPlansLoading,
+    enabled: !!user?.id && !isNaN(parsedSubtopicId),
     staleTime: 5 * 60 * 1000,
   });
+
+  const isTopicCompleted = topicDataResponse?.task?.status === 'COMPLETED';
 
   const { data: assessmentHistory, isLoading: isLoadingHistory } = useQuery({
     queryKey: ['assessment-history', user?.id, parsedSubtopicId, currentSubscriptionPlanId],
     queryFn: () => studyService.getAssessmentHistory(user!.id, parsedSubtopicId, currentSubscriptionPlanId),
-    enabled: !!user?.id && !isNaN(parsedSubtopicId) && !isPlansLoading,
+    enabled: !!user?.id && !isNaN(parsedSubtopicId) && !isTopicLoading,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -553,7 +553,7 @@ const StudyContent = () => {
     let isActive = true;
     let started = false;
 
-    if (!user?.id || isNaN(parsedSubtopicId) || isLoadingHistory || isPlansLoading) return;
+    if (!user?.id || isNaN(parsedSubtopicId) || isLoadingHistory || isTopicLoading) return;
     if (assessmentHistory?.attempts?.length > 0 || isTopicCompleted) return;
 
     const startTiming = async () => {
@@ -574,11 +574,11 @@ const StudyContent = () => {
     return () => {
       isActive = false;
       if (started && !isNaN(parsedSubtopicId)) {
-        studyService.stopTopicTiming(parsedSubtopicId, activeReadingSessionId || undefined).catch(() => { });
+        studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId).catch(() => { });
         queryClient.invalidateQueries({ queryKey: ['topic-timings'] });
       }
     };
-  }, [user?.id, parsedSubtopicId, assessmentHistory, isLoadingHistory, isPlansLoading, isTopicCompleted]);
+  }, [user?.id, parsedSubtopicId, assessmentHistory, isLoadingHistory, isTopicLoading, isTopicCompleted]);
 
   // When keyword changes, reset editing state
   useEffect(() => {
@@ -732,11 +732,14 @@ const StudyContent = () => {
   const startAssessment = async () => {
     if (!user?.id || !parsedSubtopicId || isNaN(parsedSubtopicId)) return;
 
-    // End reading session explicitly
+    // Keep reading session active during assessment to track total time
+    /* 
     try {
-      await studyService.stopTopicTiming(parsedSubtopicId, activeReadingSessionId || undefined);
+      await studyService.stopTopicTiming(parsedSubtopicId, activeReadingSessionId || undefined, currentSubscriptionPlanId);
       queryClient.invalidateQueries({ queryKey: ['topic-timings'] });
     } catch { }
+    */
+
 
     try {
       const response = await studyService.startMCQAttempt({
@@ -854,32 +857,53 @@ const StudyContent = () => {
 
       toast.success("Assessment submitted successfully!");
 
-      // Invalidate query to refresh timing stats
-      queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id, parsedSubtopicId] });
+      // Stop the reading/study session timing since the topic is now fully completed (including MCQ)
+      if (activeReadingSessionId) {
+        try {
+          await studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId);
+          setActiveReadingSessionId(null);
+        } catch (e) {
+          // If already stopped or 404, we can safely ignore
+          console.log("Topic timing session already stopped or not found");
+        }
+      }
 
       // Update study plan status to COMPLETED
-      const planToUpdate = userPlans.find((p: any) => p.syllabus_id === parsedSubtopicId);
-      if (planToUpdate) {
+      const planToUpdateId = topicDataResponse?.task?.plan_row_id || (urlPlanRowId ? parseInt(urlPlanRowId) : null);
+      if (planToUpdateId) {
         try {
-          await studyService.updateStudyPlan(planToUpdate.id, { plan_status: 'COMPLETED' });
+          // Send multiple status fields to be exhaustive and ensure backend picks it up
+          await studyService.updateStudyPlan(planToUpdateId, {
+            plan_status: 'COMPLETED',
+            status: 'COMPLETED',
+            is_completed: true
+          } as any);
+
+          // Optimistically update the topic content cache
+          queryClient.setQueryData(['topic-content', parsedSubtopicId, user.id, currentSubscriptionPlanId], (oldData: any) => {
+            if (!oldData) return oldData;
+            return {
+              ...oldData,
+              task: {
+                ...oldData.task,
+                status: 'COMPLETED',
+                plan_status: 'COMPLETED',
+                is_completed: true
+              }
+            };
+          });
         } catch (e) {
           console.error("Failed to update study plan status", e);
         }
       }
 
-      // Invalidate queries to refresh progress and history
+      // Invalidate queries to refresh progress and history globally
+      queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id, currentSubscriptionPlanId] });
       queryClient.invalidateQueries({ queryKey: ['study-plans', user.id] });
       queryClient.invalidateQueries({ queryKey: ['roadmap', user.id] });
       queryClient.invalidateQueries({ queryKey: ['topic-content', parsedSubtopicId, user.id] });
       queryClient.invalidateQueries({ queryKey: ['assessment-history', user.id, parsedSubtopicId] });
-      queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id] });
-      queryClient.invalidateQueries({ queryKey: ['topic-timings', user.id, parsedSubtopicId] });
-
-      // Stop the reading session timing since the topic is now completed
-      if (activeReadingSessionId) {
-        studyService.stopTopicTiming(parsedSubtopicId, activeReadingSessionId).catch(() => { });
-        setActiveReadingSessionId(null);
-      }
 
     } catch (error) {
       setIsSubmittingAssessment(false);

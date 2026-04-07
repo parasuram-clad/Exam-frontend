@@ -21,13 +21,23 @@ export interface RoadmapDayItem {
     subject?: string;
     part?: string;
     image_url?: string;
-    topic?: { id: number; name: string; minutes: number; description: string }[];
+    topic?: { 
+        id: number; 
+        name: string; 
+        minutes: number; 
+        description: string;
+        plan_status?: string;
+        plan_row_id?: number;
+        is_completed?: boolean;
+    }[];
     minutes: number;
     identifier?: string;
     title?: string;
     description?: string;
     weekly_test_id?: number;
     is_completed?: boolean;
+    plan_status?: string;
+    plan_row_id?: number;
 }
 
 export interface RoadmapDay {
@@ -122,12 +132,16 @@ export interface TopicContentResponse {
     };
     task: {
         id: number;
+        plan_row_id?: number;
+        plan_id?: number;
         subject: string;
         part: string;
         topic: string;
         short_description: string;
         status: string;
         duration_minutes: number;
+        content_type_id: number;
+        content_type_code: string;
         image_url: string;
         learning_content: {
             introduction: string;
@@ -175,6 +189,7 @@ export interface TopicTiming {
     id: number;
     user_id: number;
     syllabus_id: number;
+    plan_id?: number;
     start_time: string;
     end_time?: string;
     total_estimate?: number;
@@ -195,10 +210,10 @@ const studyService = {
     /**
      * Stop topic timing session
      */
-    stopTopicTiming: async (syllabusId: number, sessionId?: number): Promise<TopicTiming> => {
+    stopTopicTiming: async (syllabusId: number, planId?: number): Promise<TopicTiming> => {
         const response = await apiClient.post('/topic-timing/stop', {
             syllabus_id: syllabusId,
-            session_id: sessionId
+            plan_id: planId
         });
         return response.data;
     },
@@ -206,8 +221,10 @@ const studyService = {
     /**
      * Get all topic timing records for a user
      */
-    getUserTopicTimings: async (syllabusId?: number): Promise<TopicTiming[]> => {
-        const params = syllabusId ? { syllabus_id: syllabusId } : {};
+    getUserTopicTimings: async (syllabusId?: number, planId?: number): Promise<TopicTiming[]> => {
+        const params: any = {};
+        if (syllabusId) params.syllabus_id = syllabusId;
+        if (planId) params.plan_id = planId;
         const response = await apiClient.get('/topic-timing', { params });
         return response.data;
     },
@@ -223,10 +240,6 @@ const studyService = {
     /**
      * Get all study plans for a user
      */
-    getUserStudyPlans: async (userId: number): Promise<StudyPlanResponse[]> => {
-        const response = await apiClient.get(`/study-plan/user/${userId}`, { params: { limit: 1000 } });
-        return response.data;
-    },
 
     /**
      * Get study plan by ID
@@ -318,8 +331,8 @@ const studyService = {
     /**
      * Get the organized roadmap for a user
      */
-    getUserRoadmap: async (userId: number): Promise<RoadmapResponse> => {
-        const response = await apiClient.get(`/study-plan/roadmap/${userId}`);
+    getUserRoadmap: async (userId: number, planId?: number): Promise<RoadmapResponse> => {
+        const response = await apiClient.get(`/study-plan/roadmap/${userId}`, { params: { plan_id: planId } });
 
         return response.data;
     },
@@ -433,9 +446,9 @@ const studyService = {
     // ================================================================
     // SUBJECT WEEKLY TEST
     // ================================================================
-    getSubjectWeeklyTestQuestions: async (subjectId: number, weekNo: number, planId?: number) => {
+    getSubjectWeeklyTestQuestions: async (planId: number, weekNo: number) => {
         const response = await apiClient.get('/subject-weekly-test/questions', {
-            params: { subject_id: subjectId, week_no: weekNo, plan_id: planId }
+            params: { plan_id: planId, week_no: weekNo }
         });
         return response.data;
     },
@@ -451,16 +464,16 @@ const studyService = {
         return response.data;
     },
 
-    getSubjectWeeklyTestResult: async (subjectId: number, weekNo: number, planId?: number) => {
+    getSubjectWeeklyTestResult: async (planId: number, weekNo: number) => {
         const response = await apiClient.get('/subject-weekly-test/result', {
-            params: { subject_id: subjectId, week_no: weekNo, plan_id: planId }
+            params: { plan_id: planId, week_no: weekNo }
         });
         return response.data;
     },
 
-    getSubjectWeeklyTestHistory: async (subjectId: number, planId?: number) => {
+    getSubjectWeeklyTestHistory: async (planId: number) => {
         const response = await apiClient.get('/subject-weekly-test/history', {
-            params: { subject_id: subjectId, plan_id: planId }
+            params: { plan_id: planId }
         });
         return response.data;
     },
@@ -468,9 +481,9 @@ const studyService = {
     // ================================================================
     // SUBJECT MONTHLY TEST
     // ================================================================
-    getSubjectMonthlyTestQuestions: async (subjectId: number, monthNo: number, planId?: number) => {
+    getSubjectMonthlyTestQuestions: async (planId: number, monthNo: number) => {
         const response = await apiClient.get('/subject-monthly-test/questions', {
-            params: { subject_id: subjectId, month_no: monthNo, plan_id: planId }
+            params: { plan_id: planId, month_no: monthNo }
         });
         return response.data;
     },
@@ -486,16 +499,16 @@ const studyService = {
         return response.data;
     },
 
-    getSubjectMonthlyTestResult: async (subjectId: number, monthNo: number, planId?: number) => {
+    getSubjectMonthlyTestResult: async (planId: number, monthNo: number) => {
         const response = await apiClient.get('/subject-monthly-test/result', {
-            params: { subject_id: subjectId, month_no: monthNo, plan_id: planId }
+            params: { plan_id: planId, month_no: monthNo }
         });
         return response.data;
     },
 
-    getSubjectMonthlyTestHistory: async (subjectId: number, planId?: number) => {
+    getSubjectMonthlyTestHistory: async (planId: number) => {
         const response = await apiClient.get('/subject-monthly-test/history', {
-            params: { subject_id: subjectId, plan_id: planId }
+            params: { plan_id: planId }
         });
         return response.data;
     },
@@ -503,9 +516,9 @@ const studyService = {
     /**
      * Get dashboard data
      */
-    getDashboardData: async (userId: number) => {
+    getDashboardData: async (userId: number, planId?: number) => {
         const response = await apiClient.get('/dashboard', {
-            params: { user_id: userId }
+            params: { user_id: userId, plan_id: planId }
         });
         return response.data;
     }

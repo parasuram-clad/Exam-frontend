@@ -12,6 +12,7 @@ interface Subtopic {
   totalTime: number;
   status: "continue" | "start" | "completed";
   isTest?: boolean;
+  planRowId?: number;
 }
 
 interface StudyTopicCard {

@@ -70,25 +70,13 @@ const fallbackTodaysPlan: StudyPlanItem[] = [];
 const Index = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, currentContext } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: userPlans = [] } = useQuery({
-    queryKey: ['study-plans', user?.id],
-    queryFn: async () => {
-      try {
-        return await studyService.getUserStudyPlans(user!.id);
-      } catch {
-        return [];
-      }
-    },
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-  });
 
   const { data: roadmapData } = useQuery<RoadmapResponse>({
-    queryKey: ['roadmap', user?.id],
-    queryFn: () => studyService.getUserRoadmap(user!.id),
+    queryKey: ['roadmap', user?.id, currentContext?.plan_id],
+    queryFn: () => studyService.getUserRoadmap(user!.id, currentContext?.plan_id),
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
   });
@@ -226,15 +214,21 @@ const Index = () => {
     }
   };
 
-  const calculateCurrentProgressDay = (plans: any[]) => {
-    if (plans.length > 0) {
-      const sortedDays = Array.from(new Set(plans.map(p => p.day_no))).sort((a, b) => a - b);
+  const calculateCurrentProgressDay = (roadmap: RoadmapResponse | undefined) => {
+    if (roadmap?.plan && roadmap.plan.length > 0) {
+      const overallPlan = roadmap.plan.find(p => p.plan_type === 'OVERALL') || roadmap.plan[0];
+      const sortedDays = [...overallPlan.days].sort((a, b) => a.day - b.day);
+      
       const firstIncomplete = sortedDays.find(day => {
-        const dayPlans = plans.filter(p => p.day_no === day);
-        // Use is_completed (boolean) as source of truth, same as mobile
-        return !dayPlans.every(p => p.is_completed === true);
+        return !day.items.every(item => {
+          if (item.type === 'TOPIC') {
+            const subtopics = Array.isArray(item.topic) ? item.topic : [];
+            return subtopics.every(t => t.is_completed === true || t.plan_status === 'COMPLETED');
+          }
+          return item.is_completed === true || item.plan_status === 'COMPLETED';
+        });
       });
-      return firstIncomplete || sortedDays[0] || 1;
+      return firstIncomplete?.day || sortedDays[0]?.day || 1;
     }
     return 1;
   };
@@ -248,22 +242,10 @@ const Index = () => {
     return historyIcon;
   };
 
-  const currentProgressDay = calculateCurrentProgressDay(userPlans);
+  const currentProgressDay = calculateCurrentProgressDay(roadmapData);
 
   const todaysPlan = useMemo(() => {
     if (!roadmapData?.plan || roadmapData.plan.length === 0) return [];
-
-    // Build statusMap exactly like mapping.ts:
-    // key = syllabus_id (number), value = 'COMPLETED' | plan_status
-    const statusMap: Record<number, string> = {};
-    if (Array.isArray(userPlans)) {
-      userPlans.forEach((p: any) => {
-        const sid = Number(p.syllabus_id);
-        if (!isNaN(sid) && sid > 0) {
-          statusMap[sid] = p.is_completed ? 'COMPLETED' : (p.plan_status || 'start');
-        }
-      });
-    }
 
     const overallPlan = roadmapData.plan.find((p: any) => p.plan_type === 'OVERALL') || roadmapData.plan[0];
     const activeRoadmapDay = overallPlan.days.find((d: any) => d.day === currentProgressDay) || overallPlan.days[0];
@@ -282,15 +264,12 @@ const Index = () => {
         const subtopics = Array.isArray(item.topic) ? item.topic : [];
         const totalTopics = subtopics.length || 1;
 
-        // Match mapping.ts exactly: t.is_completed OR statusMap entry = COMPLETED
         const completedCount = subtopics.filter((t: any) => {
-          const sid = Number(t.id);
-          return t.is_completed === true || statusMap[sid] === 'COMPLETED';
+          return t.is_completed === true || t.plan_status === 'COMPLETED';
         }).length;
 
         const inProgressCount = subtopics.filter((t: any) => {
-          const sid = Number(t.id);
-          return !t.is_completed && statusMap[sid] !== 'COMPLETED' && statusMap[sid] === 'IN_PROGRESS';
+          return !t.is_completed && t.plan_status !== 'COMPLETED' && t.plan_status === 'IN_PROGRESS';
         }).length;
 
         progress = Math.round((completedCount / totalTopics) * 100);
@@ -305,10 +284,12 @@ const Index = () => {
         subtitle = "Test available";
         topics = [item.description || "Weekly Revision Test"];
         buttonLabel = "Take Test";
+        progress = item.is_completed ? 100 : 0;
       } else {
         subtitle = "Revision";
         topics = [item.description || "Review topics"];
         buttonLabel = "Start Revision";
+        progress = item.is_completed ? 100 : 0;
       }
 
       return {
@@ -321,7 +302,7 @@ const Index = () => {
         buttonLabel
       };
     });
-  }, [roadmapData, userPlans, currentProgressDay]);
+  }, [roadmapData, currentProgressDay]);
 
   const { logout } = useAuth();
   const handleLogout = async () => {

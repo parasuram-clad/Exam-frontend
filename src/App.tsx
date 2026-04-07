@@ -1,7 +1,7 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration } from "react-router-dom";
 import Home from "./pages/Home";
 import Index from "./pages/Index";
 import StudyPlan from "./pages/StudyPlan";
@@ -34,52 +34,60 @@ import NotificationHandler from "./components/NotificationHandler";
 
 const queryClient = new QueryClient();
 
+const RootLayout = () => {
+  return (
+    <>
+      <Outlet />
+      <ChatbotWidget />
+      <ScrollRestoration />
+    </>
+  );
+};
+
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
+      { path: "/", element: <Home /> },
+      { path: "/dashboard", element: <ProtectedRoute><Index /></ProtectedRoute> },
+      { path: "/ask-doubt", element: <ProtectedRoute><AskYourDoubt /></ProtectedRoute> },
+      { path: "/current-affairs", element: <ProtectedRoute><CurrentAffairs /></ProtectedRoute> },
+      { path: "/study-plan", element: <ProtectedRoute><StudyPlan /></ProtectedRoute> },
+      { path: "/study-plan/topic/:topicId", element: <ProtectedRoute><TopicStudy /></ProtectedRoute> },
+      { path: "/study-plan/topic/:topicId/subtopic/:subtopicId", element: <ProtectedRoute><StudyContent /></ProtectedRoute> },
+      { path: "/test-series", element: <ProtectedRoute><TestSeries /></ProtectedRoute> },
+      { path: "/test-series/:subject", element: <ProtectedRoute><TestDetails /></ProtectedRoute> },
+      { path: "/test-series/:subject/test/:testId", element: <ProtectedRoute><TestAttempt /></ProtectedRoute> },
+      { path: "/test-series/subject/:subjectId/roadmap", element: <ProtectedRoute><SubjectRoadmap /></ProtectedRoute> },
+      { path: "/test-series/:subject/test/:testId/analytics", element: <ProtectedRoute><TestAnalytics /></ProtectedRoute> },
+      { path: "/progress", element: <ProtectedRoute><MyProgress /></ProtectedRoute> },
+      { path: "/profile", element: <ProtectedRoute><Profile /></ProtectedRoute> },
+      { path: "/leaderboard", element: <ProtectedRoute><Leaderboard /></ProtectedRoute> },
+      { path: "/schedule", element: <ProtectedRoute><Schedule /></ProtectedRoute> },
+      { path: "/notifications", element: <ProtectedRoute><Notifications /></ProtectedRoute> },
+      { path: "/study-plan/topic/:topicId/subtopic/:subtopicId/mindmap", element: <ProtectedRoute><MindMapView /></ProtectedRoute> },
+      { path: "/study-plan/topic/:topicId/subtopic/:subtopicId/section/:sectionId/mindmap", element: <ProtectedRoute><MindMapView /></ProtectedRoute> },
+      { path: "/upgrade-plan", element: <ProtectedRoute><UpgradePlan /></ProtectedRoute> },
+      { path: "/renew-plan", element: <ProtectedRoute><RenewPlan /></ProtectedRoute> },
+      { path: "/payment", element: <ProtectedRoute><Payment /></ProtectedRoute> },
+      { path: "*", element: <NotFound /> },
+    ]
+  }
+]);
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <InitialDataLoader>
-        <TooltipProvider>
-          <NotificationHandler />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<Home />} />
-
-              {/* Protected Routes */}
-              <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-              <Route path="/ask-doubt" element={<ProtectedRoute><AskYourDoubt /></ProtectedRoute>} />
-              <Route path="/current-affairs" element={<ProtectedRoute><CurrentAffairs /></ProtectedRoute>} />
-              <Route path="/study-plan" element={<ProtectedRoute><StudyPlan /></ProtectedRoute>} />
-              <Route path="/study-plan/topic/:topicId" element={<ProtectedRoute><TopicStudy /></ProtectedRoute>} />
-              <Route path="/study-plan/topic/:topicId/subtopic/:subtopicId" element={<ProtectedRoute><StudyContent /></ProtectedRoute>} />
-              <Route path="/test-series" element={<ProtectedRoute><TestSeries /></ProtectedRoute>} />
-              <Route path="/test-series/:subject" element={<ProtectedRoute><TestDetails /></ProtectedRoute>} />
-              <Route path="/test-series/:subject/test/:testId" element={<ProtectedRoute><TestAttempt /></ProtectedRoute>} />
-              <Route path="/test-series/subject/:subjectId/roadmap" element={<ProtectedRoute><SubjectRoadmap /></ProtectedRoute>} />
-              <Route path="/test-series/:subject/test/:testId/analytics" element={<ProtectedRoute><TestAnalytics /></ProtectedRoute>} />
-              <Route path="/progress" element={<ProtectedRoute><MyProgress /></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-              <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
-              <Route path="/schedule" element={<ProtectedRoute><Schedule /></ProtectedRoute>} />
-              <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-              <Route path="/study-plan/topic/:topicId/subtopic/:subtopicId/mindmap" element={<ProtectedRoute><MindMapView /></ProtectedRoute>} />
-              <Route path="/study-plan/topic/:topicId/subtopic/:subtopicId/section/:sectionId/mindmap" element={<ProtectedRoute><MindMapView /></ProtectedRoute>} />
-              <Route path="/upgrade-plan" element={<ProtectedRoute><UpgradePlan /></ProtectedRoute>} />
-              <Route path="/renew-plan" element={<ProtectedRoute><RenewPlan /></ProtectedRoute>} />
-              <Route path="/payment" element={<ProtectedRoute><Payment /></ProtectedRoute>} />
-
-              {/* Fallback */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-
-            <ChatbotWidget />
-          </BrowserRouter>
-        </TooltipProvider>
-      </InitialDataLoader>
-    </AuthProvider>
-  </QueryClientProvider>
+          <TooltipProvider>
+            <NotificationHandler />
+            <Sonner />
+            <RouterProvider router={router} />
+          </TooltipProvider>
+        </InitialDataLoader>
+      </AuthProvider>
+    </QueryClientProvider>
   </ErrorBoundary>
 );
 

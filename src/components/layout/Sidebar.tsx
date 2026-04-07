@@ -17,6 +17,13 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface NavItem {
   icon: React.ElementType;
@@ -47,7 +54,7 @@ export function Sidebar({ isOpen, onToggle, activePath }: SidebarProps) {
     { icon: User, label: t('nav.profile', 'Profile'), href: "/profile" },
   ];
 
-  const { logout } = useAuth();
+  const { logout, user, currentContextId, setCurrentContextId } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -77,24 +84,44 @@ export function Sidebar({ isOpen, onToggle, activePath }: SidebarProps) {
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <Link to="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-700 rounded-xl flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-primary-foreground" />
+        <div className="p-5 border-b border-border space-y-4">
+          <div className="flex items-center justify-between ">
+            <Link to="/dashboard" className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-700 rounded-xl flex items-center justify-center">
+                <GraduationCap className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <div className="leading-tight">
+                <h1 className="font-medium font-goldman text-lg text-foreground tracking-tight">Thani</h1>
+                <p className="text-xs text-muted-foreground font-medium font-goldman">ORUVAN</p>
+              </div>
+            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden text-foreground hover:bg-muted"
+              onClick={onToggle}
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+
+          {/* Context Switcher */}
+          {user?.dashboard?.contexts && user.dashboard.contexts.length > 0 && (
+            <div className="mt-2">
+              <Select value={currentContextId} onValueChange={setCurrentContextId}>
+                <SelectTrigger className="w-full bg-muted/50 border-none h-11 rounded-xl text-xs font-semibold hover:bg-muted transition-colors">
+                  <SelectValue placeholder="Select Plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  {user.dashboard.contexts.map((ctx) => (
+                    <SelectItem key={ctx.context_id} value={ctx.context_id} className="text-xs font-medium">
+                      {ctx.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="leading-tight">
-              <h1 className="font-medium font-goldman text-lg text-foreground tracking-tight">Thani</h1>
-              <p className="text-xs text-muted-foreground font-medium font-goldman">ORUVAN</p>
-            </div>
-          </Link>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden text-foreground hover:bg-muted"
-            onClick={onToggle}
-          >
-            <X className="w-5 h-5" />
-          </Button>
+          )}
         </div>
 
         {/* Navigation */}
