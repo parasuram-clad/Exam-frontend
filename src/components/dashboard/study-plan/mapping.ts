@@ -7,7 +7,8 @@ export const mapRoadmapToFrontend = (
   backendPlans: StudyPlanResponse[],
   timings: TopicTiming[],
   weeklyHistory: any[],
-  monthlyHistory: any[]
+  monthlyHistory: any[],
+  userId?: number
 ): Record<number, StudyTopicCardData[]> => {
   console.log('mapRoadmapToFrontend called with:', {
     roadmapDaysCount: roadmapPlan?.length,
@@ -106,7 +107,19 @@ export const mapRoadmapToFrontend = (
           } else {
             const spent = timingMap[t.id] || 0;
             const planned = t.minutes || 45;
-            totalTopicProgress += Math.min(90, (spent / (planned || 1)) * 100);
+            const timeProgress = Math.min(90, (spent / (planned || 1)) * 100);
+            
+            // Factor in reading progress from localStorage if available
+            let readingProgress = 0;
+            if (userId) {
+              const savedPercent = localStorage.getItem(`read_percent_${t.id}_${userId}`);
+              if (savedPercent) {
+                // Reading progress alone can reach up to 90%. Only MCQ makes it 100%.
+                readingProgress = Math.min(90, parseFloat(savedPercent));
+              }
+            }
+            
+            totalTopicProgress += Math.max(timeProgress, readingProgress);
           }
         });
         const progress = Math.round(totalTopicProgress / (subtopics.length || 1));

@@ -183,6 +183,7 @@ export interface SubmitMCQRequest {
     started_at: string;
     submitted_at: string;
     plan_id?: number;
+    plan_row_id?: number;
 }
 
 export interface TopicTiming {
@@ -199,10 +200,11 @@ const studyService = {
     /**
      * Start topic timing session
      */
-    startTopicTiming: async (syllabusId: number, planId?: number): Promise<TopicTiming> => {
+    startTopicTiming: async (syllabusId: number, planId?: number, planRowId?: number): Promise<TopicTiming> => {
         const response = await apiClient.post('/topic-timing/start', {
             syllabus_id: syllabusId,
-            plan_id: planId
+            plan_id: planId,
+            plan_row_id: planRowId
         });
         return response.data;
     },
@@ -210,10 +212,11 @@ const studyService = {
     /**
      * Stop topic timing session
      */
-    stopTopicTiming: async (syllabusId: number, planId?: number): Promise<TopicTiming> => {
+    stopTopicTiming: async (syllabusId: number, planId?: number, planRowId?: number): Promise<TopicTiming> => {
         const response = await apiClient.post('/topic-timing/stop', {
             syllabus_id: syllabusId,
-            plan_id: planId
+            plan_id: planId,
+            plan_row_id: planRowId
         });
         return response.data;
     },
@@ -276,8 +279,8 @@ const studyService = {
     /**
      * Fetch detailed topic content by syllabus ID
      */
-    getTopicContentBySyllabusId: async (syllabusId: number, userId: number, planId?: number): Promise<TopicContentResponse> => {
-        const response = await apiClient.get(`/topic-content/${syllabusId}`, { params: { user_id: userId, plan_id: planId } });
+    getTopicContentBySyllabusId: async (syllabusId: number, userId: number, planId?: number, planRowId?: number): Promise<TopicContentResponse> => {
+        const response = await apiClient.get(`/topic-content/${syllabusId}`, { params: { user_id: userId, plan_id: planId, plan_row_id: planRowId } });
         return response.data;
     },
 
@@ -340,9 +343,9 @@ const studyService = {
     /**
      * Get assessment history for a specific topic
      */
-    getAssessmentHistory: async (userId: number, syllabusId: number, planId?: number) => {
+    getAssessmentHistory: async (userId: number, syllabusId: number, planId?: number, planRowId?: number) => {
         const response = await apiClient.get('/mcq/history', {
-            params: { user_id: userId, syllabus_id: syllabusId, plan_id: planId }
+            params: { user_id: userId, syllabus_id: syllabusId, plan_id: planId, plan_row_id: planRowId }
         });
         return response.data;
     },
@@ -350,7 +353,7 @@ const studyService = {
     /**
      * Start an MCQ attempt (fetch questions)
      */
-    startMCQAttempt: async (payload: { syllabus_id: number; difficulty?: string; plan_id?: number }) => {
+    startMCQAttempt: async (payload: { syllabus_id: number; difficulty?: string; plan_id?: number; plan_row_id?: number }) => {
         const response = await apiClient.post('/mcq/start', payload);
         return response.data;
     },
@@ -366,9 +369,9 @@ const studyService = {
     /**
      * Get an MCQ attempt result
      */
-    getMCQResult: async (userId: number, syllabusId: number, planId?: number) => {
+    getMCQResult: async (userId: number, syllabusId: number, planId?: number, planRowId?: number) => {
         const response = await apiClient.get('/mcq/result', {
-            params: { user_id: userId, syllabus_id: syllabusId, plan_id: planId }
+            params: { user_id: userId, syllabus_id: syllabusId, plan_id: planId, plan_row_id: planRowId }
         });
         return response.data;
     },

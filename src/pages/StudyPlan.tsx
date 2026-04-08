@@ -106,8 +106,8 @@ const StudyPlan = () => {
   });
 
   const { data: topicTimings = [] } = useQuery({
-    queryKey: ['topic-timings', user?.id, currentPlan?.plan_id],
-    queryFn: () => studyService.getUserTopicTimings(undefined, currentPlan?.plan_id),
+    queryKey: ['topic-timings', user?.id],
+    queryFn: () => studyService.getUserTopicTimings(undefined, undefined),
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
   });
@@ -253,7 +253,7 @@ const StudyPlan = () => {
       const totalRoadmapDays = currentPlan?.total_days || (relevantDays.length > 0 ? Math.max(...relevantDays.map(d => d.day)) : 120);
 
       if (relevantDays.length > 0) {
-        const mappedPlans = mapRoadmapToFrontend(relevantDays, [], topicTimings, wHistory, mHistory);
+        const mappedPlans = mapRoadmapToFrontend(relevantDays, [], topicTimings, wHistory, mHistory, user?.id);
         setDynamicDayWisePlans(mappedPlans);
         const currentDay = calculateCurrentProgressDay(mappedPlans, totalRoadmapDays);
         

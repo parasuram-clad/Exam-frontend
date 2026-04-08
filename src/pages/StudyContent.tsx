@@ -437,11 +437,12 @@ const StudyContent = () => {
 
   // Resolve the subscription plan ID first to use in query
   const currentSubscriptionPlanId = urlPlanId ? parseInt(urlPlanId) : studyContext?.plan_id;
+  const currentPlanRowId = urlPlanRowId ? parseInt(urlPlanRowId) : undefined;
 
   // Get topic data response next
   const { data: topicDataResponse, isLoading: isTopicLoading } = useQuery({
-    queryKey: ['topic-content', parsedSubtopicId, user?.id, currentSubscriptionPlanId],
-    queryFn: () => studyService.getTopicContentBySyllabusId(parsedSubtopicId, user!.id, currentSubscriptionPlanId),
+    queryKey: ['topic-content', parsedSubtopicId, user?.id, currentSubscriptionPlanId, currentPlanRowId],
+    queryFn: () => studyService.getTopicContentBySyllabusId(parsedSubtopicId, user!.id, currentSubscriptionPlanId, currentPlanRowId),
     enabled: !!user?.id && !isNaN(parsedSubtopicId),
     staleTime: 5 * 60 * 1000,
   });
@@ -449,8 +450,8 @@ const StudyContent = () => {
   const isTopicCompleted = topicDataResponse?.task?.status === 'COMPLETED';
 
   const { data: assessmentHistory, isLoading: isLoadingHistory } = useQuery({
-    queryKey: ['assessment-history', user?.id, parsedSubtopicId, currentSubscriptionPlanId],
-    queryFn: () => studyService.getAssessmentHistory(user!.id, parsedSubtopicId, currentSubscriptionPlanId),
+    queryKey: ['assessment-history', user?.id, parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId],
+    queryFn: () => studyService.getAssessmentHistory(user!.id, parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId),
     enabled: !!user?.id && !isNaN(parsedSubtopicId) && !isTopicLoading,
     staleTime: 5 * 60 * 1000,
   });
@@ -558,7 +559,7 @@ const StudyContent = () => {
 
     const startTiming = async () => {
       try {
-        const timing = await studyService.startTopicTiming(parsedSubtopicId, currentSubscriptionPlanId);
+        const timing = await studyService.startTopicTiming(parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId);
         if (isActive) {
           setActiveReadingSessionId(timing.id);
           started = true;
@@ -574,7 +575,7 @@ const StudyContent = () => {
     return () => {
       isActive = false;
       if (started && !isNaN(parsedSubtopicId)) {
-        studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId).catch((e: any) => {
+        studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId).catch((e: any) => {
           // Silently ignore 404 (no active session) — not a blocking error
           if (e?.response?.status !== 404) {
             console.error("Failed to stop topic timing on unmount", e);
@@ -614,6 +615,45 @@ const StudyContent = () => {
     }
     return () => clearInterval(readingTimer);
   }, [activeReadingSessionId, timingHistory]);
+
+  // Scroll Persistence Logic
+  useEffect(() => {
+    if (!sections.length || !readingPanelRef.current || !user?.id || !subtopicId) return;
+
+    const offsetKey = `read_offset_${subtopicId}_${user.id}`;
+    const percentKey = `read_percent_${subtopicId}_${user.id}`;
+    
+    const savedOffset = localStorage.getItem(offsetKey);
+    const savedPercent = localStorage.getItem(percentKey);
+
+    if (savedOffset || savedPercent) {
+      // Small delay to ensure content is rendered before scrolling
+      setTimeout(() => {
+        if (readingPanelRef.current) {
+          if (savedOffset) {
+            readingPanelRef.current.scrollTop = parseFloat(savedOffset);
+          } else if (savedPercent) {
+            const percent = parseFloat(savedPercent);
+            const maxScroll = readingPanelRef.current.scrollHeight - readingPanelRef.current.clientHeight;
+            readingPanelRef.current.scrollTop = (percent / 100) * maxScroll;
+          }
+        }
+      }, 150);
+    }
+  }, [sections, subtopicId, user?.id]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (!user?.id || !subtopicId) return;
+    const container = e.currentTarget;
+    const offsetKey = `read_offset_${subtopicId}_${user.id}`;
+    const percentKey = `read_percent_${subtopicId}_${user.id}`;
+    
+    const maxScroll = container.scrollHeight - container.clientHeight;
+    const percent = maxScroll > 0 ? (container.scrollTop / maxScroll) * 100 : 0;
+    
+    localStorage.setItem(offsetKey, container.scrollTop.toString());
+    localStorage.setItem(percentKey, percent.toFixed(2));
+  };
 
   useEffect(() => {
     if (isAssessmentStarted && !isAssessmentFinished && timeLeft > 0) {
@@ -750,7 +790,8 @@ const StudyContent = () => {
       const response = await studyService.startMCQAttempt({
         syllabus_id: parsedSubtopicId,
         difficulty: "easy",
-        plan_id: currentSubscriptionPlanId
+        plan_id: currentSubscriptionPlanId,
+        plan_row_id: currentPlanRowId
       });
 
       if (response && response.questions) {
@@ -829,7 +870,8 @@ const StudyContent = () => {
         answers: answers,
         started_at: assessmentStartTime,
         submitted_at: new Date().toISOString(),
-        plan_id: currentSubscriptionPlanId
+        plan_id: currentSubscriptionPlanId,
+        plan_row_id: currentPlanRowId
       });
 
       // Map backend results back to frontend format
@@ -864,7 +906,7 @@ const StudyContent = () => {
 
       // Stop the reading/study session timing since the topic is now fully completed (including MCQ)
       try {
-        await studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId);
+        await studyService.stopTopicTiming(parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId);
         setActiveReadingSessionId(null);
       } catch (e: any) {
         // 404 means no active session was found (e.g. already stopped or never started) — not a blocking error
@@ -1163,7 +1205,7 @@ const StudyContent = () => {
                     if (!viewHistoryAnswers) {
                       if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
                         try {
-                          const result = await studyService.getMCQResult(user.id, parsedSubtopicId, currentSubscriptionPlanId);
+                          const result = await studyService.getMCQResult(user.id, parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId);
                           if (result && result.questions) {
                             const letterToIdx: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
                             const ans = result.questions.map((q: any) => letterToIdx[q.selected_option] ?? null);
@@ -1328,7 +1370,12 @@ const StudyContent = () => {
       <div className="w-full h-full overflow-hidden">
         {mode === 'reading' && (
           <div className="w-full h-full overflow-y-auto bg-[#f5f5f5]">
-            <div className={cn("h-full overflow-y-auto pt-20", getBackgroundStyle())} style={{ maxWidth: '800px', margin: '0 auto' }} ref={readingPanelRef}>
+            <div
+              className={cn("h-full overflow-y-auto pt-20", getBackgroundStyle())}
+              style={{ maxWidth: '800px', margin: '0 auto' }}
+              ref={readingPanelRef}
+              onScroll={handleScroll}
+            >
               {renderReadingContent()}
             </div>
           </div>
@@ -1337,11 +1384,15 @@ const StudyContent = () => {
         {mode === 'study' && (
           <div className="flex flex-col lg:flex-row h-full w-full overflow-hidden">
             {/* Reading Panel */}
-            <div className={cn(
-              "w-full lg:w-[60%] h-[35%] lg:h-full overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200/10 transition-all duration-300 pt-20 lg:pt-24",
-              focusedNoteKeyword ? "h-0 opacity-0 invisible lg:h-full lg:opacity-100 lg:visible" : "h-[35%]",
-              getBackgroundStyle()
-            )} ref={readingPanelRef}>
+            <div
+              className={cn(
+                "w-full lg:w-[60%] h-[35%] lg:h-full overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200/10 transition-all duration-300 pt-20 lg:pt-24",
+                focusedNoteKeyword ? "h-0 opacity-0 invisible lg:h-full lg:opacity-100 lg:visible" : "h-[35%]",
+                getBackgroundStyle()
+              )}
+              ref={readingPanelRef}
+              onScroll={handleScroll}
+            >
               {renderReadingContent()}
             </div>
 

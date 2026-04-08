@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -47,6 +48,15 @@ export const StudyTopicDetailDialog = ({
   isFetching = false
 }: StudyTopicDetailDialogProps) => {
   const queryClient = useQueryClient();
+  const [now, setNow] = useState(new Date());
+
+  // Update "now" every 30 seconds to provide real-time timing updates
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setInterval(() => setNow(new Date()), 30000);
+      return () => clearInterval(timer);
+    }
+  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -85,10 +95,13 @@ export const StudyTopicDetailDialog = ({
 
                 // subtopic.timeSpent already includes snapshot of ongoingTime from mapping.ts 
                 // but if there's an active timing for a non-completed topic, ensure we show it or update it.
-                if (activeTiming && activeTiming.id && subtopic.status !== "completed" && !subtopic.timeSpent && activeTiming.start_time) {
+                // Calculate live timing for active session
+                if (activeTiming && activeTiming.id && subtopic.status !== "completed" && activeTiming.start_time) {
                    const startTimeStr = activeTiming.start_time.endsWith('Z') ? activeTiming.start_time : `${activeTiming.start_time}Z`;
-                   const ongoingMinutes = Math.floor((new Date().getTime() - new Date(startTimeStr).getTime()) / (1000 * 60));
-                   liveTimeSpent = ongoingMinutes;
+                   const ongoingMinutes = Math.floor((now.getTime() - new Date(startTimeStr).getTime()) / (1000 * 60));
+                   // The subtopic.timeSpent might have past sessions, but for the active one we use the live diff
+                   // If we already have timeSpent (summed from backend), we just ensure we show at least the ongoing part
+                   liveTimeSpent = Math.max(subtopic.timeSpent, ongoingMinutes);
                 }
 
                 return (
@@ -120,7 +133,32 @@ export const StudyTopicDetailDialog = ({
                         <span className="font-medium text-primary-foreground">{liveTimeSpent}m / {subtopic.totalTime}m</span>
                       </div>
                       <div className="h-2 bg-primary-foreground/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-accent rounded-full transition-all duration-1000 ease-linear" style={{ width: `${Math.min((liveTimeSpent / subtopic.totalTime) * 100, 100)}%` }} />
+                        {(() => {
+                          const timeProgress = subtopic.totalTime > 0 ? (liveTimeSpent / subtopic.totalTime) * 100 : 0;
+                          let readingProgress = 0;
+                          
+                          if (user?.id) {
+                            const savedPercent = localStorage.getItem(`read_percent_${subtopic.id}_${user.id}`);
+                            if (savedPercent) {
+                              readingProgress = parseFloat(savedPercent);
+                            }
+                          }
+
+                          let finalProgress = 0;
+                          if (subtopic.status === "completed") {
+                            finalProgress = 100;
+                          } else {
+                            // Max of time or reading, capped at 90% for non-completed
+                            finalProgress = Math.min(90, Math.max(timeProgress, readingProgress));
+                          }
+
+                          return (
+                            <div 
+                              className="h-full bg-accent rounded-full transition-all duration-500 ease-out" 
+                              style={{ width: `${finalProgress}%` }} 
+                            />
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

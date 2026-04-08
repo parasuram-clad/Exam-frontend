@@ -17,7 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import studyService from "@/services/study.service";
 import authService from "@/services/auth.service";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trophy } from "lucide-react";
 
 interface RightSidebarWidgetsProps {
     initialView?: 'streak' | 'leaderboard' | 'all';
@@ -33,7 +33,7 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
     const { data: dashboardData, isLoading, error } = useQuery({
         queryKey: ['dashboard', user?.id, currentContext?.plan_id],
         queryFn: () => studyService.getDashboardData(user!.id, currentContext?.plan_id),
-        enabled: !!user?.id,
+        enabled: !!user?.id && !!currentContext?.plan_id,
         staleTime: 5 * 60 * 1000,
     });
 
@@ -43,6 +43,22 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
     const showDailyPerformance = initialView === 'all';
     const showStreak = initialView === 'all' || initialView === 'streak';
     const showLeaderboard = initialView === 'all' || initialView === 'leaderboard';
+
+    if (!currentContext?.plan_id) {
+        return (
+            <div className="bg-card rounded-xl p-6 border border-dashed border-border text-center space-y-4 shadow-sm">
+                <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mx-auto">
+                    <Trophy className="w-6 h-6 text-primary" />
+                </div>
+                <div className="space-y-1">
+                    <h3 className="font-semibold text-sm">No Performance Data</h3>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed font-medium">
+                        Generate your study plan to track your streak, leaderboard rank, and daily study metrics.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     if (isLoading) {
         return (
