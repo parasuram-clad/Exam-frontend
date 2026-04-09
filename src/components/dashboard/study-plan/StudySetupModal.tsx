@@ -17,6 +17,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Globe, Target, BookOpen, ChevronDown, Calendar, Zap, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import studyService, { ExamFormOptionsResponse } from "@/services/study.service";
 
 // Asset imports (passed as props or imported here if possible)
 import modalTopLeft from "@/assets/study-plan/top-left-mid.png";
@@ -24,11 +26,6 @@ import modalTopRight from "@/assets/study-plan/top-right-mid.png";
 import modalBottomLeft from "@/assets/study-plan/bottom-left.png";
 import modalBottomRight from "@/assets/study-plan/bottom-right.png";
 
-const EXAM_SUB_DIVISIONS: Record<string, string[]> = {
-  "TNPSC": ["Group I", "Group II", "Group IIA", "Group IV"],
-  "TNTET": ["TET Paper I", "TET Paper II", "PG TET"],
-  "TNUSRB": ["SI/SO", "PC/Fireman"]
-};
 
 interface StudySetupModalProps {
   isOpen: boolean;
@@ -55,6 +52,17 @@ export const StudySetupModal = ({
   setSetupData,
   onGenerate
 }: StudySetupModalProps) => {
+  const { data: formOptions, isLoading: optionsLoading } = useQuery<ExamFormOptionsResponse>({
+    queryKey: ['exam-form-options'],
+    queryFn: () => studyService.getExamFormOptions(),
+    staleTime: 24 * 60 * 60 * 1000, // 24 hours
+  });
+
+  const selectedExamData = formOptions?.exams.find(e => e.exam_name === setupData.examType);
+  const availableSubDivisions = selectedExamData?.sub_divisions.map(s => s.name) || [];
+  const selectedSubDivisionData = selectedExamData?.sub_divisions.find(s => setupData.subDivision.includes(s.name));
+  const availableYears = selectedSubDivisionData?.available_years || [new Date().getFullYear(), new Date().getFullYear() + 1, new Date().getFullYear() + 2];
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
@@ -134,9 +142,11 @@ export const StudySetupModal = ({
                     <SelectValue placeholder="Select Exam Type" />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-border/50 p-2">
-                    <SelectItem value="TNPSC" className="rounded-lg focus:bg-accent/10">TNPSC</SelectItem>
-                    <SelectItem value="TNTET" className="rounded-lg focus:bg-accent/10">TNTET</SelectItem>
-                    <SelectItem value="TNUSRB" className="rounded-lg focus:bg-accent/10">TNUSRB</SelectItem>
+                    {formOptions?.exams.map((exam) => (
+                      <SelectItem key={exam.exam_name} value={exam.exam_name} className="rounded-lg focus:bg-accent/10">
+                        {exam.exam_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -160,7 +170,7 @@ export const StudySetupModal = ({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="rounded-2xl border-border/50 shadow-xl max-h-60 overflow-y-auto p-2">
-                    {setupData.examType && EXAM_SUB_DIVISIONS[setupData.examType]?.map((sub) => (
+                    {availableSubDivisions.map((sub) => (
                       <DropdownMenuItem
                         key={sub}
                         className="w-[220px] rounded-lg flex items-center gap-3 py-2.5 px-3 focus:bg-accent/10 cursor-pointer"
@@ -209,14 +219,11 @@ export const StudySetupModal = ({
                     <SelectValue placeholder="Select Year" />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-border/50 shadow-xl p-2">
-                    {[0, 1, 2].map((offset) => {
-                      const year = (new Date().getFullYear() + offset).toString();
-                      return (
-                        <SelectItem key={year} value={year} className="rounded-lg focus:bg-accent/10">
-                          {year}
-                        </SelectItem>
-                      );
-                    })}
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={year.toString()} className="rounded-lg focus:bg-accent/10">
+                        {year}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

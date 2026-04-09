@@ -260,7 +260,7 @@ const StudyPlan = () => {
       const totalRoadmapDays = currentPlan?.total_days || (relevantDays.length > 0 ? Math.max(...relevantDays.map(d => d.day)) : 120);
 
       if (relevantDays.length > 0) {
-        const mappedPlans = mapRoadmapToFrontend(relevantDays, [], topicTimings, wHistory, mHistory, user?.id);
+        const mappedPlans = mapRoadmapToFrontend(relevantDays, [], topicTimings, wHistory, mHistory, user?.id, currentPlan?.plan_id);
         setDynamicDayWisePlans(mappedPlans);
         const currentDay = calculateCurrentProgressDay(mappedPlans, totalRoadmapDays);
         
@@ -288,16 +288,21 @@ const StudyPlan = () => {
 
   const overallProgress = useMemo(() => {
     if (!totalDays || totalDays === 0) return 0;
-    const timingMap: Record<number, number> = {};
+    const timingMap: Record<string, number> = {}; // Key: "syllabusId_planRowId"
     const now = new Date();
-    const statusMap: Record<number, boolean> = {};
+    const statusMap: Record<string, boolean> = {}; // Key: "syllabusId_planRowId" or "identifier"
+
     if (currentPlan) {
       currentPlan.days.forEach(d => {
         d.items.forEach(item => {
           if (item.type === 'TOPIC' && item.topic) {
-            item.topic.forEach((t: any) => { if (t.is_completed || t.plan_status === 'COMPLETED') statusMap[t.id] = true; });
+            item.topic.forEach((t: any) => {
+              const key = t.plan_row_id ? `${t.id}_row_${t.plan_row_id}` : `${t.id}_plan_${currentPlan?.plan_id}`;
+              if (t.is_completed || t.plan_status === 'COMPLETED') statusMap[key] = true;
+            });
           } else if (item.is_completed || item.plan_status === 'COMPLETED') {
-            statusMap[item.identifier || item.title || 0] = true;
+            const key = item.plan_row_id ? `${item.plan_row_id}` : (item.identifier || item.title || "0");
+            statusMap[key] = true;
           }
         });
       });
@@ -306,32 +311,59 @@ const StudyPlan = () => {
     topicTimings.forEach((tValue: TopicTiming) => {
       if (currentPlan?.plan_id && tValue.plan_id !== currentPlan.plan_id) return;
       let m = Number(tValue.total_estimate || 0);
-      if (!tValue.end_time && tValue.start_time && !statusMap[tValue.syllabus_id]) {
+      
+      const timingKey = tValue.plan_row_id ? `${tValue.syllabus_id}_row_${tValue.plan_row_id}` : `${tValue.syllabus_id}_plan_${tValue.plan_id}`;
+
+      if (!tValue.end_time && tValue.start_time && !statusMap[timingKey]) {
         const startTimeStr = tValue.start_time.endsWith('Z') ? tValue.start_time : `${tValue.start_time}Z`;
         const start = new Date(startTimeStr);
         if (!isNaN(start.getTime())) m += Math.max(0, Math.round((now.getTime() - start.getTime()) / (1000 * 60)));
       }
-      timingMap[tValue.syllabus_id] = (timingMap[tValue.syllabus_id] || 0) + m;
+      timingMap[timingKey] = (timingMap[timingKey] || 0) + m;
     });
 
     const completedFullDays = Math.max(0, currentProgressDay - 1);
     let currentDayFraction = 0;
     if (currentProgressDay <= totalDays) {
       const todayCards = dynamicDayWisePlans[currentProgressDay] || [];
-      const allSubtopics: { syllabusId: number; minutes: number; isCompleted: boolean }[] = [];
+      const allSubtopics: { syllabusId: number; planRowId?: number; minutes: number; isCompleted: boolean }[] = [];
       todayCards.forEach(card => {
         if (card.subtopics) {
           card.subtopics.forEach(st => {
             const sid = parseInt(st.id, 10);
-            if (!isNaN(sid)) allSubtopics.push({ syllabusId: sid, minutes: st.totalTime || 45, isCompleted: st.status === 'completed' });
+            if (!isNaN(sid)) {
+              allSubtopics.push({
+                syllabusId: sid,
+                planRowId: st.planRowId,
+                minutes: st.totalTime || 45,
+                isCompleted: st.status === 'completed'
+              });
+            }
           });
         }
       });
       if (allSubtopics.length > 0) {
         let topicProgressSum = 0;
         allSubtopics.forEach(st => {
-          if (st.isCompleted) topicProgressSum += 100;
-          else topicProgressSum += Math.min(90, ((timingMap[st.syllabusId] || 0) / (st.minutes || 45)) * 100);
+          if (st.isCompleted) {
+            topicProgressSum += 100;
+          } else {
+            const timingKey = st.planRowId ? `${st.syllabusId}_row_${st.planRowId}` : `${st.syllabusId}_plan_${currentPlan?.plan_id}`;
+            const timeProgress = Math.min(90, ((timingMap[timingKey] || 0) / (st.minutes || 45)) * 100);
+            
+            let readingProgress = 0;
+            if (user?.id) {
+              const planIdStr = currentPlan?.plan_id ? `plan_${currentPlan.plan_id}` : "global";
+              const rowIdStr = st.planRowId ? `row_${st.planRowId}` : "norow";
+              const percentKey = `read_percent_${st.syllabusId}_${planIdStr}_${rowIdStr}_${user.id}`;
+              const savedPercent = localStorage.getItem(percentKey);
+              if (savedPercent) {
+                readingProgress = Math.min(90, parseFloat(savedPercent));
+              }
+            }
+            
+            topicProgressSum += Math.max(timeProgress, readingProgress);
+          }
         });
         currentDayFraction = (topicProgressSum / allSubtopics.length) / 100;
       }

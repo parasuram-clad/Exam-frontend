@@ -114,10 +114,21 @@ export const StudyTopicDetailDialog = ({
 
             <div className="space-y-4">
               {selectedTopic.subtopics.map((subtopic) => {
-                const matchingTimings = (combinedTimings || []).filter(t =>
-                  t.syllabus_id.toString() === subtopic.id &&
-                  (subtopic.planRowId ? (t.plan_row_id === subtopic.planRowId || !t.plan_row_id) : true)
-                );
+                const matchingTimings = (combinedTimings || []).filter(t => {
+                  const syllabusMatch = t.syllabus_id.toString() === subtopic.id;
+                  if (!syllabusMatch) return false;
+                  
+                  if (subtopic.planRowId) {
+                    return t.plan_row_id?.toString() === subtopic.planRowId.toString();
+                  } else {
+                    // Match plan_id if we are in a plan context
+                    if (studyContext?.plan_id) {
+                      return t.plan_id?.toString() === studyContext.plan_id.toString();
+                    }
+                    // Global fallback
+                    return !t.plan_id && !t.plan_row_id;
+                  }
+                });
 
                 // Calculate total completed time for this subtopic
                 const completedTimeSum = matchingTimings
@@ -172,7 +183,10 @@ export const StudyTopicDetailDialog = ({
                           let readingProgress = 0;
 
                           if (user?.id) {
-                            const savedPercent = localStorage.getItem(`read_percent_${subtopic.id}_${user.id}`);
+                            const planIdStr = studyContext?.plan_id ? `plan_${studyContext.plan_id}` : "global";
+                            const rowIdStr = subtopic.planRowId ? `row_${subtopic.planRowId}` : "norow";
+                            const percentKey = `read_percent_${subtopic.id}_${planIdStr}_${rowIdStr}_${user.id}`;
+                            const savedPercent = localStorage.getItem(percentKey);
                             if (savedPercent) {
                               readingProgress = parseFloat(savedPercent);
                             }

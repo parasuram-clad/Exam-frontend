@@ -620,8 +620,10 @@ const StudyContent = () => {
   useEffect(() => {
     if (!sections.length || !readingPanelRef.current || !user?.id || !subtopicId) return;
 
-    const offsetKey = `read_offset_${subtopicId}_${user.id}`;
-    const percentKey = `read_percent_${subtopicId}_${user.id}`;
+    const planIdStr = currentSubscriptionPlanId ? `plan_${currentSubscriptionPlanId}` : "global";
+    const rowIdStr = currentPlanRowId ? `row_${currentPlanRowId}` : "norow";
+    const offsetKey = `read_offset_${subtopicId}_${planIdStr}_${rowIdStr}_${user.id}`;
+    const percentKey = `read_percent_${subtopicId}_${planIdStr}_${rowIdStr}_${user.id}`;
     
     const savedOffset = localStorage.getItem(offsetKey);
     const savedPercent = localStorage.getItem(percentKey);
@@ -645,8 +647,10 @@ const StudyContent = () => {
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (!user?.id || !subtopicId) return;
     const container = e.currentTarget;
-    const offsetKey = `read_offset_${subtopicId}_${user.id}`;
-    const percentKey = `read_percent_${subtopicId}_${user.id}`;
+    const planIdStr = currentSubscriptionPlanId ? `plan_${currentSubscriptionPlanId}` : "global";
+    const rowIdStr = currentPlanRowId ? `row_${currentPlanRowId}` : "norow";
+    const offsetKey = `read_offset_${subtopicId}_${planIdStr}_${rowIdStr}_${user.id}`;
+    const percentKey = `read_percent_${subtopicId}_${planIdStr}_${rowIdStr}_${user.id}`;
     
     const maxScroll = container.scrollHeight - container.clientHeight;
     const percent = maxScroll > 0 ? (container.scrollTop / maxScroll) * 100 : 0;
@@ -924,6 +928,8 @@ const StudyContent = () => {
       if (planToUpdateId) {
         try {
           await studyService.updateStudyPlan(planToUpdateId, {
+            plan_id: currentSubscriptionPlanId || undefined,
+            syllabus_id: parsedSubtopicId,
             plan_status: 'COMPLETED',
             is_completed: true
           });
@@ -1257,7 +1263,8 @@ const StudyContent = () => {
                 </button>
               )}
 
-              {!isAssessmentFinished && (
+              {/* Show Start/Retake Assessment button if attempts < 3 */}
+              {(!isAssessmentFinished || (assessmentHistory?.total_attempts || 0) < 3) && (
                 <Button
                   onClick={startAssessment}
                   disabled={!topicData}
@@ -1267,7 +1274,7 @@ const StudyContent = () => {
                   )}
                 >
                   <Play className="w-5 h-5 mr-2.5 fill-current" />
-                  {!topicData ? "Loading..." : "Start Assessment"}
+                  {!topicData ? "Loading..." : (isAssessmentFinished ? "Retake Assessment" : "Start Assessment")}
                 </Button>
               )}
             </div>

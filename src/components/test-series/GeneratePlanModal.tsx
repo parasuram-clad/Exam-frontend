@@ -5,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Globe, Target, BookOpen, Calendar, Zap, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import studyService, { ExamFormOptionsResponse } from "@/services/study.service";
 
 // Asset imports
 import modalTopLeft from "@/assets/study-plan/top-left-mid.png";
@@ -19,11 +21,6 @@ interface GeneratePlanModalProps {
   initialData?: any;
 }
 
-const EXAM_SUB_DIVISIONS: Record<string, string[]> = {
-  "TNPSC": ["Group I", "Group II", "Group IIA", "Group IV"],
-  "TNTET": ["TET Paper I", "TET Paper II", "PG TET"],
-  "TNUSRB": ["SI/SO", "PC/Fireman"]
-};
 
 export const GeneratePlanModal: React.FC<GeneratePlanModalProps> = ({
   isOpen,
@@ -39,6 +36,17 @@ export const GeneratePlanModal: React.FC<GeneratePlanModalProps> = ({
     learner_type: initialData.learner_type || "Student",
   });
   const [loading, setLoading] = useState(false);
+
+  const { data: formOptions } = useQuery<ExamFormOptionsResponse>({
+    queryKey: ['exam-form-options'],
+    queryFn: () => studyService.getExamFormOptions(),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  const selectedExamData = formOptions?.exams.find(e => e.exam_name === formData.exam_type);
+  const availableSubDivisions = selectedExamData?.sub_divisions.map(s => s.name) || [];
+  const selectedSubDivisionData = selectedExamData?.sub_divisions.find(s => s.name === formData.sub_division);
+  const availableYears = selectedSubDivisionData?.available_years || [new Date().getFullYear(), new Date().getFullYear() + 1, new Date().getFullYear() + 2];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,15 +97,19 @@ export const GeneratePlanModal: React.FC<GeneratePlanModalProps> = ({
                   </div>
                   <Select
                     value={formData.exam_type}
-                    onValueChange={(v) => setFormData({ ...formData, exam_type: v, sub_division: EXAM_SUB_DIVISIONS[v]?.[0] || "" })}
+                    onValueChange={(v) => {
+                      const exam = formOptions?.exams.find(e => e.exam_name === v);
+                      const firstSub = exam?.sub_divisions[0]?.name || "";
+                      setFormData({ ...formData, exam_type: v, sub_division: firstSub });
+                    }}
                   >
                     <SelectTrigger className="w-full bg-muted/30 border-none h-12 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background text-foreground/80 shadow-none">
                       <SelectValue placeholder="Select Type" />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-border/50 p-2 bg-white">
-                      {Object.keys(EXAM_SUB_DIVISIONS).map((type) => (
-                        <SelectItem key={type} value={type} className="rounded-lg focus:bg-accent/10">
-                          {type}
+                      {formOptions?.exams.map((exam) => (
+                        <SelectItem key={exam.exam_name} value={exam.exam_name} className="rounded-lg focus:bg-accent/10">
+                          {exam.exam_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -119,7 +131,7 @@ export const GeneratePlanModal: React.FC<GeneratePlanModalProps> = ({
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-border/50 p-2 bg-white">
-                      {[2025, 2026, 2027].map((y) => (
+                      {availableYears.map((y) => (
                         <SelectItem key={y} value={y.toString()} className="rounded-lg focus:bg-accent/10">
                           {y}
                         </SelectItem>
@@ -143,7 +155,7 @@ export const GeneratePlanModal: React.FC<GeneratePlanModalProps> = ({
                       <SelectValue placeholder="Select Exam" />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-border/50 p-2 bg-white">
-                      {EXAM_SUB_DIVISIONS[formData.exam_type]?.map((sub) => (
+                      {availableSubDivisions.map((sub) => (
                         <SelectItem key={sub} value={sub} className="rounded-lg focus:bg-accent/10">
                           {sub}
                         </SelectItem>

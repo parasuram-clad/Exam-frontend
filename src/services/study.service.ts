@@ -197,6 +197,20 @@ export interface TopicTiming {
     total_estimate?: number;
 }
 
+export interface ExamSubDivisionOption {
+    name: string;
+    available_years: number[];
+}
+
+export interface ExamOption {
+    exam_name: string;
+    sub_divisions: ExamSubDivisionOption[];
+}
+
+export interface ExamFormOptionsResponse {
+    exams: ExamOption[];
+}
+
 const studyService = {
     /**
      * Start topic timing session
@@ -257,8 +271,8 @@ const studyService = {
     /**
      * Update study plan status
      */
-    updateStudyPlan: async (planId: number, payload: { plan_status?: string, minutes?: number, is_completed?: boolean }) => {
-        const response = await apiClient.put(`/study-plan/${planId}`, payload);
+    updateStudyPlan: async (planRowId: number, payload: { plan_id?: number, syllabus_id?: number, plan_status?: string, minutes?: number, is_completed?: boolean }) => {
+        const response = await apiClient.put(`/study-plan/${planRowId}`, payload);
         return response.data;
     },
 
@@ -525,6 +539,14 @@ const studyService = {
         const response = await apiClient.get('/dashboard', {
             params: { user_id: userId, plan_id: planId }
         });
+        return response.data;
+    },
+
+    /**
+     * Get all exam form options (exam types, sub-divisions, available years)
+     */
+    getExamFormOptions: async (): Promise<ExamFormOptionsResponse> => {
+        const response = await apiClient.get('/exam-engine/form-options');
         return response.data;
     }
 };

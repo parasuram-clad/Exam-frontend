@@ -8,7 +8,8 @@ export const mapRoadmapToFrontend = (
   timings: TopicTiming[],
   weeklyHistory: any[],
   monthlyHistory: any[],
-  userId?: number
+  userId?: number,
+  planId?: number
 ): Record<number, StudyTopicCardData[]> => {
   console.log('mapRoadmapToFrontend called with:', {
     roadmapDaysCount: roadmapPlan?.length,
@@ -71,12 +72,8 @@ export const mapRoadmapToFrontend = (
         }
       }
       
-      const key = t.plan_row_id || t.syllabus_id;
+      const key = t.plan_row_id ? `${t.syllabus_id}_row_${t.plan_row_id}` : `${t.syllabus_id}_plan_${t.plan_id}`;
       timingMap[key] = (timingMap[key] || 0) + sessionMinutes;
-      // Also ensure sync with syllabus_id for fallback
-      if (t.plan_row_id && t.syllabus_id) {
-        timingMap[`sid_${t.syllabus_id}`] = (timingMap[`sid_${t.syllabus_id}`] || 0) + sessionMinutes;
-      }
     });
   }
 
@@ -100,7 +97,8 @@ export const mapRoadmapToFrontend = (
 
         const inProgressCount = subtopics.filter((t: any) => {
           const status = t.plan_row_id ? (statusMap[t.plan_row_id] || statusMap[t.id]) : statusMap[t.id];
-          return status === 'IN_PROGRESS' || timingMap[t.id] > 0;
+          const timingKey = t.plan_row_id ? `${t.id}_row_${t.plan_row_id}` : `${t.id}_plan_${t.plan_id || planId}`;
+          return status === 'IN_PROGRESS' || (timingMap[timingKey] || 0) > 0;
         }).length;
 
         // Calculate progress including timing for a consistent % with mobile
@@ -110,14 +108,20 @@ export const mapRoadmapToFrontend = (
           if (status === 'COMPLETED') {
             totalTopicProgress += 100;
           } else {
-            const spent = (t.plan_row_id ? timingMap[t.plan_row_id] : timingMap[t.id]) || 0;
+            const timingKey = t.plan_row_id ? `${t.id}_row_${t.plan_row_id}` : `${t.id}_plan_${t.plan_id || planId}`;
+            const spent = timingMap[timingKey] || 0;
             const planned = t.minutes || 45;
             const timeProgress = Math.min(90, (spent / (planned || 1)) * 100);
             
             // Factor in reading progress from localStorage if available
             let readingProgress = 0;
             if (userId) {
-              const savedPercent = localStorage.getItem(`read_percent_${t.id}_${userId}`);
+              // IMPORTANT: Use the same scoped keys as StudyContent.tsx
+              const currentPlanId = t.plan_id || planId;
+              const planIdStr = currentPlanId ? `plan_${currentPlanId}` : "global";
+              const rowIdStr = t.plan_row_id ? `row_${t.plan_row_id}` : "norow";
+              const percentKey = `read_percent_${t.id}_${planIdStr}_${rowIdStr}_${userId}`;
+              const savedPercent = localStorage.getItem(percentKey);
               if (savedPercent) {
                 // Reading progress alone can reach up to 90%. Only MCQ makes it 100%.
                 readingProgress = Math.min(90, parseFloat(savedPercent));
@@ -150,9 +154,9 @@ export const mapRoadmapToFrontend = (
             id: t.id ? t.id.toString() : `topic-${idx}-${Math.random()}`,
             name: t.name || 'Untitled Topic',
             description: t.description || '',
-            timeSpent: (t.plan_row_id ? (timingMap[t.plan_row_id] || timingMap[`sid_${t.id}`] || timingMap[t.id]) : (timingMap[t.id] || 0)) || 0,
+            timeSpent: (t.plan_row_id ? (timingMap[`${t.id}_row_${t.plan_row_id}`]) : (timingMap[`${t.id}_plan_${t.plan_id}`] || 0)) || 0,
             totalTime: t.minutes || 0,
-            status: ((t.plan_row_id && statusMap[t.plan_row_id] === 'COMPLETED') || (!t.plan_row_id && statusMap[t.id] === 'COMPLETED') ? 'completed' : ((t.plan_row_id ? (statusMap[t.plan_row_id] === 'IN_PROGRESS' || statusMap[t.id] === 'IN_PROGRESS') : statusMap[t.id] === 'IN_PROGRESS') || (t.plan_row_id ? (timingMap[t.plan_row_id] || timingMap[`sid_${t.id}`] || timingMap[t.id]) : timingMap[t.id]) > 0 ? 'continue' : 'start')) as any,
+            status: ((t.plan_row_id && statusMap[t.plan_row_id] === 'COMPLETED') || (!t.plan_row_id && statusMap[t.id] === 'COMPLETED') ? 'completed' : ((t.plan_row_id ? (statusMap[t.plan_row_id] === 'IN_PROGRESS' || statusMap[t.id] === 'IN_PROGRESS') : statusMap[t.id] === 'IN_PROGRESS') || (t.plan_row_id ? (timingMap[`${t.id}_row_${t.plan_row_id}`]) : timingMap[`${t.id}_plan_${t.plan_id}`]) > 0 ? 'continue' : 'start')) as any,
             planRowId: t.plan_row_id,
           })),
         };
@@ -222,7 +226,8 @@ export const mapRoadmapToFrontend = (
 
 export const mapBackendPlanToFrontend = (
   backendPlans: StudyPlanResponse[],
-  topicTimings: TopicTiming[]
+  topicTimings: TopicTiming[],
+  userId?: number
 ): Record<number, StudyTopicCardData[]> => {
   const groupedByDay: Record<number, StudyPlanResponse[]> = {};
   backendPlans.forEach(plan => {
@@ -245,8 +250,14 @@ export const mapBackendPlanToFrontend = (
       const now = new Date();
       topicTimings.forEach(t => {
         let m = Number(t.total_estimate || 0);
+        // Scoped key matching mapping.ts standard
+        const key = t.plan_row_id ? `${t.syllabus_id}_row_${t.plan_row_id}` : `${t.syllabus_id}_plan_${t.plan_id}`;
+        
         // Find if this specific syllabus_id is marked as completed in current context
-        const planItem = backendPlans.find(bp => bp.syllabus_id === t.syllabus_id);
+        const planItem = backendPlans.find(bp => {
+           if (t.plan_row_id) return bp.id === t.plan_row_id;
+           return bp.syllabus_id === t.syllabus_id && bp.plan_id === t.plan_id;
+        });
         const isAlreadyDone = planItem?.is_completed || planItem?.plan_status === 'COMPLETED';
 
         if (!t.end_time && t.start_time && !isAlreadyDone) {
@@ -254,12 +265,15 @@ export const mapBackendPlanToFrontend = (
           const start = new Date(startTimeStr);
           if (!isNaN(start.getTime())) m += Math.max(0, Math.round((now.getTime() - start.getTime()) / (1000 * 60)));
         }
-        localTimingMap[t.syllabus_id] = (localTimingMap[t.syllabus_id] || 0) + m;
+        localTimingMap[key] = (localTimingMap[key] || 0) + m;
       });
 
       // Priority based status check for items in grouped subject
       const completedCount = items.filter(i => i.is_completed || i.plan_status === 'COMPLETED').length;
-      const inProgressCount = items.filter(i => (i.plan_status === 'IN_PROGRESS' || (localTimingMap[i.syllabus_id] > 0)) && !i.is_completed).length;
+      const inProgressCount = items.filter(i => {
+          const timingKey = i.id ? `${i.syllabus_id}_row_${i.id}` : `${i.syllabus_id}_plan_${i.plan_id}`;
+          return (i.plan_status === 'IN_PROGRESS' || (localTimingMap[timingKey] > 0)) && !i.is_completed;
+      }).length;
 
       console.log(`Processing subject ${subject}: completed=${completedCount}, inProgress=${inProgressCount}, total=${items.length}`);
 
@@ -270,7 +284,20 @@ export const mapBackendPlanToFrontend = (
           totalItemProgress += 100;
         } else {
           const spent = localTimingMap[i.syllabus_id] || 0;
-          totalItemProgress += Math.min(90, (spent / (i.minutes || 45)) * 100);
+          const timeProgress = Math.min(90, (spent / (i.minutes || 45)) * 100);
+          
+          let readingProgress = 0;
+          if (userId) {
+            const planIdStr = i.plan_id ? `plan_${i.plan_id}` : "global";
+            const rowIdStr = i.id ? `row_${i.id}` : "norow"; // Assuming backend plan ID is the row ID here
+            const percentKey = `read_percent_${i.syllabus_id}_${planIdStr}_${rowIdStr}_${userId}`;
+            const savedPercent = localStorage.getItem(percentKey);
+            if (savedPercent) {
+              readingProgress = Math.min(90, parseFloat(savedPercent));
+            }
+          }
+          
+          totalItemProgress += Math.max(timeProgress, readingProgress);
         }
       });
       const progress = Math.round(totalItemProgress / (items.length || 1));
@@ -291,7 +318,8 @@ export const mapBackendPlanToFrontend = (
         status: overallStatus,
         topics: Array.from(new Set(items.map(i => i.chapter))).map(ch => ({ name: ch, color: 'bg-[#7C79EC]' })),
         subtopics: items.map(i => {
-          const spent = localTimingMap[i.syllabus_id] || 0;
+          const timingKey = i.id ? `${i.syllabus_id}_row_${i.id}` : `${i.syllabus_id}_plan_${i.plan_id}`;
+          const spent = localTimingMap[timingKey] || 0;
           const isCompleted = i.is_completed || i.plan_status === 'COMPLETED';
           return {
             id: i.id.toString(), name: i.topic, description: `Chapter: ${i.chapter}`,

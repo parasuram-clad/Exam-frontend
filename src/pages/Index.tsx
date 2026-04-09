@@ -38,6 +38,7 @@ import imgCard1 from "@/assets/dashboard/img-card1.png";
 import testBannerImg from "@/assets/test-image.png";
 import mockTestGirl from "@/assets/dashboard/mock-test-girl.png";
 import studyService, { RoadmapResponse } from "@/services/study.service";
+import { mapRoadmapToFrontend } from "@/components/dashboard/study-plan/mapping";
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -74,11 +75,29 @@ const Index = () => {
   const queryClient = useQueryClient();
 
 
-  const { data: roadmapData } = useQuery<RoadmapResponse>({
+  const { data: roadmapData, isLoading: isLoadingRoadmap } = useQuery<RoadmapResponse>({
     queryKey: ['roadmap', user?.id, currentContext?.plan_id],
     queryFn: () => studyService.getUserRoadmap(user!.id, currentContext?.plan_id),
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: topicTimings } = useQuery({
+    queryKey: ['topicTimings', user?.id, currentContext?.plan_id],
+    queryFn: () => studyService.getUserTopicTimings(undefined, currentContext?.plan_id),
+    enabled: !!user?.id,
+  });
+
+  const { data: weeklyHistory } = useQuery({
+    queryKey: ['weeklyHistory', user?.id, currentContext?.plan_id],
+    queryFn: () => studyService.getWeeklyTestHistory(user!.id, currentContext?.plan_id),
+    enabled: !!user?.id,
+  });
+
+  const { data: monthlyHistory } = useQuery({
+    queryKey: ['monthlyHistory', user?.id, currentContext?.plan_id],
+    queryFn: () => studyService.getMonthlyTestHistory(user!.id, currentContext?.plan_id),
+    enabled: !!user?.id,
   });
 
   const { data: dashboardData } = useQuery({
@@ -227,6 +246,14 @@ const Index = () => {
       const overallPlan = roadmap.plan.find(p => p.plan_type === 'OVERALL') || roadmap.plan[0];
       const sortedDays = [...overallPlan.days].sort((a, b) => a.day - b.day);
 
+      // 1. Try to find today's calendar date first to prevent auto-skipping to tomorrow
+      // Use local date string (YYYY-MM-DD)
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const todayPlanning = sortedDays.find(d => d.date === todayStr);
+      if (todayPlanning) return todayPlanning.day;
+
+      // 2. Fallback to first incomplete day
       const firstIncomplete = sortedDays.find(day => {
         return !day.items.every(item => {
           if (item.type === 'TOPIC') {
@@ -241,76 +268,48 @@ const Index = () => {
     return 1;
   };
 
-  const getSubjectIconFallback = (subject: string) => {
-    const s = subject.toLowerCase();
-    if (s.includes("history") || s.includes("kural")) return historyIcon;
-    if (s.includes("geography") || s.includes("admin")) return economyIcon;
-    if (s.includes("science") || s.includes("polity")) return economyIcon;
-    if (s.includes("current") || s.includes("affairs")) return currentAffairsIcon;
-    return historyIcon;
-  };
-
   const currentProgressDay = calculateCurrentProgressDay(roadmapData);
 
   const todaysPlan = useMemo(() => {
     if (!roadmapData?.plan || roadmapData.plan.length === 0) return [];
 
-    const overallPlan = roadmapData.plan.find((p: any) => p.plan_type === 'OVERALL') || roadmapData.plan[0];
-    const activeRoadmapDay = overallPlan.days.find((d: any) => d.day === currentProgressDay) || overallPlan.days[0];
-    if (!activeRoadmapDay || !activeRoadmapDay.items) return fallbackTodaysPlan;
+    // Respect the current context's plan_id if set, else prefer OVERALL plan
+    const currentActivePlanId = currentContext?.plan_id;
+    const currentPlan = roadmapData.plan.find(p => p.plan_id === currentActivePlanId) 
+                      || roadmapData.plan.find(p => p.plan_type === 'OVERALL') 
+                      || roadmapData.plan[0];
+                      
+    const relevantDays = currentPlan?.days || [];
 
-    return activeRoadmapDay.items.map((item: any) => {
-      let title = item.subject || item.title || item.type;
-      let subtitle = "";
-      let tag = "";
-      let topics: string[] = [];
-      let progress = 0;
+    const mappedResult = mapRoadmapToFrontend(
+      relevantDays,
+      [],
+      topicTimings || [],
+      weeklyHistory || [],
+      monthlyHistory || [],
+      user?.id,
+      currentActivePlanId
+    );
+    
+    const dayTopics = mappedResult[currentProgressDay] || [];
+
+    return dayTopics.map((item) => {
       let buttonLabel = "Start Now";
-      let icon = getMediaUrl(item.image_url, getSubjectIconFallback(title));
-
-      if (item.type === 'TOPIC') {
-        const subtopics = Array.isArray(item.topic) ? item.topic : [];
-        const totalTopics = subtopics.length || 1;
-
-        const completedCount = subtopics.filter((t: any) => {
-          return t.is_completed === true || t.plan_status === 'COMPLETED';
-        }).length;
-
-        const inProgressCount = subtopics.filter((t: any) => {
-          return !t.is_completed && t.plan_status !== 'COMPLETED' && t.plan_status === 'IN_PROGRESS';
-        }).length;
-
-        progress = Math.round((completedCount / totalTopics) * 100);
-        subtitle = `${totalTopics} Topic${totalTopics > 1 ? 's' : ''}`;
-        tag = "Topic";
-        topics = subtopics.map((t: any) => t.name || 'Untitled') as string[];
-
-        buttonLabel = progress === 100 ? "Review"
-          : (completedCount > 0 || inProgressCount > 0) ? "Continue Learning"
-            : "Start Now";
-      } else if (item.type === 'TEST') {
-        subtitle = "Test available";
-        topics = [item.description || "Weekly Revision Test"];
-        buttonLabel = "Take Test";
-        progress = item.is_completed ? 100 : 0;
-      } else {
-        subtitle = "Revision";
-        topics = [item.description || "Review topics"];
-        buttonLabel = "Start Revision";
-        progress = item.is_completed ? 100 : 0;
-      }
+      if (item.status === 'completed') buttonLabel = "Review";
+      else if (item.status === 'in-progress') buttonLabel = "Continue Learning";
 
       return {
-        icon,
-        title: title.length > 20 ? title.substring(0, 17) + "..." : title,
-        subtitle,
-        tag,
-        progress,
-        topics: topics.slice(0, 2), // only show up to 2 topics on this card
+        icon: item.image,
+        title: item.title,
+        subtitle: `${item.topicCount} Topic${item.topicCount !== 1 ? 's' : ''}`,
+        tag: item.type === 'TEST' ? 'Assessment' : 'Topic',
+        progress: item.progress,
+        topics: item.topics.map(t => t.name),
+        rawTopics: item.topics,
         buttonLabel
       };
     });
-  }, [roadmapData, currentProgressDay]);
+  }, [roadmapData, topicTimings, weeklyHistory, monthlyHistory, currentProgressDay, user?.id, currentContext?.plan_id]);
 
   const { logout } = useAuth();
   const handleLogout = async () => {
@@ -614,7 +613,12 @@ const Index = () => {
               todaysPlan.length === 0 ? "flex-col" : "grid grid-flow-col auto-cols-[250px]"
             )}
           >
-            {todaysPlan.length === 0 ? (
+            {(isLoadingRoadmap) ? (
+              <div className="w-full bg-card rounded-2xl p-8 border border-border flex flex-col items-center justify-center text-center space-y-4">
+                 <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                 <p className="text-sm text-muted-foreground">Refreshing your plan...</p>
+              </div>
+            ) : !roadmapData?.plan || roadmapData.plan.length === 0 ? (
               <motion.div
                 variants={itemVariants}
                 className="w-full bg-card rounded-2xl p-8 border border-dashed border-border flex flex-col items-center justify-center text-center space-y-4"
@@ -639,6 +643,27 @@ const Index = () => {
                       Generating...
                     </span>
                   ) : "Set Up My Plan"}
+                </Button>
+              </motion.div>
+            ) : todaysPlan.length === 0 ? (
+              <motion.div
+                variants={itemVariants}
+                className="w-full bg-card rounded-2xl p-8 border border-border flex flex-col items-center justify-center text-center space-y-4"
+              >
+                <div className="p-4 bg-emerald-50 rounded-full">
+                  <Trophy className="w-8 h-8 text-emerald-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">All Tasks Completed!</h3>
+                  <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                    Great job! You've finished everything for today. Check your progress in the Study Plan tab.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => navigate("/study-plan")}
+                  className="rounded-xl px-8 h-12 bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/10"
+                >
+                  View Roadmap
                 </Button>
               </motion.div>
             ) : (
@@ -691,18 +716,26 @@ const Index = () => {
 
                   {/* Topics — max 2 + N more, matching mobile */}
                   <ul className="space-y-1 mb-2 flex-1">
-                    {item.topics.slice(0, 2).map((topic) => (
+                    {item.rawTopics?.slice(0, 2).map((topic: any) => (
                       <li
-                        key={topic}
+                        key={topic.name}
                         className="flex items-center gap-2 text-[12px] text-foreground/80 truncate"
                       >
-                        <span className="w-1 h-1 bg-foreground/40 rounded-full flex-shrink-0" />
-                        <span className="truncate">{topic}</span>
+                        {topic.status === 'completed' ? (
+                          <div className="w-3 h-3 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          </div>
+                        ) : (
+                          <span className="w-1 h-1 bg-foreground/40 rounded-full flex-shrink-0" />
+                        )}
+                        <span className={cn("truncate", topic.status === 'completed' && "text-emerald-600 font-medium")}>
+                          {topic.name}
+                        </span>
                       </li>
                     ))}
-                    {item.topics.length > 2 && (
+                    {(item.topics?.length || 0) > 2 && (
                       <li className="text-[11px] font-semibold text-primary pl-3">
-                        + {item.topics.length - 2} more
+                        + {(item.topics?.length || 0) - 2} more
                       </li>
                     )}
                   </ul>

@@ -64,7 +64,7 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
         return {
           title: "Topic Details",
           subtitle: "Explore subtopics and study material",
-          showBackButton: true,
+          showBackButton: false,
           backButtonText: "Back to Study Plan",
           backButtonPath: "/study-plan",
         };

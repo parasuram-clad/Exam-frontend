@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {  AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +46,8 @@ import {
   Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import studyService, { ExamFormOptionsResponse } from "@/services/study.service";
 import { 
   ProfileHeader, 
   PersonalDetailsTab, 
@@ -54,11 +56,6 @@ import {
 } from "@/components/dashboard/profile";
 import { BASE_URL } from "@/config/env";
 
-const EXAM_SUB_DIVISIONS: Record<string, string[]> = {
-  "TNPSC": ["Group I", "Group II", "Group IIA", "Group IV"],
-  "TNTET": ["TET Paper I", "TET Paper II", "PG TET"],
-  "TNUSRB": ["SI/SO", "PC/Fireman"]
-};
 
 interface ProfileData {
   firstName: string;
@@ -212,7 +209,6 @@ const Profile = () => {
 
     setIsVerifyingLoading(true);
     try {
-      // Use apiClient instead of raw fetch to ensure auth headers and refresh interceptors apply
       const response = await apiClient.post('/accounts/request-verification', { identifier });
 
       if (response.status === 200) {
@@ -258,24 +254,20 @@ const Profile = () => {
   const handleNotificationToggle = async (key: string, value: boolean) => {
     if (!userId) return;
 
-    // Update local state first for responsiveness
     setProfileData(prev => ({ ...prev, [key]: value }));
 
     try {
-      // Map frontend camelCase to backend snake_case
       const backendKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
 
       await authService.updateProfile(userId, {
         [backendKey]: value
       });
 
-      // Update original data to avoid "unsaved changes" warning if any
       setOriginalProfileData(prev => ({ ...prev, [key]: value }));
       toast.success("Notification preference updated");
     } catch (err) {
       console.error("Failed to update notification preference", err);
       toast.error("Failed to update preference");
-      // Revert local state on failure
       setProfileData(prev => ({ ...prev, [key]: !value }));
     }
   };
@@ -283,7 +275,6 @@ const Profile = () => {
   const handleSave = async () => {
     if (!userId) return;
 
-    // Check if any data has changed
     const hasChanges = JSON.stringify(profileData) !== JSON.stringify(originalProfileData);
 
     if (!hasChanges) {
@@ -291,7 +282,6 @@ const Profile = () => {
       return;
     }
 
-    // New verification check
     if (profileData.email !== originalProfileData?.email && !isEmailVerified) {
       toast.error("Please verify your new email address before saving.");
       return;
@@ -338,7 +328,6 @@ const Profile = () => {
         notify_personalized_insights: profileData.notifyPersonalizedInsights
       });
 
-      // Update the original data to match current data after success
       setOriginalProfileData({ ...profileData });
       setIsEditing(false);
       await queryClient.invalidateQueries({ queryKey: ['user-me'] });
@@ -364,14 +353,12 @@ const Profile = () => {
         return;
       }
 
-      // Show immediate local preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfileImage(reader.result as string);
       };
       reader.readAsDataURL(file);
 
-      // Perform actual upload to backend
       const uploadToastId = toast.loading("Uploading image...");
       try {
         const response = await authService.updateAvatar(userId, file);
@@ -383,7 +370,6 @@ const Profile = () => {
       } catch (err) {
         console.error("Avatar upload failed:", err);
         toast.error("Failed to upload profile picture", { id: uploadToastId });
-        // Revert preview on failure
         if (user?.photo_url) {
           setProfileImage(getMediaUrl(user.photo_url));
         }
@@ -523,7 +509,6 @@ const Profile = () => {
                 handleConfirmVerification={handleConfirmVerification}
                 isPincodeLoading={isPincodeLoading}
                 handlePincodeLookup={handlePincodeLookup}
-                EXAM_SUB_DIVISIONS={EXAM_SUB_DIVISIONS}
               />
             )}
 

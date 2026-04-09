@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { 
   UserCheck, Mail, Phone, Calendar, MapPin, Globe, BookOpen, Target, Zap, Smartphone, Loader2, Check, Award 
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import studyService, { ExamFormOptionsResponse } from "@/services/study.service";
 import {
   Select,
   SelectContent,
@@ -30,7 +32,6 @@ interface PersonalDetailsTabProps {
   handleConfirmVerification: () => void;
   isPincodeLoading: boolean;
   handlePincodeLookup: (val: string) => void;
-  EXAM_SUB_DIVISIONS: Record<string, string[]>;
 }
 
 export const PersonalDetailsTab = ({
@@ -48,9 +49,19 @@ export const PersonalDetailsTab = ({
   handleRequestVerification,
   handleConfirmVerification,
   isPincodeLoading,
-  handlePincodeLookup,
-  EXAM_SUB_DIVISIONS
+  handlePincodeLookup
 }: PersonalDetailsTabProps) => {
+  const { data: formOptions, isLoading: optionsLoading } = useQuery<ExamFormOptionsResponse>({
+    queryKey: ['exam-form-options'],
+    queryFn: () => studyService.getExamFormOptions(),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  const selectedExamData = formOptions?.exams.find(e => e.exam_name === profileData.examType);
+  const availableSubDivisions = selectedExamData?.sub_divisions.map(s => s.name) || [];
+  const selectedSubDivisionData = selectedExamData?.sub_divisions.find(s => s.name === profileData.subDivision);
+  const availableYears = selectedSubDivisionData?.available_years || [2025, 2026, 2027, 2028];
+
   return (
     <div className="space-y-10">
       <div>
@@ -535,9 +546,9 @@ export const PersonalDetailsTab = ({
                       <SelectValue placeholder="Select Type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="TNPSC">TNPSC</SelectItem>
-                      <SelectItem value="TNTET">TNTET</SelectItem>
-                      <SelectItem value="TNUSRB">TNUSRB</SelectItem>
+                      {formOptions?.exams.map((exam) => (
+                        <SelectItem key={exam.exam_name} value={exam.exam_name}>{exam.exam_name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -559,7 +570,7 @@ export const PersonalDetailsTab = ({
                       <SelectValue placeholder="Select Group" />
                     </SelectTrigger>
                     <SelectContent>
-                      {profileData.examType && EXAM_SUB_DIVISIONS[profileData.examType]?.map(sub => (
+                      {availableSubDivisions.map(sub => (
                         <SelectItem key={sub} value={sub}>{sub}</SelectItem>
                       ))}
                     </SelectContent>
@@ -583,10 +594,9 @@ export const PersonalDetailsTab = ({
                       <SelectValue placeholder="Select Year" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="2025">2025</SelectItem>
-                      <SelectItem value="2026">2026</SelectItem>
-                      <SelectItem value="2027">2027</SelectItem>
-                      <SelectItem value="2028">2028</SelectItem>
+                      {availableYears.map(year => (
+                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
