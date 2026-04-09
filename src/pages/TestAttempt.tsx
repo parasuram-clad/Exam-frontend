@@ -222,7 +222,7 @@ const TestAttempt = () => {
         const errObj = error as any;
         const detail = errObj.response?.data?.detail || "";
         const status = errObj.response?.status;
-        
+
         const isCompleted = status === 403 && String(detail).toLowerCase().includes("already completed");
         const isLocked = (status === 403 || status === 400) && String(detail).toLowerCase().includes("not yet available");
         const isSubscriptionRequired = status === 403 && String(detail).toLowerCase().includes("subscription");
@@ -232,25 +232,25 @@ const TestAttempt = () => {
                 <div className="w-full max-w-md bg-white rounded-[40px] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col items-center">
                     <div className={cn(
                         "w-20 h-20 rounded-full flex items-center justify-center mb-6",
-                        isCompleted ? "bg-emerald-50 text-emerald-500" : 
-                        isLocked ? "bg-amber-50 text-amber-500" : "bg-rose-50 text-rose-500"
+                        isCompleted ? "bg-emerald-50 text-emerald-500" :
+                            isLocked ? "bg-amber-50 text-amber-500" : "bg-rose-50 text-rose-500"
                     )}>
-                        {isCompleted ? <CheckCircle2 className="w-10 h-10" /> : 
-                         isLocked ? <Lock className="w-10 h-10" /> : 
-                         <AlertTriangle className="w-10 h-10" />}
+                        {isCompleted ? <CheckCircle2 className="w-10 h-10" /> :
+                            isLocked ? <Lock className="w-10 h-10" /> :
+                                <AlertTriangle className="w-10 h-10" />}
                     </div>
 
                     <h2 className="text-xl font-bold text-slate-900 mb-3 leading-tight">
-                        {isCompleted ? "Test Completed" : 
-                         isLocked ? "Test Locked" : 
-                         isSubscriptionRequired ? "Premium Required" : "Something went wrong"}
+                        {isCompleted ? "Test Completed" :
+                            isLocked ? "Test Locked" :
+                                isSubscriptionRequired ? "Premium Required" : "Something went wrong"}
                     </h2>
 
                     <p className="text-slate-500 mb-8 leading-relaxed">
-                        {isCompleted ? "You have already completed this test and submitted your answers. You can view your performance analytics." : 
-                         isLocked ? (detail || "This test is not yet available for attempt.") : 
-                         isSubscriptionRequired ? "You need a premium subscription to access this test series." :
-                         (detail || "We couldn't load the test questions. Please check your connection and try again.")}
+                        {isCompleted ? "You have already completed this test and submitted your answers. You can view your performance analytics." :
+                            isLocked ? (detail || "This test is not yet available for attempt.") :
+                                isSubscriptionRequired ? "You need a premium subscription to access this test series." :
+                                    (detail || "We couldn't load the test questions. Please check your connection and try again.")}
                     </p>
 
                     <div className="flex flex-col w-full gap-3">
@@ -275,11 +275,11 @@ const TestAttempt = () => {
                             </button>
                         ) : null}
 
-                        <button 
+                        <button
                             onClick={() => {
                                 setShouldBlock(false);
                                 navigate(-1);
-                            }} 
+                            }}
                             className="w-full h-12 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all"
                         >
                             {isLocked || isSubscriptionRequired ? "Go Back" : "Try Again"}

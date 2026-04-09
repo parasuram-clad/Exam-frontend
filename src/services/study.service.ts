@@ -191,6 +191,7 @@ export interface TopicTiming {
     user_id: number;
     syllabus_id: number;
     plan_id?: number;
+    plan_row_id?: number; // 👈 ADD
     start_time: string;
     end_time?: string;
     total_estimate?: number;
@@ -224,10 +225,11 @@ const studyService = {
     /**
      * Get all topic timing records for a user
      */
-    getUserTopicTimings: async (syllabusId?: number, planId?: number): Promise<TopicTiming[]> => {
+    getUserTopicTimings: async (syllabusId?: number, planId?: number, planRowId?: number): Promise<TopicTiming[]> => {
         const params: any = {};
         if (syllabusId) params.syllabus_id = syllabusId;
         if (planId) params.plan_id = planId;
+        if (planRowId) params.plan_row_id = planRowId;
         const response = await apiClient.get('/topic-timing', { params });
         return response.data;
     },

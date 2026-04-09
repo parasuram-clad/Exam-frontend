@@ -94,9 +94,9 @@ const TestSeries = () => {
   const [activeTab, setActiveTab] = useState<"subject" | "sets">("sets");
 
   // Determine purchased test plan types
-  const hasOverallTests = useMemo(() => 
+  const hasOverallTests = useMemo(() =>
     user?.dashboard?.contexts?.some(c => c.plan_type === 'OVERALL_TEST_SERIES'), [user]);
-  const hasSubjectTests = useMemo(() => 
+  const hasSubjectTests = useMemo(() =>
     user?.dashboard?.contexts?.some(c => c.plan_type === 'SUBJECT_TEST_SERIES'), [user]);
   const showTabs = hasOverallTests && hasSubjectTests;
 
@@ -196,22 +196,22 @@ const TestSeries = () => {
       setLoading(true);
 
       // 1. Fetch Overall Roadmap
-      const targetOverallId = currentContext?.plan_type === 'OVERALL_TEST_SERIES' 
-        ? currentContext.plan_id 
+      const targetOverallId = currentContext?.plan_type === 'OVERALL_TEST_SERIES'
+        ? currentContext.plan_id
         : user?.dashboard?.contexts?.find(c => c.plan_type === 'OVERALL_TEST_SERIES')?.plan_id;
-  
+
       if (targetOverallId || hasOverallTests) {
         const roadmaps = await testSeriesOverallService.getRoadmap(targetOverallId);
         if (roadmaps.plans && roadmaps.plans.length > 0) {
           setRoadmap(roadmaps.plans[0]);
         } else if (hasOverallTests && activeTab === "sets") {
-           setIsModalOpen(true);
+          setIsModalOpen(true);
         }
       }
 
       // 2. Fetch Available Subjects for Subject-Wise View
       const subjectPlan = user?.dashboard?.contexts?.find(c => c.plan_type === 'SUBJECT_TEST_SERIES');
-      
+
       if (user.exam_type && user.sub_division) {
         setSubjectsLoading(true);
         const response = await testSeriesSubjectService.getAvailableSubjects(

@@ -106,8 +106,8 @@ const StudyPlan = () => {
   });
 
   const { data: topicTimings = [] } = useQuery({
-    queryKey: ['topic-timings', user?.id],
-    queryFn: () => studyService.getUserTopicTimings(undefined, undefined),
+    queryKey: ['topic-timings', user?.id, currentPlan?.plan_id],
+    queryFn: () => studyService.getUserTopicTimings(undefined, currentPlan?.plan_id),
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
   });
@@ -136,6 +136,13 @@ const StudyPlan = () => {
   const [activeDay, setActiveDay] = useState<number>(1);
   const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  // Real-time refresh timer
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
   const [setupData, setSetupData] = useState({
     name: user?.full_name || "",
     medium: user?.preferred_language === 'ta' ? 'tamil' : 'english',
@@ -274,7 +281,7 @@ const StudyPlan = () => {
         setDynamicDayWisePlans({});
       }
     }
-  }, [roadmapData, topicTimings, weeklyHistoryData, monthlyHistoryData, viewMode, selectedSubject, currentPlan]);
+  }, [roadmapData, topicTimings, weeklyHistoryData, monthlyHistoryData, viewMode, selectedSubject, currentPlan, tick]);
 
   const totalDays = useMemo(() => currentPlan?.total_days || (currentPlan?.days && currentPlan.days.length > 0 ? Math.max(...currentPlan.days.map(d => d.day)) : 120), [currentPlan]);
   const currentProgressDay = useMemo(() => calculateCurrentProgressDay(dynamicDayWisePlans, totalDays), [dynamicDayWisePlans, totalDays]);

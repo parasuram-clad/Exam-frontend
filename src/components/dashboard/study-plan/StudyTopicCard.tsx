@@ -89,14 +89,11 @@ export const StudyTopicCard = ({
       className="bg-card rounded-2xl p-4 border border-border shadow-sm flex flex-col h-[230px] snap-center relative"
     >
       {/* Locked Overlay Design */}
-      {isLocked && (
+      {/* {isLocked && (
         <div className="absolute inset-0 z-20 overflow-hidden rounded-2xl">
-          {/* Glass-morphic background with stronger blur on edges */}
           <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px] transition-all duration-500" />
           
-          {/* Center Content Container */}
           <div className="relative h-full w-full flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300">
-            {/* Lock Icon with Animated Background */}
             <div className="relative mb-3">
               <div className="absolute inset-0 bg-muted/80 rounded-full blur-xl scale-150 animate-pulse" />
               <div className="relative w-12 h-12 bg-background/80 border border-border shadow-md rounded-full flex items-center justify-center">
@@ -104,18 +101,17 @@ export const StudyTopicCard = ({
               </div>
             </div>
 
-            {/* Locked Text & Reason */}
-            <div className="space-y-1">
-              <p className="text-[14px] font-bold text-foreground/90 tracking-tight">Day Locked</p>
-              <p className="text-[10px] text-muted-foreground font-medium leading-tight max-w-[140px]">
-                {isPrevAssessmentMissing 
-                  ? "Finish your weekly assessment to unlock this day" 
-                  : `This day will unlock when you reach Day ${activeDay}`}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="space-y-1">
+        <p className="text-[14px] font-bold text-foreground/90 tracking-tight">Day Locked</p>
+        <p className="text-[10px] text-muted-foreground font-medium leading-tight max-w-[140px]">
+          {isPrevAssessmentMissing
+            ? "Finish your weekly assessment to unlock this day"
+            : `This day will unlock when you reach Day ${activeDay}`}
+        </p>
+      </div>
+    </div>
+        </div >
+      )} */}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-2 gap-2">

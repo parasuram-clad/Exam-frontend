@@ -53,14 +53,14 @@ export const mapRoadmapToFrontend = (
     });
   }
 
-  // Create a timing map (sum of total_estimate per syllabus_id)
-  const timingMap: Record<number, number> = {};
+  // Create a timing map (sum of total_estimate per plan_row_id or syllabus_id)
+  const timingMap: Record<number | string, number> = {};
   const now = new Date();
 
   if (Array.isArray(timings)) {
     timings.forEach(t => {
       let sessionMinutes = Number(t.total_estimate || 0);
-      const isCompleted = (t.plan_id ? statusMap[t.plan_id] === 'COMPLETED' : false) || statusMap[t.syllabus_id] === 'COMPLETED';
+      const isCompleted = (t.plan_row_id ? statusMap[t.plan_row_id] === 'COMPLETED' : false) || statusMap[t.syllabus_id] === 'COMPLETED';
 
       if (!t.end_time && t.start_time && !isCompleted) {
         // If session is still active and topic isn't completed, calculate elapsed time
@@ -70,9 +70,14 @@ export const mapRoadmapToFrontend = (
           sessionMinutes += Math.max(0, Math.round((now.getTime() - start.getTime()) / (1000 * 60)));
         }
       }
-      timingMap[t.syllabus_id] = (timingMap[t.syllabus_id] || 0) + sessionMinutes;
+      
+      const key = t.plan_row_id || t.syllabus_id;
+      timingMap[key] = (timingMap[key] || 0) + sessionMinutes;
+      // Also ensure sync with syllabus_id for fallback
+      if (t.plan_row_id && t.syllabus_id) {
+        timingMap[`sid_${t.syllabus_id}`] = (timingMap[`sid_${t.syllabus_id}`] || 0) + sessionMinutes;
+      }
     });
-    console.log('Timing map sample:', Object.entries(timingMap).slice(0, 5));
   }
 
   const result: Record<number, StudyTopicCardData[]> = {};
@@ -105,7 +110,7 @@ export const mapRoadmapToFrontend = (
           if (status === 'COMPLETED') {
             totalTopicProgress += 100;
           } else {
-            const spent = timingMap[t.id] || 0;
+            const spent = (t.plan_row_id ? timingMap[t.plan_row_id] : timingMap[t.id]) || 0;
             const planned = t.minutes || 45;
             const timeProgress = Math.min(90, (spent / (planned || 1)) * 100);
             
@@ -145,9 +150,9 @@ export const mapRoadmapToFrontend = (
             id: t.id ? t.id.toString() : `topic-${idx}-${Math.random()}`,
             name: t.name || 'Untitled Topic',
             description: t.description || '',
-            timeSpent: Math.round(timingMap[t.id] || 0),
+            timeSpent: (t.plan_row_id ? (timingMap[t.plan_row_id] || timingMap[`sid_${t.id}`] || timingMap[t.id]) : (timingMap[t.id] || 0)) || 0,
             totalTime: t.minutes || 0,
-            status: ((t.plan_row_id && statusMap[t.plan_row_id] === 'COMPLETED') || (!t.plan_row_id && statusMap[t.id] === 'COMPLETED') ? 'completed' : ((t.plan_row_id ? (statusMap[t.plan_row_id] === 'IN_PROGRESS' || statusMap[t.id] === 'IN_PROGRESS') : statusMap[t.id] === 'IN_PROGRESS') || timingMap[t.id] > 0 ? 'continue' : 'start')) as any,
+            status: ((t.plan_row_id && statusMap[t.plan_row_id] === 'COMPLETED') || (!t.plan_row_id && statusMap[t.id] === 'COMPLETED') ? 'completed' : ((t.plan_row_id ? (statusMap[t.plan_row_id] === 'IN_PROGRESS' || statusMap[t.id] === 'IN_PROGRESS') : statusMap[t.id] === 'IN_PROGRESS') || (t.plan_row_id ? (timingMap[t.plan_row_id] || timingMap[`sid_${t.id}`] || timingMap[t.id]) : timingMap[t.id]) > 0 ? 'continue' : 'start')) as any,
             planRowId: t.plan_row_id,
           })),
         };

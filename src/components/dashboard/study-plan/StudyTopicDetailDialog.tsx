@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { prefetchTopic } from "@/services/prefetch";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/context/AuthContext";
+import studyService from "@/services/study.service";
 
 interface Subtopic {
   id: string;
@@ -48,7 +50,31 @@ export const StudyTopicDetailDialog = ({
   isFetching = false
 }: StudyTopicDetailDialogProps) => {
   const queryClient = useQueryClient();
+  const { currentContext } = useAuth();
   const [now, setNow] = useState(new Date());
+
+  // Derive the active study context.
+  const studyContext = useMemo(() => {
+    if (currentContext?.plan_type === 'OVERALL' || currentContext?.plan_type === 'SUBJECT') {
+      return currentContext;
+    }
+    return user?.dashboard?.contexts?.find((c: any) => c.plan_type === 'OVERALL' || c.plan_type === 'SUBJECT');
+  }, [currentContext, user?.dashboard?.contexts]);
+
+  // Fetch timings specifically for this topic/plan/row if available for maximum precision
+  const { data: localTimings = [], isLoading: isTimingsLoading } = useQuery({
+    queryKey: ['topic-timings', user?.id, selectedTopic?.id, studyContext?.plan_id, selectedTopic?.subtopics?.[0]?.planRowId],
+    queryFn: () => studyService.getUserTopicTimings(
+      selectedTopic ? parseInt(selectedTopic.subtopics[0].id) : undefined,
+      studyContext?.plan_id,
+      selectedTopic?.subtopics[0].planRowId
+    ),
+    enabled: !!user?.id && !!selectedTopic && isOpen,
+    staleTime: 30000, // Refresh more often in dialog
+  });
+
+  // Combine prop timings with local precise timings (local preferred)
+  const combinedTimings = localTimings.length > 0 ? localTimings : topicTimings;
 
   // Update "now" every 30 seconds to provide real-time timing updates
   useEffect(() => {
@@ -60,7 +86,7 @@ export const StudyTopicDetailDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[85vh] overflow-hidden p-0 bg-background rounded-2xl sm:rounded-3xl flex flex-col">
+      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-hidden p-0 bg-background rounded-2xl sm:rounded-3xl flex flex-col">
         <DialogTitle className="sr-only">Topic Details - {selectedTopic?.title || 'Details'}</DialogTitle>
         <DialogDescription className="sr-only">Detailed breakdown of subtopics and progress for {selectedTopic?.title || 'this topic'}.</DialogDescription>
         {selectedTopic && (
@@ -88,28 +114,40 @@ export const StudyTopicDetailDialog = ({
 
             <div className="space-y-4">
               {selectedTopic.subtopics.map((subtopic) => {
-                const matchingTimings = topicTimings.filter(t => t.syllabus_id.toString() === subtopic.id);
+                const matchingTimings = (combinedTimings || []).filter(t =>
+                  t.syllabus_id.toString() === subtopic.id &&
+                  (subtopic.planRowId ? (t.plan_row_id === subtopic.planRowId || !t.plan_row_id) : true)
+                );
+
+                // Calculate total completed time for this subtopic
+                const completedTimeSum = matchingTimings
+                  .filter(t => t.end_time)
+                  .reduce((sum, t) => sum + Number(t.total_estimate || 0), 0);
+
                 const activeTiming = matchingTimings.find(t => !t.end_time);
+                let liveTimeSpent = completedTimeSum;
 
-                let liveTimeSpent = subtopic.timeSpent;
-
-                // subtopic.timeSpent already includes snapshot of ongoingTime from mapping.ts 
-                // but if there's an active timing for a non-completed topic, ensure we show it or update it.
-                // Calculate live timing for active session
                 if (activeTiming && activeTiming.id && subtopic.status !== "completed" && activeTiming.start_time) {
-                   const startTimeStr = activeTiming.start_time.endsWith('Z') ? activeTiming.start_time : `${activeTiming.start_time}Z`;
-                   const ongoingMinutes = Math.floor((now.getTime() - new Date(startTimeStr).getTime()) / (1000 * 60));
-                   // The subtopic.timeSpent might have past sessions, but for the active one we use the live diff
-                   // If we already have timeSpent (summed from backend), we just ensure we show at least the ongoing part
-                   liveTimeSpent = Math.max(subtopic.timeSpent, ongoingMinutes);
+                  const startTimeStr = activeTiming.start_time.endsWith('Z') ? activeTiming.start_time : `${activeTiming.start_time}Z`;
+                  const ongoingMinutes = (now.getTime() - new Date(startTimeStr).getTime()) / (1000 * 60);
+                  liveTimeSpent += Math.max(0, ongoingMinutes);
+                } else {
+                  // Fallback to the pre-calculated timeSpent if no active session is found (or handle cases where mapping.ts already did the work)
+                  liveTimeSpent = subtopic.timeSpent;
                 }
 
                 return (
                   <div key={subtopic.id} className="bg-primary rounded-2xl p-5">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
                       <div className="flex-1">
-                        <h3 className="text-primary-foreground text-lg font-medium mb-1">{subtopic.name}</h3>
-                        <p className="text-primary-foreground/70 text-sm">{subtopic.description}</p>
+                        <h3 className="text-primary-foreground text-lg font-medium mb-1">{subtopic.name} </h3>
+                        <p className="text-primary-foreground/70 text-sm mb-2">{subtopic.description}</p>
+                        <div className="flex items-center gap-2 text-primary-foreground/60 text-xs font-medium uppercase tracking-wider">
+                          <span>Time Tracked:</span>
+                          <span className="text-primary-foreground">
+                            {liveTimeSpent % 1 === 0 ? liveTimeSpent : liveTimeSpent.toFixed(1)}m / {subtopic.totalTime}m
+                          </span>
+                        </div>
                       </div>
                       <Button
                         onClick={() => onSubtopicClick(selectedTopic.id, subtopic.id)}
@@ -128,15 +166,11 @@ export const StudyTopicDetailDialog = ({
                       </Button>
                     </div>
                     <div>
-                      <div className="flex items-center justify-between text-primary-foreground/80 text-sm mb-2">
-                        <span>Time Spent</span>
-                        <span className="font-medium text-primary-foreground">{liveTimeSpent}m / {subtopic.totalTime}m</span>
-                      </div>
                       <div className="h-2 bg-primary-foreground/10 rounded-full overflow-hidden">
                         {(() => {
                           const timeProgress = subtopic.totalTime > 0 ? (liveTimeSpent / subtopic.totalTime) * 100 : 0;
                           let readingProgress = 0;
-                          
+
                           if (user?.id) {
                             const savedPercent = localStorage.getItem(`read_percent_${subtopic.id}_${user.id}`);
                             if (savedPercent) {
@@ -153,9 +187,9 @@ export const StudyTopicDetailDialog = ({
                           }
 
                           return (
-                            <div 
-                              className="h-full bg-accent rounded-full transition-all duration-500 ease-out" 
-                              style={{ width: `${finalProgress}%` }} 
+                            <div
+                              className="h-full bg-accent rounded-full transition-all duration-500 ease-out"
+                              style={{ width: `${finalProgress}%` }}
                             />
                           );
                         })()}

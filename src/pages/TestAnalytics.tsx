@@ -91,7 +91,7 @@ const TestAnalytics = () => {
     const { user } = useAuth();
     const isDesktop = useMediaQuery("(min-width: 1280px)");
 
-    const isOverall = subject?.toLowerCase() === 'overall' || subject?.toLowerCase() === 'general';
+    const isOverall = subject?.toLowerCase().includes('overall') || subject?.toLowerCase() === 'general';
     const isSubject = subject?.toLowerCase() === 'subject';
 
     const { data: resultData, isLoading: resultLoading, refetch } = useQuery({

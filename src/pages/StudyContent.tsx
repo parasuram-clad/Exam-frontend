@@ -457,8 +457,8 @@ const StudyContent = () => {
   });
 
   const { data: timingHistory = [] } = useQuery({
-    queryKey: ['topic-timings', user?.id, parsedSubtopicId],
-    queryFn: () => studyService.getUserTopicTimings(parsedSubtopicId),
+    queryKey: ['topic-timings', user?.id, parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId],
+    queryFn: () => studyService.getUserTopicTimings(parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId),
     enabled: !!user?.id && !isNaN(parsedSubtopicId),
     staleTime: 5 * 60 * 1000,
   });
