@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { StudyTopicCardData as StudyTopicCardType, getSubjectIconFallback } from "./constants";
 import { format } from "date-fns";
-import { Lock } from "lucide-react";
+import { Lock, ClipboardCheck, Trophy, Sparkles } from "lucide-react";
 
 interface StudyTopicCardProps {
   topic: StudyTopicCardType;
@@ -33,6 +33,10 @@ export const StudyTopicCard = ({
   prefetchTopic,
   queryClient
 }: StudyTopicCardProps) => {
+  const isTest = topic.type === 'TEST';
+  const testType = topic.subtopics[0]?.testType;
+  const isMonthly = isTest && testType === 'MONTHLY';
+  const isWeekly = isTest && testType !== 'MONTHLY';
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const roadmapDay = roadmapData?.days?.find((d: any) => d.day === activeDay);
   const isFuture = roadmapDay?.date && roadmapDay.date > todayStr;
@@ -86,8 +90,22 @@ export const StudyTopicCard = ({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.08 }}
-      className="bg-card rounded-2xl p-4 border border-border shadow-sm flex flex-col h-[230px] snap-center relative"
+      className={cn(
+        "rounded-[24px] p-5 border transition-all duration-500 flex flex-col h-[240px] snap-center relative overflow-hidden group",
+        isMonthly
+          ? "bg-[#FEF2F2] border-[#FEE2E2] shadow-xl shadow-red-100/50"
+          : isWeekly
+            ? "bg-[#F7FEE7] border-[#ECFCCB] shadow-xl shadow-lime-100/50"
+            : "bg-card border-border shadow-sm hover:shadow-md"
+      )}
     >
+      {/* Background Decorative Accent for Test */}
+      {isTest && (
+        <div className={cn(
+          "absolute top-0 right-0 w-32 h-32 blur-[60px] rounded-full -mr-16 -mt-16 pointer-events-none transition-all duration-700",
+          isMonthly ? "bg-red-500/10 group-hover:bg-red-500/20" : "bg-lime-500/20 group-hover:bg-lime-500/30"
+        )} />
+      )}
       {/* Locked Overlay Design */}
       {/* {isLocked && (
         <div className="absolute inset-0 z-20 overflow-hidden rounded-2xl">
@@ -114,79 +132,143 @@ export const StudyTopicCard = ({
       )} */}
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-2 gap-2">
-        <div className="flex items-center gap-3 min-w-0">
-          <img
-            src={topic.image}
-            alt={topic.title}
-            className="w-14 h-14 object-contain flex-shrink-0"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = getSubjectIconFallback(topic.title);
-            }}
-          />
+      <div className="flex items-start justify-between mb-4 gap-2 relative z-10">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className={cn(
+            "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-transform duration-500 group-hover:scale-110 shadow-sm",
+            isMonthly ? "bg-[#EF4444] text-white" : isWeekly ? "bg-[#3B5AA4] text-white" : "bg-muted/50"
+          )}>
+            {isTest ? (
+              topic.status === 'completed' ? <Trophy className="w-6 h-6" /> : <ClipboardCheck className="w-6 h-6" />
+            ) : (
+              <img
+                src={topic.image}
+                alt={topic.title}
+                className="w-10 h-10 object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = getSubjectIconFallback(topic.title);
+                }}
+              />
+            )}
+          </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-foreground text-sm truncate">
+            <h3 className={cn(
+              "font-bold text-sm tracking-tight truncate",
+              isMonthly ? "text-red-950" : isWeekly ? "text-slate-900" : "text-foreground"
+            )}>
               {topic.title}
             </h3>
-            <p className="text-[10px] text-muted-foreground">
-              {topic.topicCount} Topic{topic.topicCount !== 1 ? 's' : ''}
+            <p className={cn(
+              "text-[10px] font-medium uppercase tracking-wider",
+              isMonthly ? "text-red-600/70" : isWeekly ? "text-lime-700/70" : "text-muted-foreground"
+            )}>
+              {isTest ? (topic.status === 'completed' ? 'Evaluation Finished' : 'Required Assessment') : `${topic.topicCount} Topic${topic.topicCount !== 1 ? 's' : ''}`}
             </p>
           </div>
         </div>
         {tag && (
           <span className={cn(
-            "text-[9px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1 flex-shrink-0 mt-1",
+            "text-[9px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap flex items-center gap-1.5 flex-shrink-0 shadow-sm",
             tagColor
           )}>
-            <span className={cn("w-1 h-1 rounded-full", tagDot)} />
+            <span className={cn("w-1.5 h-1.5 rounded-full", tagDot)} />
             {tag}
           </span>
         )}
       </div>
 
       {/* Progress bar — colored by status like mobile */}
-      <div className="mb-3">
-        <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-          <div
-            className={cn(
-              "h-full rounded-full transition-all duration-700",
-              topic.status === 'completed' ? "bg-emerald-500" :
-                topic.status === 'in-progress' ? "bg-primary" :
-                  "bg-muted-foreground/20"
-            )}
-            style={{ width: `${Math.min(100, topic.progress || 0)}%` }}
-          />
+      {!isTest && (
+        <div className="mb-3">
+          <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-700",
+                topic.status === 'completed' ? "bg-emerald-500" :
+                  topic.status === 'in-progress' ? "bg-primary" :
+                    "bg-muted-foreground/20"
+              )}
+              style={{ width: `${Math.min(100, topic.progress || 0)}%` }}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Topics — max 2 + N more, matching mobile */}
-      <ul className="space-y-1 mb-2 flex-1 overflow-hidden">
-        {topic.topics.slice(0, 2).map((t, i) => (
-          <li
-            key={i}
-            className="flex items-center gap-2 text-[12px] text-foreground/80"
-          >
-            <span className={cn("w-1 h-1 rounded-full flex-shrink-0", t.color || "bg-foreground/40")} />
-            <span className="truncate">{t.name}</span>
-          </li>
-        ))}
-        {topic.topics.length > 2 && (
-          <li className="text-[11px] font-semibold text-primary pl-3">
-            + {topic.topics.length - 2} more
-          </li>
-        )}
-      </ul>
+      {isTest && topic.status !== 'completed' && (
+        <div className="mb-4 relative z-10 px-1">
+          <div className={cn(
+            "flex items-center gap-2 text-[11px] font-bold py-2 px-3 rounded-lg border border-dashed",
+            isMonthly ? "text-red-700 bg-red-100/50 border-red-200" : "text-indigo-700 bg-indigo-50 border-indigo-200"
+          )}>
+            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+            <span>CRITICAL ASSESSMENT</span>
+          </div>
+        </div>
+      )}
+
+      {isTest && topic.status === 'completed' && (
+        <div className="mb-4 relative z-10 px-1">
+          <div className={cn(
+            "text-[11px] font-bold py-2 px-3 rounded-lg border border-dashed flex items-center gap-2",
+            isMonthly ? "text-red-800 bg-red-100/30 border-red-200/50" : "text-emerald-700 bg-emerald-50 border-emerald-200"
+          )}>
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full",
+              isMonthly ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+            )} />
+            <span>Mastery Achieved</span>
+          </div>
+        </div>
+      )}
+
+      {/* Content — topics list or test details */}
+      <div className="flex-1 overflow-hidden mb-4 relative z-10">
+        <ul className="space-y-2">
+          {topic.topics.slice(0, 2).map((t, i) => (
+            <li
+              key={i}
+              className="flex items-center gap-3 text-[12px] group/item"
+            >
+              <div className={cn(
+                "w-1.5 h-1.5 rounded-full flex-shrink-0 transition-all duration-300 group-hover/item:scale-125",
+                t.color || (isMonthly ? "bg-red-400" : isWeekly ? "bg-lime-500" : "bg-primary/40")
+              )} />
+              <span className={cn(
+                "truncate font-medium",
+                isMonthly ? "text-red-900 group-hover/item:text-red-950" : isWeekly ? "text-slate-700 group-hover/item:text-slate-950" : "text-foreground/80"
+              )}>
+                {t.name}
+              </span>
+            </li>
+          ))}
+          {topic.topics.length > 2 && (
+            <li className={cn(
+              "text-[10px] font-bold pl-4.5 tracking-wide",
+              isMonthly ? "text-red-600" : isWeekly ? "text-lime-700" : "text-primary/70"
+            )}>
+              + {topic.topics.length - 2} ADDITIONAL FOCUS
+            </li>
+          )}
+        </ul>
+      </div>
 
       {/* Action */}
       <Button
         onClick={() => handleViewDetails(topic)}
-
-        // disabled={isLocked}
         className={cn(
-          "w-full rounded-xl font-medium h-10 mt-auto text-sm bg-foreground text-background hover:bg-foreground/90"
+          "w-full rounded-[14px] font-bold h-11 relative z-10 transition-all duration-300",
+          isMonthly
+            ? "bg-gradient-to-b from-[#EF4444] to-[#991B1B] hover:opacity-90 text-white shadow-lg shadow-red-200"
+            : isWeekly
+              ? "bg-gradient-to-b from-[#3B5AA4] to-[#183066] hover:opacity-90 text-white shadow-lg shadow-lime-200"
+              : "bg-gradient-to-b from-[#3B5AA4] to-[#183066] hover:opacity-90 text-white shadow-lg "
+
         )}
       >
-        {buttonLabel}
+        <span className="flex items-center justify-center gap-2">
+          {buttonLabel}
+          {topic.status !== 'completed' && <Sparkles className="w-3.5 h-3.5" />}
+        </span>
       </Button>
     </motion.div >
   );

@@ -12,6 +12,8 @@ import authService from "@/services/auth.service";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { notificationService } from "@/services/notification.service";
+import studyService from "@/services/study.service";
+import { useAuth } from "@/context/AuthContext";
 
 import { RightSidebarHeader } from "./RightSidebarHeader";
 
@@ -29,8 +31,16 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { currentContext } = useAuth();
   const currentPath = location.pathname;
   const initials = userName.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
+
+  const { data: dashboardData } = useQuery({
+    queryKey: ['dashboard', user?.id, currentContext?.plan_id],
+    queryFn: () => studyService.getDashboardData(user!.id, currentContext?.plan_id),
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
+  });
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['notifications-unread-count'],
@@ -205,7 +215,7 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-50/80 border border-orange-100 rounded-full cursor-pointer active:scale-95 transition-transform"
             >
               <span className="text-base">🔥</span>
-              <span className="text-xs font-medium text-orange-600">3</span>
+              <span className="text-xs font-medium text-orange-600">{dashboardData?.streak?.current_streak || 0}</span>
             </div>
 
             {/* Leaderboard Badge */}
@@ -214,7 +224,9 @@ export function Header({ user, userName, userTitle, avatarUrl, onMenuToggle, onS
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50/80 border border-blue-100 rounded-full cursor-pointer active:scale-95 transition-transform"
             >
               <Trophy className="w-3.5 h-3.5 text-blue-600" />
-              <span className="text-xs font-medium text-blue-600">12th</span>
+              <span className="text-xs font-medium text-blue-600">
+                {dashboardData?.leaderboard?.your_rank ? `#${dashboardData.leaderboard.your_rank}` : '-'}
+              </span>
             </div>
 
             {/* Notification Bell (Mobile Only) */}

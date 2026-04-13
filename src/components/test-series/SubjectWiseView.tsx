@@ -87,7 +87,7 @@ export const SubjectWiseView = ({ subjects }: SubjectWiseViewProps) => {
                             e.stopPropagation();
                             handleSubjectClick(subject);
                         }}
-                        className="w-full h-11 bg-[#0F172A] text-white hover:bg-[#1E293B] rounded-xl text-sm font-medium shadow-sm transition-all active:scale-[0.98] mt-auto"
+                        className="w-full h-11 bg-gradient-to-b from-[#3B5AA4] to-[#183066] hover:opacity-90 text-white  rounded-xl text-sm font-medium shadow-sm transition-all active:scale-[0.98] mt-auto"
                     >
                         Select
                     </Button>

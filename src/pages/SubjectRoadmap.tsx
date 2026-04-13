@@ -179,7 +179,7 @@ const SubjectRoadmap = () => {
                         <Library className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                         <h3 className="text-lg font-bold text-slate-900 mb-1">No Roadmap Available</h3>
                         <p className="text-slate-500 text-sm mb-6">You haven't generated a test series for this subject yet.</p>
-                        <Button 
+                        <Button
                             onClick={handleInitialize}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-8"
                         >
@@ -231,18 +231,18 @@ const SubjectRoadmap = () => {
                                                 <p className={cn(
                                                     "text-[10px] font-bold mt-1 px-2 py-0.5 rounded-md inline-block uppercase tracking-wider",
                                                     test.obtained_marks !== null
-                                                        ? "bg-emerald-100 text-emerald-700" 
+                                                        ? "bg-emerald-100 text-emerald-700"
                                                         : test.status === "LOCKED"
                                                             ? "bg-slate-100 text-slate-400"
                                                             : test.access === "REQUIRES_SUBSCRIPTION"
                                                                 ? "bg-[#eff7db] text-[#0F172A]"
                                                                 : "bg-sky-50 text-sky-600"
                                                 )}>
-                                                    {test.obtained_marks !== null 
-                                                        ? "Completed" 
-                                                        : test.status === "LOCKED" 
+                                                    {test.obtained_marks !== null
+                                                        ? "Completed"
+                                                        : test.status === "LOCKED"
                                                             ? "Locked"
-                                                            : test.access === "REQUIRES_SUBSCRIPTION" 
+                                                            : test.access === "REQUIRES_SUBSCRIPTION"
                                                                 ? "Premium"
                                                                 : "Unlocked"
                                                     }
@@ -303,7 +303,7 @@ const SubjectRoadmap = () => {
                                                 "w-full h-10 rounded-lg text-sm font-medium transition-all active:scale-[0.98] shadow-sm",
                                                 test.access === "REQUIRES_SUBSCRIPTION"
                                                     ? "bg-[#eff7db] text-[#0F172A] hover:bg-[#C7DD64] border border-[#C7DD66]/30 shadow-none"
-                                                    : "bg-[#0F172A] text-white hover:bg-[#1E293B]",
+                                                    : "bg-gradient-to-b from-[#3B5AA4] to-[#183066] hover:opacity-90 text-white  rounded-xl text-sm font-medium shadow-sm transition-all active:scale-[0.98] mt-auto",
                                                 test.status === "LOCKED" && "bg-slate-200 text-slate-400 shadow-none pointer-events-none"
                                             )}
                                         >

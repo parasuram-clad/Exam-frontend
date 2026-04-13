@@ -385,8 +385,15 @@ const studyService = {
     /**
      * Get an MCQ attempt result
      */
-    getMCQResult: async (userId: number, syllabusId: number, planId?: number, planRowId?: number) => {
+    getMCQResult: async (syllabusId: number, planId?: number, planRowId?: number, attemptId?: number) => {
         const response = await apiClient.get('/mcq/result', {
+            params: { syllabus_id: syllabusId, plan_id: planId, plan_row_id: planRowId, attempt_id: attemptId }
+        });
+        return response.data;
+    },
+
+    getAssessmentHistory: async (userId: number, syllabusId: number, planId?: number, planRowId?: number) => {
+        const response = await apiClient.get('/mcq/history', {
             params: { user_id: userId, syllabus_id: syllabusId, plan_id: planId, plan_row_id: planRowId }
         });
         return response.data;

@@ -19,6 +19,7 @@ import {
   Loader2,
   CheckCircle2,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -451,6 +452,8 @@ const CurrentAffairs = () => {
     setIsCalendarOpen(false);
   };
 
+  const queryClient = useQueryClient();
+
   const loadArticles = async (date: Date) => {
     try {
       setLoading(true);
@@ -579,6 +582,11 @@ const CurrentAffairs = () => {
 
       const res = await currentAffairsService.submitQuiz(submission);
       setQuizResult(res);
+      // Invalidate dashboard and related queries to refresh streak and progress
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['roadmap'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['study-plans'] });
       toast.success("Quiz submitted successfully!");
     } catch (err) {
       console.error("Failed to submit quiz", err);

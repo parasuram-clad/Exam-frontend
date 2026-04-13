@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -16,6 +17,7 @@ interface Subtopic {
   status: "continue" | "start" | "completed";
   isTest?: boolean;
   planRowId?: number;
+  testType?: 'WEEKLY' | 'MONTHLY';
 }
 
 interface StudyTopicCard {
@@ -147,16 +149,59 @@ export const StudyTopicDetailDialog = ({
                   liveTimeSpent = subtopic.timeSpent;
                 }
 
+                const isTest = subtopic.isTest;
+                const isMonthly = isTest && subtopic.testType === 'MONTHLY';
+                const isWeekly = isTest && subtopic.testType !== 'MONTHLY';
+
                 return (
-                  <div key={subtopic.id} className="bg-primary rounded-2xl p-5">
+                  <div key={subtopic.id} className={cn(
+                    "rounded-3xl p-6 transition-all duration-500 relative overflow-hidden group",
+                    isMonthly
+                      ? "bg-[#FEF2F2] border border-[#FEE2E2] shadow-xl shadow-red-100/50"
+                      : isWeekly
+                        ? "bg-[#F7FEE7] border border-[#ECFCCB] shadow-xl shadow-lime-100/50"
+                        : "bg-primary"
+                  )}>
+                    {isTest && (
+                      <div className={cn(
+                        "absolute top-0 right-0 w-32 h-32 blur-[60px] rounded-full -mr-16 -mt-16 pointer-events-none transition-all duration-700",
+                        isMonthly ? "bg-red-500/10 group-hover:bg-red-500/20" : "bg-lime-500/20 group-hover:bg-lime-500/30"
+                      )} />
+                    )}
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
                       <div className="flex-1">
-                        <h3 className="text-primary-foreground text-lg font-medium mb-1">{subtopic.name} </h3>
-                        <p className="text-primary-foreground/70 text-sm mb-2">{subtopic.description}</p>
-                        <div className="flex items-center gap-2 text-primary-foreground/60 text-xs font-medium uppercase tracking-wider">
-                          <span>Time Tracked:</span>
-                          <span className="text-primary-foreground">
-                            {liveTimeSpent % 1 === 0 ? liveTimeSpent : liveTimeSpent.toFixed(1)}m / {subtopic.totalTime}m
+                        <div className="flex items-center gap-2 mb-1">
+                          {isTest && (
+                            <span className={cn(
+                              "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm",
+                              isMonthly ? "bg-[#EF4444] text-white shadow-red-200/50" : "bg-[#3B5AA4] text-white shadow-indigo-200/50"
+                            )}>
+                              {subtopic.testType === 'MONTHLY' ? 'Monthly Test' : 'Weekly Test'}
+                            </span>
+                          )}
+                          <h3 className={cn(
+                            "text-lg font-bold tracking-tight",
+                            isMonthly ? "text-red-950" : isWeekly ? "text-slate-900" : "text-primary-foreground"
+                          )}>{subtopic.name} </h3>
+                        </div>
+                        <p className={cn(
+                          "text-sm mb-2",
+                          isMonthly ? "text-red-900/70" : isWeekly ? "text-slate-700" : "text-primary-foreground/70"
+                        )}>{subtopic.description}</p>
+                        
+                        <div className={cn(
+                          "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider",
+                          isMonthly ? "text-red-600/70" : isWeekly ? "text-lime-700/70" : "text-primary-foreground/60"
+                        )}>
+                          <span>{isTest ? "Evaluation Period:" : "Time Tracked:"}</span>
+                          <span className={cn(
+                            "font-bold",
+                            isMonthly ? "text-red-700" : isWeekly ? "text-lime-700" : "text-primary-foreground"
+                          )}>
+                            {isTest 
+                              ? `${subtopic.totalTime} Minutes`
+                              : `${liveTimeSpent % 1 === 0 ? liveTimeSpent : liveTimeSpent.toFixed(1)}m / ${subtopic.totalTime}m`
+                            }
                           </span>
                         </div>
                       </div>
@@ -166,7 +211,14 @@ export const StudyTopicDetailDialog = ({
                         onMouseEnter={() => {
                           if (user?.id) prefetchTopic(queryClient, subtopic.id, user.id);
                         }}
-                        className="bg-card hover:bg-card/90 text-foreground px-6 rounded-xl font-medium shrink-0 disabled:opacity-70"
+                        className={cn(
+                          "px-8 rounded-xl font-bold transition-all duration-300 shadow-lg relative z-10 h-11",
+                          isMonthly 
+                            ? "bg-gradient-to-b from-[#EF4444] to-[#991B1B] hover:opacity-90 text-white shadow-red-200" 
+                            : isWeekly
+                              ? "bg-gradient-to-b from-[#3B5AA4] to-[#183066] hover:opacity-90 text-white shadow-lime-200"
+                              : "bg-card hover:bg-card/90 text-foreground"
+                        )}
                       >
                         {isFetching ? (
                           <span className="flex items-center gap-2">
@@ -176,39 +228,41 @@ export const StudyTopicDetailDialog = ({
                         ) : subtopic.status === "continue" ? "Continue" : subtopic.status === "completed" ? "View Analytics" : "Start Now"}
                       </Button>
                     </div>
-                    <div>
-                      <div className="h-2 bg-primary-foreground/10 rounded-full overflow-hidden">
-                        {(() => {
-                          const timeProgress = subtopic.totalTime > 0 ? (liveTimeSpent / subtopic.totalTime) * 100 : 0;
-                          let readingProgress = 0;
+                    {!isTest && (
+                      <div>
+                        <div className="h-2 bg-primary-foreground/10 rounded-full overflow-hidden">
+                          {(() => {
+                            const timeProgress = subtopic.totalTime > 0 ? (liveTimeSpent / subtopic.totalTime) * 100 : 0;
+                            let readingProgress = 0;
 
-                          if (user?.id) {
-                            const planIdStr = studyContext?.plan_id ? `plan_${studyContext.plan_id}` : "global";
-                            const rowIdStr = subtopic.planRowId ? `row_${subtopic.planRowId}` : "norow";
-                            const percentKey = `read_percent_${subtopic.id}_${planIdStr}_${rowIdStr}_${user.id}`;
-                            const savedPercent = localStorage.getItem(percentKey);
-                            if (savedPercent) {
-                              readingProgress = parseFloat(savedPercent);
+                            if (user?.id) {
+                              const planIdStr = studyContext?.plan_id ? `plan_${studyContext.plan_id}` : "global";
+                              const rowIdStr = subtopic.planRowId ? `row_${subtopic.planRowId}` : "norow";
+                              const percentKey = `read_percent_${subtopic.id}_${planIdStr}_${rowIdStr}_${user.id}`;
+                              const savedPercent = localStorage.getItem(percentKey);
+                              if (savedPercent) {
+                                readingProgress = parseFloat(savedPercent);
+                              }
                             }
-                          }
 
-                          let finalProgress = 0;
-                          if (subtopic.status === "completed") {
-                            finalProgress = 100;
-                          } else {
-                            // Max of time or reading, capped at 90% for non-completed
-                            finalProgress = Math.min(90, Math.max(timeProgress, readingProgress));
-                          }
+                            let finalProgress = 0;
+                            if (subtopic.status === "completed") {
+                              finalProgress = 100;
+                            } else {
+                              // Max of time or reading, capped at 90% for non-completed
+                              finalProgress = Math.min(90, Math.max(timeProgress, readingProgress));
+                            }
 
-                          return (
-                            <div
-                              className="h-full bg-accent rounded-full transition-all duration-500 ease-out"
-                              style={{ width: `${finalProgress}%` }}
-                            />
-                          );
-                        })()}
+                            return (
+                              <div
+                                className="h-full bg-accent rounded-full transition-all duration-500 ease-out"
+                                style={{ width: `${finalProgress}%` }}
+                              />
+                            );
+                          })()}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}

@@ -3,7 +3,9 @@ import { CheckCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import trophyHero from "@/assets/results/trophy-hero.png";
+import scoreHigh from "@/assets/results/trophy-hero.png";
+import scoreMedium from "@/assets/results/score-medium.png";
+import scoreLow from "@/assets/results/score-low.png";
 
 export interface QuizQuestion {
     id: string | number;
@@ -51,27 +53,33 @@ const CONFETTI = [
 ];
 
 
-function TrophyIllustration() {
+function TrophyIllustration({ accuracy }: { accuracy: number }) {
+    let illustration = scoreHigh;
+    if (accuracy < 50) illustration = scoreLow;
+    else if (accuracy < 80) illustration = scoreMedium;
+
     return (
         <div className="relative w-full flex items-center justify-center" style={{ height: 220 }}>
-            {/* Confetti scattered around */}
-            <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
-                {CONFETTI.map((c, i) => (
-                    <motion.div
-                        key={i}
-                        className="absolute"
-                        style={{ width: c.w, height: c.h, backgroundColor: c.color, left: c.left, top: -14 }}
-                        animate={{ y: [0, 460], opacity: [0, 0.6, 0.6, 0], rotate: [0, 360] }}
-                        transition={{ duration: c.dur, delay: c.delay, repeat: Infinity, ease: "linear" }}
-                    />
-                ))}
-            </div>
-            {/* Trophy hero image — centered */}
+            {/* Confetti scattered around - only for high accuracy */}
+            {accuracy >= 80 && (
+                <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
+                    {CONFETTI.map((c, i) => (
+                        <motion.div
+                            key={i}
+                            className="absolute"
+                            style={{ width: c.w, height: c.h, backgroundColor: c.color, left: c.left, top: -14 }}
+                            animate={{ y: [0, 460], opacity: [0, 0.6, 0.6, 0], rotate: [0, 360] }}
+                            transition={{ duration: c.dur, delay: c.delay, repeat: Infinity, ease: "linear" }}
+                        />
+                    ))}
+                </div>
+            )}
+            {/* Character hero image — centered */}
             <motion.img
-                src={trophyHero}
-                alt="Trophy"
+                src={illustration}
+                alt="Achievement"
                 className="relative z-10 object-contain"
-                style={{ height: 180 }}
+                style={{ height: 200 }}
                 initial={{ scale: 0.85, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 180, damping: 14 }}
@@ -392,7 +400,7 @@ export function DailyQuizModal({ isOpen, onClose, onComplete, questions, title, 
                             </div>
 
                             {/* Trophy illustration + confetti */}
-                            <TrophyIllustration />
+                            <TrophyIllustration accuracy={accuracy} />
 
                             {/* Score */}
                             <div className="flex flex-col items-center mt-2 mb-5">

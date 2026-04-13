@@ -1,8 +1,11 @@
 import { DashboardLayout } from "@/components/layout";
-import { Trophy, Medal, TrendingUp, Users, Crown, Star } from "lucide-react";
+import { Trophy, Medal, TrendingUp, Users, Crown, Star, Loader2, AlertCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import studyService from "@/services/study.service";
 
 interface LeaderboardEntry {
   rank: number;
@@ -15,10 +18,52 @@ interface LeaderboardEntry {
   isCurrentUser?: boolean;
 }
 
-const leaderboardData: LeaderboardEntry[] = [];
-
 const Leaderboard = () => {
-  const currentUserRank = leaderboardData.find(e => e.isCurrentUser);
+  const { user, currentContext } = useAuth();
+
+  const { data: dashboardData, isLoading, isError } = useQuery({
+    queryKey: ["dashboard", user?.id, currentContext?.plan_id],
+    queryFn: () => studyService.getDashboardData(user!.id, currentContext!.plan_id),
+    enabled: !!user?.id && !!currentContext?.plan_id,
+  });
+
+  const lb = dashboardData?.leaderboard;
+  const fullLeaderboard: any[] = lb?.leaderboard || [];
+  
+  const leaderboardData: LeaderboardEntry[] = fullLeaderboard.map((entry: any) => ({
+    rank: entry.rank,
+    name: entry.name,
+    avatar: entry.avatar_url,
+    initials: entry.initials || entry.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase(),
+    marks: Math.round(entry.total_marks || entry.score || 0),
+    accuracy: `${Math.round(entry.accuracy || 0)}%`,
+    testsCompleted: entry.tests_completed || 0,
+    isCurrentUser: entry.is_current_user || entry.is_you,
+  }));
+
+  const currentUser = leaderboardData.find(e => e.isCurrentUser);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-80 space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground font-medium">Loading leaderboard...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (isError) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-80 gap-3 text-destructive">
+          <AlertCircle className="w-6 h-6" />
+          <p className="font-medium">Failed to load leaderboard. Please try again.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -30,7 +75,7 @@ const Leaderboard = () => {
               <Medal className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <p className="text-2xl font-medium text-foreground">#{currentUserRank?.rank || "-"}</p>
+              <p className="text-2xl font-medium text-foreground">#{lb?.your_rank || "-"}</p>
               <p className="text-sm text-muted-foreground">Your Rank</p>
             </div>
           </div>
@@ -41,7 +86,7 @@ const Leaderboard = () => {
               <TrendingUp className="w-5 h-5 text-success" />
             </div>
             <div>
-              <p className="text-2xl font-medium text-foreground">{currentUserRank?.accuracy || "-"}</p>
+              <p className="text-2xl font-medium text-foreground">{currentUser?.accuracy || "-"}</p>
               <p className="text-sm text-muted-foreground">Your Accuracy</p>
             </div>
           </div>
@@ -52,7 +97,7 @@ const Leaderboard = () => {
               <Trophy className="w-5 h-5 text-info" />
             </div>
             <div>
-              <p className="text-2xl font-medium text-foreground">{currentUserRank?.marks || "-"}</p>
+              <p className="text-2xl font-medium text-foreground">{currentUser?.marks || "-"}</p>
               <p className="text-sm text-muted-foreground">Total Marks</p>
             </div>
           </div>
@@ -63,7 +108,7 @@ const Leaderboard = () => {
               <Users className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-medium text-foreground">0</p>
+              <p className="text-2xl font-medium text-foreground">{lb?.total_users || 0}</p>
               <p className="text-sm text-muted-foreground">Total Participants</p>
             </div>
           </div>
@@ -176,7 +221,7 @@ const Leaderboard = () => {
         <div className="divide-y divide-border">
           {leaderboardData.map((entry) => (
             <div
-              key={entry.rank}
+              key={`${entry.rank}-${entry.name}`}
               className={cn(
                 "grid grid-cols-[60px_1fr_80px_80px_80px] gap-2 p-4 items-center",
                 entry.isCurrentUser && "bg-accent/10"
@@ -216,11 +261,13 @@ const Leaderboard = () => {
             </div>
           ))}
         </div>
-        <div className="p-4 border-t border-border">
-          <Button variant="outline" className="w-full">
-            Load More
-          </Button>
-        </div>
+        {leaderboardData.length > 20 && (
+          <div className="p-4 border-t border-border">
+            <Button variant="outline" className="w-full">
+              Load More
+            </Button>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

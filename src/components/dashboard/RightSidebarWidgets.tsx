@@ -34,7 +34,7 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
         queryKey: ['dashboard', user?.id, currentContext?.plan_id],
         queryFn: () => studyService.getDashboardData(user!.id, currentContext?.plan_id),
         enabled: !!user?.id && !!currentContext?.plan_id,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 30 * 1000,
     });
 
     const features = dashboardData?.context?.features;
@@ -85,6 +85,16 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
         current_rank: 0
     };
 
+    const formatStudyTime = (minutes: number) => {
+        if (!minutes || minutes === 0) return "0 min";
+        const totalMinutes = Math.floor(minutes);
+        const hrs = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+
+        if (hrs === 0) return `${mins} min`;
+        return mins > 0 ? `${hrs} hr ${mins} min` : `${hrs} hr`;
+    };
+
     const streakCount = dashboardData?.streak?.current_streak || 0;
 
     // Map backend leaderboard to LeaderboardEntry format
@@ -116,28 +126,30 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
                         <div className="bg-muted/50 rounded-xl p-3 h-20  flex items-center gap-2">
                             <img src={studyHoursIcon} alt="Study Time" className="w-6 h-6" />
                             <div>
-                                <p className="text-xl font-semibold text-foreground">{dailyPerformance.study_time || dailyPerformance.study_hours || 0}h</p>
+                                <p className="text-lg font-semibold text-foreground whitespace-nowrap">
+                                    {formatStudyTime(dailyPerformance.study_time || dailyPerformance.study_hours || 0)}
+                                </p>
                                 <p className="text-[10px] text-muted-foreground font-medium">Study Time</p>
                             </div>
                         </div>
                         <div className="bg-muted/50 rounded-xl p-3 h-20  flex items-center gap-2">
                             <img src={accuracyIcon} alt="Accuracy" className="w-6 h-6" />
                             <div>
-                                <p className="text-xl font-semibold text-foreground">{dailyPerformance.accuracy}%</p>
+                                <p className="text-lg font-semibold text-foreground">{dailyPerformance.accuracy}%</p>
                                 <p className="text-[10px] text-muted-foreground font-medium">Accuracy</p>
                             </div>
                         </div>
                         <div className="bg-muted/50 rounded-xl p-3 h-20  flex items-center gap-2">
                             <img src={mcqsIcon} alt="MCQs" className="w-6 h-6" />
                             <div>
-                                <p className="text-xl font-semibold  text-foreground">{dailyPerformance.mcqs_solved}</p>
+                                <p className="text-lg font-semibold  text-foreground">{dailyPerformance.mcqs_solved}</p>
                                 <p className="text-[10px] text-muted-foreground font-medium">MCQs Solved</p>
                             </div>
                         </div>
                         <div className="bg-muted/50 rounded-xl p-3 h-20 flex items-center gap-2">
                             <img src={rankIcon} alt="Current Rank" className="w-6 h-6" />
                             <div>
-                                <p className="text-xl font-semibold text-foreground">{dailyPerformance.current_rank}</p>
+                                <p className="text-lg font-semibold text-foreground">{dailyPerformance.current_rank}</p>
                                 <p className="text-[10px] text-muted-foreground font-medium">Current Rank</p>
                             </div>
                         </div>
@@ -150,7 +162,12 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
                 <>
                     <StreakWidget
                         streakDays={streakCount}
-                        calendar={dashboardData?.streak?.weekly_strip}
+                        calendar={dashboardData?.streak?.weekly_calendar}
+                        streakPoints={dashboardData?.streak?.streak_points}
+                        nextPointIn={dashboardData?.streak?.next_point_in}
+                        dailyTaskStatus={dashboardData?.streak?.daily_task_status}
+                        statusMessage={dashboardData?.streak?.status_message}
+                        streakConfig={dashboardData?.streak?.streak_config}
                     />
                 </>
             )}

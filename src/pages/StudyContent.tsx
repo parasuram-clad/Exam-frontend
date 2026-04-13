@@ -26,13 +26,17 @@ import {
   Layers,
   Loader2,
   Pin,
-  MousePointer2
+  MousePointer2,
+  ArrowRight
 } from "lucide-react";
 import { cn, getErrorMessage, getMediaUrl } from "@/lib/utils";
 import { DailyQuizModal, QUIZ_QUESTIONS } from "@/components/dashboard/DailyQuizModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
+import scoreHigh from "@/assets/results/trophy-hero.png";
+import scoreMedium from "@/assets/results/score-medium.png";
+import scoreLow from "@/assets/results/score-low.png";
 
 // Types from StudyInterface
 type Mode = "reading" | "study" | "revision";
@@ -624,7 +628,7 @@ const StudyContent = () => {
     const rowIdStr = currentPlanRowId ? `row_${currentPlanRowId}` : "norow";
     const offsetKey = `read_offset_${subtopicId}_${planIdStr}_${rowIdStr}_${user.id}`;
     const percentKey = `read_percent_${subtopicId}_${planIdStr}_${rowIdStr}_${user.id}`;
-    
+
     const savedOffset = localStorage.getItem(offsetKey);
     const savedPercent = localStorage.getItem(percentKey);
 
@@ -651,10 +655,10 @@ const StudyContent = () => {
     const rowIdStr = currentPlanRowId ? `row_${currentPlanRowId}` : "norow";
     const offsetKey = `read_offset_${subtopicId}_${planIdStr}_${rowIdStr}_${user.id}`;
     const percentKey = `read_percent_${subtopicId}_${planIdStr}_${rowIdStr}_${user.id}`;
-    
+
     const maxScroll = container.scrollHeight - container.clientHeight;
     const percent = maxScroll > 0 ? (container.scrollTop / maxScroll) * 100 : 0;
-    
+
     localStorage.setItem(offsetKey, container.scrollTop.toString());
     localStorage.setItem(percentKey, percent.toFixed(2));
   };
@@ -781,15 +785,6 @@ const StudyContent = () => {
   const startAssessment = async () => {
     if (!user?.id || !parsedSubtopicId || isNaN(parsedSubtopicId)) return;
 
-    // Keep reading session active during assessment to track total time
-    /* 
-    try {
-      await studyService.stopTopicTiming(parsedSubtopicId, activeReadingSessionId || undefined, currentSubscriptionPlanId);
-      queryClient.invalidateQueries({ queryKey: ['topic-timings'] });
-    } catch { }
-    */
-
-
     try {
       const response = await studyService.startMCQAttempt({
         syllabus_id: parsedSubtopicId,
@@ -820,26 +815,47 @@ const StudyContent = () => {
       setIsAssessmentStarted(true);
       setIsAssessmentFinished(false);
       setTimeLeft(600);
-      setIsAssessmentSubmitted(false);
       setAssessmentStartTime(new Date().toISOString());
     } catch (err: any) {
-      if (err.response?.status === 404) {
-        // FALLBACK: If /mcq/start fails but we have assessment in the content, use it!
-        if (topicAssessment && topicAssessment.questions?.length > 0) {
-          console.log("Using cached assessment from topic content as fallback");
-          setIsAssessmentStarted(true);
-          setIsAssessmentFinished(false);
-          setTimeLeft(600);
-          setIsAssessmentSubmitted(false);
-          setAssessmentStartTime(new Date().toISOString());
-          return;
-        }
-        toast.error("Questions not generated for this topic yet.");
-      } else if (err.response?.status === 403) {
-        toast.error(err.response.data.detail || "You have already attempted this topic today.");
+      if (err.response?.status === 403) {
+        toast.error("You have reached your maximum attempts for today.");
       } else {
-        toast.error("Failed to start assessment.");
+        toast.error("Failed to start assessment");
       }
+      console.error(err);
+    }
+  };
+
+  const handleViewAttempt = async (attemptId: number) => {
+    try {
+      const result = await studyService.getMCQResult(parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId, attemptId);
+      if (result) {
+        const letterToIdx: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
+
+        // Map questions for display
+        const mappedQuestions = result.questions.map((q: any) => ({
+          id: q.mcq_id,
+          mcq_id: q.mcq_id,
+          question: q.question,
+          options: [q.options?.A || "", q.options?.B || "", q.options?.C || "", q.options?.D || ""],
+          correct_answer_index: q.correct_answer_index,
+          explanation: q.reason || q.explanation || "",
+          difficulty: q.difficulty || result.difficulty
+        }));
+
+        const userAns = result.questions.map((q: any) => letterToIdx[q.selected_option] ?? null);
+
+        setResultsQuestions(mappedQuestions);
+        setViewHistoryAnswers(userAns);
+        setViewHistoryTimeTaken(result.time_taken_seconds || 0);
+        setQuizScore(result.correct_answers);
+        setIsAssessmentSubmitted(true);
+        setShowResultsOnly(true);
+        setIsAssessmentStarted(true);
+      }
+    } catch (err) {
+      toast.error("Failed to load attempt details");
+      console.error(err);
     }
   };
 
@@ -1167,120 +1183,177 @@ const StudyContent = () => {
           </div>
         ))
         }
-
-        {/* Assessment Activation Section */}
-        <div className="pt-16 border-t border-gray-200/20">
+        {/* Refined Assessment Achievement Card */}
+        <div className="pt-20 pb-32 border-t border-gray-100/50 max-w-4xl mx-auto px-6">
           <div className={cn(
-            "p-10 md:p-14 rounded-[32px] text-center space-y-8",
-            backgroundPreset === 'dark' ? 'bg-[#2a2a2a]' : 'bg-[#fafafa]'
+            "relative p-10 md:p-14 rounded-[32px] text-center overflow-hidden transition-all duration-700",
+            backgroundPreset === 'dark' ? 'bg-[#1c1c1e] border border-white/5 shadow-2xl' : 'bg-white border border-slate-100 shadow-xl shadow-slate-100/50'
           )}>
-            <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto transition-transform hover:scale-110">
+
+            {/* Background Decorative Accent */}
+            <div className={cn(
+              "absolute top-0 right-0 w-80 h-80 rounded-full -mr-40 -mt-40 blur-[100px] opacity-20 pointer-events-none transition-colors duration-1000",
+              isAssessmentFinished ? "bg-emerald-400" : "bg-blue-400"
+            )} />
+
+            <div className="relative z-10 space-y-8">
               {isAssessmentFinished ? (
-                <CheckCircle className="w-9 h-9 text-emerald-500" />
+                <>
+                  {/* Dynamic Achievement Hero */}
+                  {(() => {
+                    const attempts = assessmentHistory?.attempts || [];
+                    const latestAttempt = [...attempts].sort((a, b) => (b.attempt_no || 0) - (a.attempt_no || 0))[0];
+                    const score = latestAttempt?.score_percentage || 0;
+
+                    let illustration = scoreHigh;
+                    if (score < 50) illustration = scoreLow;
+                    else if (score < 80) illustration = scoreMedium;
+
+                    return (
+                      <div className="relative mx-auto w-48 h-48 flex items-center justify-center animate-in fade-in zoom-in duration-1000">
+                        <div className={cn("absolute inset-0 rounded-full scale-90 blur-3xl opacity-30", backgroundPreset === 'dark' ? "bg-emerald-500/20" : "bg-emerald-50")} />
+                        <img
+                          src={illustration}
+                          alt="Achievement"
+                          className="relative z-10 w-full h-full object-contain drop-shadow-2xl"
+                        />
+                      </div>
+                    );
+                  })()}
+
+                  <div className="space-y-2">
+                    <h2 className={cn("text-2xl font-bold tracking-tight", getTextColor())}>
+                      Evaluation Complete
+                    </h2>
+                    <p className={cn("text-[15px] opacity-60 max-w-md mx-auto leading-relaxed", getTextColor())}>
+                      You've cleared this chapter's assessment. Your dedication to mastery is showing!
+                    </p>
+                  </div>
+
+                  {/* Performance Metric Cluster */}
+                  {(() => {
+                    const attempts = assessmentHistory?.attempts || [];
+                    const latestAttempt = [...attempts].sort((a, b) => (b.attempt_no || 0) - (a.attempt_no || 0))[0];
+                    if (!latestAttempt) return null;
+
+                    return (
+                      <div className={cn(
+                        "flex items-center justify-center py-6 px-10 rounded-2xl mx-auto max-w-[200px]",
+                        backgroundPreset === 'dark' ? "bg-white/5 border border-white/10" : "bg-slate-50 border border-slate-100"
+                      )}>
+                        <div className="text-center">
+                          <p className={cn("text-[10px] font-bold uppercase tracking-[1.5px] mb-1 opacity-50", getTextColor())}>Mastery</p>
+                          <p className="text-2xl font-bold text-emerald-500">{latestAttempt.score_percentage}%</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
               ) : (
-                <Brain className="w-9 h-9 text-accent" />
+                <>
+                  <div className="w-20 h-20 bg-blue-500/10 rounded-[24px] flex items-center justify-center mx-auto mb-6 shadow-inner">
+                    <Brain className="w-10 h-10 text-blue-600" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className={cn("text-2xl font-bold tracking-tight", getTextColor())}>
+                      Ready for Review?
+                    </h2>
+                    <p className={cn("text-[16px] opacity-60 max-w-sm mx-auto leading-relaxed", getTextColor())}>
+                      Test your knowledge of the thematic focus with a final comprehensive evaluation.
+                    </p>
+                  </div>
+                </>
               )}
-            </div>
-            <h2 className={cn("text-[22px] font-medium font-['Inter:Medium',sans-serif]", getTextColor())}>
-              {isAssessmentFinished ? "Chapter Assessment Completed" : "Final Chapter Evaluation"}
-            </h2>
-            <p className={cn("text-[15px] opacity-50 max-w-sm mx-auto", getTextColor())}>
-              {isAssessmentFinished
-                ? "You have successfully completed the assessment for this chapter. Great job!"
-                : "Validate your understanding with a synchronized exam assessment"}
-            </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button
-                onClick={handleTopicMindMapClick}
-                disabled={isMindMapLoading}
-                variant="outline"
-                className={cn(
-                  "px-8 py-6 text-[15px] rounded-xl transition-all border font-medium hover:bg-accent/5",
-                  backgroundPreset === 'dark' ? "border-gray-700 text-gray-300 hover:text-white" : "border-gray-200 text-gray-700"
-                )}
-              >
-                <MindMapIcon />
-                <span className="ml-2.5">View Mind Map</span>
-              </Button>
+              {/* Functional Action Group */}
+              <div className="space-y-4 pt-2">
+                {/* Primary Action Row */}
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  {/* Only show assessment trigger if under 3 attempts */}
+                  {(assessmentHistory?.total_attempts || 0) < 3 && (
+                    isAssessmentFinished ? (
+                      <Button
+                        onClick={startAssessment}
+                        className="w-full sm:w-auto px-10 py-6 text-[14px] rounded-2xl bg-[#1c1c1e] hover:bg-black text-white font-bold transition-all shadow-xl shadow-black/10 group transform hover:-translate-y-0.5 active:scale-95"
+                      >
+                        <Play className="w-4 h-4 mr-2 fill-current" />
+                        Reattempt
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={startAssessment}
+                        className="w-full sm:w-auto px-12 py-6 text-[15px] rounded-2xl bg-[#1c1c1e] hover:bg-black text-white font-bold transition-all shadow-xl shadow-black/10 group transform hover:-translate-y-0.5 animate-bounce-subtle"
+                      >
+                        <span>Take Final Assessment</span>
+                        <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+                      </Button>
+                    )
+                  )}
 
-              {isAssessmentFinished && (
-                <button
-                  onClick={async () => {
-                    // Try to find latest attempt in history if not in local state
-                    if (!viewHistoryAnswers) {
-                      if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
-                        try {
-                          const result = await studyService.getMCQResult(user.id, parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId);
-                          if (result && result.questions) {
-                            const letterToIdx: Record<string, number> = { "A": 0, "B": 1, "C": 2, "D": 3 };
-                            const ans = result.questions.map((q: any) => letterToIdx[q.selected_option] ?? null);
-                            const ques = result.questions.map((q: any) => ({
-                              ...q,
-                              id: q.mcq_id,
-                              options: [q.options?.A || "", q.options?.B || "", q.options?.C || "", q.options?.D || ""],
-                              difficulty: q.difficulty || result.difficulty,
-                              explanation: q.reason || q.explanation || ""
-                            }));
-                            setViewHistoryAnswers(ans);
-                            setResultsQuestions(ques);
-                            setViewHistoryTimeTaken(result.time_taken_seconds);
-                            setQuizScore(result.correct_answers);
-                            setIsAssessmentSubmitted(true);
-                          }
-                        } catch (error) {
-                          console.error('Failed to get MCQ result:', error);
-                          // Fallback to history
-                          if (assessmentHistory?.attempts?.length > 0) {
-                            const latest = assessmentHistory.attempts[assessmentHistory.attempts.length - 1];
-                            if (latest.questions) {
-                              const letterToIdx = { "A": 0, "B": 1, "C": 2, "D": 3 };
-                              const ans = latest.questions.map((q: any) => letterToIdx[q.selected_option as keyof typeof letterToIdx] ?? null);
-                              const ques = latest.questions.map((q: any) => ({
-                                ...q,
-                                id: q.mcq_id,
-                                options: [q.options?.A || "", q.options?.B || "", q.options?.C || "", q.options?.D || ""],
-                                difficulty: q.difficulty || latest.difficulty,
-                                explanation: q.explanation || ""
-                              }));
-                              setViewHistoryAnswers(ans);
-                              setResultsQuestions(ques);
-                              setViewHistoryTimeTaken(latest.time_taken_seconds);
-                              setQuizScore(latest.correct_answers);
-                              setIsAssessmentSubmitted(true);
-                            }
+                  {isAssessmentFinished && (
+                    <Button
+                      onClick={async () => {
+                        if (!viewHistoryAnswers) {
+                          if (user?.id && parsedSubtopicId && !isNaN(parsedSubtopicId)) {
+                            try {
+                              const result = await studyService.getMCQResult(user.id, parsedSubtopicId, currentSubscriptionPlanId, currentPlanRowId);
+                              if (result && result.questions) {
+                                const letterToIdx = { "A": 0, "B": 1, "C": 2, "D": 3 };
+                                const ans = result.questions.map((q: any) => letterToIdx[q.selected_option as keyof typeof letterToIdx] ?? null);
+                                const ques = result.questions.map((q: any) => ({
+                                  ...q,
+                                  id: q.mcq_id,
+                                  options: [q.options?.A || "", q.options?.B || "", q.options?.C || "", q.options?.D || ""],
+                                  difficulty: q.difficulty || result.difficulty,
+                                  explanation: q.reason || q.explanation || ""
+                                }));
+                                setViewHistoryAnswers(ans);
+                                setResultsQuestions(ques);
+                                setViewHistoryTimeTaken(result.time_taken_seconds);
+                                setQuizScore(result.correct_answers);
+                                setIsAssessmentSubmitted(true);
+                              }
+                            } catch (e) { console.error(e); }
                           }
                         }
-                      }
-                    }
-                    setShowResultsOnly(true);
-                    setIsAssessmentStarted(true);
-                  }}
-                  className="bg-emerald-50 transition-all hover:bg-emerald-100 border border-emerald-200 text-emerald-700 px-5 py-3 text-[15px] rounded-lg shadow-sm font-medium flex items-center justify-center gap-3 animate-fade-in group"
-                >
-                  <BarChart2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                  View Results
-                </button>
-              )}
-
-              {/* Show Start/Retake Assessment button if attempts < 3 */}
-              {(!isAssessmentFinished || (assessmentHistory?.total_attempts || 0) < 3) && (
-                <Button
-                  onClick={startAssessment}
-                  disabled={!topicData}
-                  className={cn(
-                    "bg-[#1c1c1e] text-white hover:bg-black px-10 py-6 text-[15px] rounded-xl transition-all shadow-md font-medium",
-                    !topicData && "opacity-50 cursor-not-allowed"
+                        setShowResultsOnly(true);
+                        setIsAssessmentStarted(true);
+                      }}
+                      className="w-full sm:w-auto px-8 py-6 text-[14px] rounded-2xl bg-emerald-100/50 hover:bg-emerald-100 text-emerald-700 font-bold border border-emerald-200 transition-all shadow-sm"
+                    >
+                      <BarChart2 className="w-4 h-4 mr-2" />
+                      Latest Results
+                    </Button>
                   )}
-                >
-                  <Play className="w-5 h-5 mr-2.5 fill-current" />
-                  {!topicData ? "Loading..." : (isAssessmentFinished ? "Retake Assessment" : "Start Assessment")}
-                </Button>
-              )}
+                </div>
+
+                {/* Quick Utility Row */}
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={() => setIsAnalyticsModalOpen(true)}
+                    className={cn(
+                      "flex items-center gap-2 px-5 py-2.5 rounded-full border text-[12px] font-bold uppercase tracking-wider transition-all",
+                      backgroundPreset === 'dark'
+                        ? "bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
+                        : "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    <HistoryIcon className="w-4 h-4" />
+                    Analytics
+                  </button>
+
+                </div>
+
+                {isAssessmentFinished && (assessmentHistory?.total_attempts || 0) < 3 && (
+                  <p className="text-[12px] text-slate-400 font-medium">
+                    {3 - (assessmentHistory?.total_attempts || 0)} attempts remaining
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div >
+      </div>
     );
   };
 
@@ -1627,141 +1700,149 @@ const StudyContent = () => {
 
       {/* Analytics Modal */}
       <Dialog open={isAnalyticsModalOpen} onOpenChange={setIsAnalyticsModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 border-none rounded-[32px] bg-[#fdfcfa] shadow-2xl">
-          <div className="relative overflow-hidden">
-            {/* Header with Background Accent */}
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none" />
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-0 border-none rounded-[28px] bg-[#F7FAF8] shadow-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className="relative p-5 sm:p-7">
+            {/* Close Button */}
 
-            <div className="relative p-8 sm:p-10">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                    <BarChart2 className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-medium text-gray-900 font-['Inter:Medium',sans-serif]">Performance Analytics</h2>
-                    <p className="text-sm text-gray-400 mt-1 font-['Inter:Regular',sans-serif]">
-                      {topicData?.task?.topic || "Study Session Overview"}
-                    </p>
-                  </div>
+
+            {/* Header */}
+            <div className="mb-6 mt-1 text-center sm:text-left">
+              <h2 className="text-lg font-bold text-slate-900 leading-tight">
+                Performance Analytics
+              </h2>
+              <p className="text-slate-500 text-[13px] mt-0.5">
+                {topicData?.task?.topic || "Study Session Overview"}
+              </p>
+            </div>
+
+            {!assessmentHistory || assessmentHistory.total_attempts === 0 ? (
+              <div className="py-16 text-center bg-white/50 backdrop-blur-sm border border-dashed border-slate-200 rounded-[20px]">
+                <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <BarChart2 className="w-7 h-7 text-slate-200" />
                 </div>
-                <button
-                  onClick={() => setIsAnalyticsModalOpen(false)}
-                  className="w-10 h-10 rounded-full bg-gray-100/50 hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-all hover:rotate-90"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <h3 className="text-sm font-semibold text-slate-900 mb-1">No Data Recorded</h3>
+                <p className="text-slate-400 max-w-xs mx-auto text-[11px] leading-relaxed px-4">
+                  Complete an assessment to see your performance metrics.
+                </p>
               </div>
+            ) : (() => {
+              const avgScore = Math.round(assessmentHistory.attempts.reduce((acc: any, curr: any) => acc + curr.score_percentage, 0) / assessmentHistory.total_attempts);
 
-              {!assessmentHistory || assessmentHistory.total_attempts === 0 ? (
-                <div className="py-24 text-center bg-white border border-dashed border-gray-200 rounded-[32px]">
-                  <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <BarChart2 className="w-10 h-10 text-gray-200" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Data Captured</h3>
-                  <p className="text-gray-400 max-w-xs mx-auto text-sm leading-relaxed">
-                    Once you complete a topic assessment, your detailed performance metrics and history will appear here.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-10">
-                  {/* Score Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    {[
-                      { label: "Total Attempts", value: assessmentHistory.total_attempts, sub: "Assessments taken", color: "text-gray-900" },
-                      { label: "Avg Accuracy", value: `${Math.round(assessmentHistory.attempts.reduce((acc: any, curr: any) => acc + curr.score_percentage, 0) / assessmentHistory.total_attempts)}%`, sub: "Knowledge mastery", color: "text-blue-600" },
-                      { label: "Personal Best", value: `${Math.max(...assessmentHistory.attempts.map((a: any) => a.score_percentage))}%`, sub: "Top achievement", color: "text-green-600" }
-                    ].map((stat, i) => (
-                      <div key={stat.label} className="bg-white p-6 rounded-[24px] border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col items-center text-center group hover:border-gray-300 transition-all duration-300">
-                        <p className="text-[10px] uppercase font-medium text-gray-400 tracking-[0.1em] mb-3">{stat.label}</p>
-                        <p className={cn("text-4xl font-medium mb-2", stat.color)}>{stat.value}</p>
-                        <p className="text-[11px] text-gray-400 font-medium">{stat.sub}</p>
+              let themeColor = "text-emerald-500";
+              let bgColor = "bg-emerald-50";
+              let badgeColor = "bg-emerald-50 text-emerald-600 border-emerald-100";
+              let masteryImg = scoreHigh;
+              let dotColor = "bg-emerald-500";
+
+              if (avgScore < 50) {
+                themeColor = "text-orange-500";
+                bgColor = "bg-orange-50";
+                badgeColor = "bg-orange-50 text-orange-600 border-orange-100";
+                masteryImg = scoreLow;
+                dotColor = "bg-orange-500";
+              } else if (avgScore < 80) {
+                themeColor = "text-blue-500";
+                bgColor = "bg-blue-50";
+                badgeColor = "bg-blue-50 text-blue-600 border-blue-100";
+                masteryImg = scoreMedium;
+                dotColor = "bg-blue-500";
+              }
+
+              return (
+                <div className="space-y-6">
+                  {/* Stats Summary - Integrated Illustration */}
+                  <div className="bg-white rounded-[24px] p-6 border border-slate-100 shadow-sm relative overflow-hidden">
+                    {/* Decorative background circle */}
+                    <div className={cn("absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none", bgColor)} />
+
+                    <div className="relative flex items-center justify-between">
+                      <div>
+                        <p className="text-4xl tracking-tight mb-1.5 font-bold">
+                          <span className={themeColor}>
+                            {avgScore}%
+                          </span>
+                          <span className="text-slate-300 text-xl font-medium ml-1">Avg Accuracy</span>
+                        </p>
+
+                        <div className="flex items-center gap-3 text-[13px] font-medium text-slate-600">
+                          <div className="flex items-center gap-1">
+                            <span className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
+                            {assessmentHistory.total_attempts} Attempts
+                          </div>
+                          <div className="w-1 h-1 bg-slate-200 rounded-full" />
+                          <div className="flex items-center gap-1 text-slate-500">
+                            Best: <span className="text-slate-900 ml-0.5">{Math.max(...assessmentHistory.attempts.map((a: any) => a.score_percentage))}%</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-3.5 flex">
+                          <div className={cn("px-2.5 py-0.5 rounded-full border flex items-center gap-1.5", badgeColor)}>
+                            <div className={cn("w-1 h-1 rounded-full animate-pulse", dotColor)} />
+                            <span className="text-[9px] font-bold uppercase tracking-widest">{avgScore >= 80 ? 'Mastery' : avgScore >= 50 ? 'Steady Progress' : 'Keep Learning'}</span>
+                          </div>
+                        </div>
                       </div>
-                    ))}
+
+                      {/* Attractive Character Illustration */}
+                      <div className="flex-shrink-0 -mr-2">
+                        <img
+                          src={masteryImg}
+                          alt="Achievement"
+                          className="w-32 h-32 object-contain animate-in fade-in zoom-in duration-700 delay-200"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  {/* List */}
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between px-1">
-                      <h3 className="text-[11px] font-medium text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                        <HistoryIcon className="w-3.5 h-3.5" />
-                        Detailed Attempt Log
+                  {/* Attempt Log */}
+                  <div className="space-y-3.5">
+                    <div className="flex items-center justify-between px-1.5">
+                      <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Detailed Log
                       </h3>
-                      <span className="text-[11px] text-gray-400 font-medium bg-gray-100 px-2 py-0.5 rounded-full">
-                        {assessmentHistory.attempts.length} Entries
-                      </span>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-2.5">
                       {assessmentHistory.attempts.map((attempt: any) => (
                         <div
-                          key={attempt.attempt_id}
-                          onClick={() => {
-                            if (attempt.questions) {
-                              const letterToIdx = { "A": 0, "B": 1, "C": 2, "D": 3 };
-                              const ans = attempt.questions.map((q: any) => letterToIdx[q.selected_option as keyof typeof letterToIdx] ?? null);
-                              const ques = attempt.questions.map((q: any) => ({
-                                ...q,
-                                difficulty: q.difficulty || attempt.difficulty
-                              }));
-                              setViewHistoryAnswers(ans);
-                              setResultsQuestions(ques);
-                              setViewHistoryTimeTaken(attempt.time_taken_seconds);
-                              setIsAssessmentSubmitted(true);
-                              setShowResultsOnly(true);
-                              setIsAssessmentStarted(true);
-                              setIsAnalyticsModalOpen(false);
-                            }
-                          }}
-                          className="bg-white border border-gray-100 p-6 rounded-[24px] flex items-center justify-between hover:border-gray-200 hover:shadow-lg hover:shadow-gray-100/50 transition-all duration-300 group cursor-pointer"
+                          key={attempt.id || attempt.attempt_id}
+                          className="bg-white/70 backdrop-blur-sm border border-slate-100 p-4 rounded-[16px] flex items-center justify-between transition-all duration-300"
                         >
-                          <div className="flex items-center gap-5">
-                            <div className="w-14 h-14 rounded-[20px] bg-gray-50 flex flex-col items-center justify-center transition-colors group-hover:bg-blue-50">
-                              <span className="text-[10px] uppercase font-medium text-gray-400 group-hover:text-blue-400">Att</span>
-                              <span className="text-lg font-medium text-gray-700 group-hover:text-blue-600 leading-none">#{attempt.attempt_no}</span>
+                          <div className="flex items-center gap-3.5">
+                            <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center">
+                              <span className="text-sm font-bold text-slate-700">#{attempt.attempt_no}</span>
                             </div>
                             <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="font-medium text-gray-900">Assessment</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-[13px] font-semibold text-slate-900">
+                                  {new Date(attempt.submitted_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                </p>
                                 <span className={cn(
-                                  "text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider",
-                                  attempt.difficulty === 'hard' ? "bg-red-50 text-red-600" : attempt.difficulty === 'medium' ? "bg-orange-50 text-orange-600" : "bg-green-50 text-green-600"
+                                  "text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase border",
+                                  attempt.difficulty === 'hard' ? "bg-red-50 text-red-600 border-red-100" : attempt.difficulty === 'medium' ? "bg-orange-50 text-orange-600 border-orange-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
                                 )}>
                                   {attempt.difficulty}
                                 </span>
                               </div>
-                              <p className="text-xs text-gray-400 font-medium">Completed on {new Date(attempt.submitted_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                              <p className="text-[9px] text-slate-400 font-normal mt-0.5">
+                                {attempt.correct_answers}/{attempt.total_questions} Questions
+                              </p>
                             </div>
                           </div>
+
                           <div className="text-right">
-                            <div className="flex items-baseline justify-end gap-1">
-                              <p className={cn(
-                                "text-3xl font-medium",
-                                attempt.score_percentage >= 80 ? "text-green-600" : attempt.score_percentage >= 50 ? "text-blue-600" : "text-red-500"
-                              )}>{attempt.score_percentage}%</p>
-                            </div>
-                            <div className="flex items-center justify-end gap-1.5 mt-1">
-                              <div className="flex h-1.5 w-24 bg-gray-100 rounded-full overflow-hidden">
-                                <div
-                                  className={cn(
-                                    "h-full rounded-full transition-all duration-500",
-                                    attempt.score_percentage >= 80 ? "bg-green-500" : attempt.score_percentage >= 50 ? "bg-blue-500" : "bg-red-500"
-                                  )}
-                                  style={{ width: `${attempt.score_percentage}%` }}
-                                />
-                              </div>
-                              <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">
-                                {attempt.correct_answers}/{attempt.total_questions}
-                              </span>
-                            </div>
+                            <p className={cn(
+                              "text-xl font-bold",
+                              attempt.score_percentage >= 80 ? "text-emerald-500" : attempt.score_percentage >= 50 ? "text-slate-700" : "text-red-400"
+                            )}>{attempt.score_percentage}%</p>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>

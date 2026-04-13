@@ -79,7 +79,7 @@ const Index = () => {
     queryKey: ['roadmap', user?.id, currentContext?.plan_id],
     queryFn: () => studyService.getUserRoadmap(user!.id, currentContext?.plan_id),
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 
   const { data: topicTimings } = useQuery({
@@ -104,7 +104,7 @@ const Index = () => {
     queryKey: ['dashboard', user?.id, currentContext?.plan_id],
     queryFn: () => studyService.getDashboardData(user!.id, currentContext?.plan_id),
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
@@ -275,10 +275,10 @@ const Index = () => {
 
     // Respect the current context's plan_id if set, else prefer OVERALL plan
     const currentActivePlanId = currentContext?.plan_id;
-    const currentPlan = roadmapData.plan.find(p => p.plan_id === currentActivePlanId) 
-                      || roadmapData.plan.find(p => p.plan_type === 'OVERALL') 
-                      || roadmapData.plan[0];
-                      
+    const currentPlan = roadmapData.plan.find(p => p.plan_id === currentActivePlanId)
+      || roadmapData.plan.find(p => p.plan_type === 'OVERALL')
+      || roadmapData.plan[0];
+
     const relevantDays = currentPlan?.days || [];
 
     const mappedResult = mapRoadmapToFrontend(
@@ -290,7 +290,7 @@ const Index = () => {
       user?.id,
       currentActivePlanId
     );
-    
+
     const dayTopics = mappedResult[currentProgressDay] || [];
 
     return dayTopics.map((item) => {
@@ -615,8 +615,8 @@ const Index = () => {
           >
             {(isLoadingRoadmap) ? (
               <div className="w-full bg-card rounded-2xl p-8 border border-border flex flex-col items-center justify-center text-center space-y-4">
-                 <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                 <p className="text-sm text-muted-foreground">Refreshing your plan...</p>
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                <p className="text-sm text-muted-foreground">Refreshing your plan...</p>
               </div>
             ) : !roadmapData?.plan || roadmapData.plan.length === 0 ? (
               <motion.div
@@ -723,7 +723,7 @@ const Index = () => {
                       >
                         {topic.status === 'completed' ? (
                           <div className="w-3 h-3 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           </div>
                         ) : (
                           <span className="w-1 h-1 bg-foreground/40 rounded-full flex-shrink-0" />
@@ -746,7 +746,7 @@ const Index = () => {
                     onMouseEnter={() => {
                       if (user?.id) prefetchAllUserData(queryClient, user);
                     }}
-                    className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-xl font-medium h-10 mt-auto text-sm"
+                    className="w-full bg-gradient-to-b from-[#3B5AA4] to-[#183066] hover:opacity-90 text-white shadow-lg  rounded-xl font-medium h-10 mt-auto text-sm"
                   >
                     {item.buttonLabel}
                   </Button>

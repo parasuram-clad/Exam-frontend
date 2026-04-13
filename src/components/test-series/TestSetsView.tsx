@@ -215,7 +215,8 @@ export const TestSetsView = ({ testSets }: TestSetsViewProps) => {
                                 "w-full h-10 rounded-[10px] text-sm font-medium border-0 transition-all active:scale-[0.98] mt-auto relative z-20",
                                 set.status === "LOCKED"
                                     ? "bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100"
-                                    : "bg-[#0F172A] text-white hover:bg-[#1E293B]"
+                                    : "bg-gradient-to-b from-[#3B5AA4] to-[#183066] hover:opacity-90 text-white shadow-lg "
+
                             )}
                             disabled={set.status === "LOCKED"}
                             onClick={(e) => {
@@ -231,7 +232,8 @@ export const TestSetsView = ({ testSets }: TestSetsViewProps) => {
                         </Button>
                     )}
                 </div>
-            ))}
+            ))
+            }
 
             <AnimatePresence>
                 {selectedSet && (
@@ -243,6 +245,6 @@ export const TestSetsView = ({ testSets }: TestSetsViewProps) => {
                     />
                 )}
             </AnimatePresence>
-        </div>
+        </div >
     );
 };

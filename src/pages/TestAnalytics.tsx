@@ -25,6 +25,8 @@ import { LeaderboardWidget, type LeaderboardEntry } from "@/components/dashboard
 import pic from "@/assets/pic.png";
 import trophyHero from "@/assets/results/trophy-hero.png";
 import trophyRank from "@/assets/results/trophy-rank.png";
+import scoreMedium from "@/assets/results/score-medium.png";
+import scoreLow from "@/assets/results/score-low.png";
 import scienceIcon from "@/assets/results/science-icon.png";
 import geographyIcon from "@/assets/results/geography-icon.png";
 import historyIcon from "@/assets/results/history-icon.png";
@@ -377,10 +379,14 @@ const TestAnalytics = () => {
                                 {/* Right: Illustration & Score */}
                                 <div className="flex flex-col items-center text-center px-4 md:px-0">
                                     <div className="relative mb-6 sm:mb-8 transform hover:scale-105 transition-transform duration-500">
+                                        <div className={cn(
+                                            "absolute inset-0 rounded-full blur-[60px] opacity-20",
+                                            data.accuracy >= 80 ? "bg-emerald-400" : data.accuracy >= 50 ? "bg-blue-400" : "bg-orange-400"
+                                        )} />
                                         <img
-                                            src={trophyHero}
+                                            src={data.accuracy >= 80 ? trophyHero : data.accuracy >= 50 ? scoreMedium : scoreLow}
                                             alt="Achievement"
-                                            className="w-40 h-40 sm:w-56 sm:h-56 object-contain drop-shadow-xl"
+                                            className="w-40 h-40 sm:w-56 sm:h-56 object-contain drop-shadow-xl relative z-10 animate-float"
                                         />
                                     </div>
                                     <div className="space-y-2">
