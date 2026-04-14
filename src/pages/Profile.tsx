@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout";
-import {  AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,11 +48,11 @@ import {
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import studyService, { ExamFormOptionsResponse } from "@/services/study.service";
-import { 
-  ProfileHeader, 
-  PersonalDetailsTab, 
-  NotificationsTab, 
-  MyPlanTab 
+import {
+  ProfileHeader,
+  PersonalDetailsTab,
+  NotificationsTab,
+  MyPlanTab
 } from "@/components/dashboard/profile";
 import { BASE_URL } from "@/config/env";
 

@@ -57,37 +57,23 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
-const WrappedTick = (props: any) => {
+const CustomTick = (props: any) => {
   const { x, y, payload } = props;
-  const text = payload.value;
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let currentLine = "";
-
-  words.forEach((word: string) => {
-    if ((currentLine + word).length > 15) {
-      lines.push(currentLine.trim());
-      currentLine = word + " ";
-    } else {
-      currentLine += word + " ";
-    }
-  });
-  lines.push(currentLine.trim());
-
+  const text = payload.value.length > 15 ? payload.value.substring(0, 12) + "..." : payload.value;
+  
   return (
     <g transform={`translate(${x},${y})`}>
-      {lines.map((line, i) => (
-        <text
-          key={i}
-          x={0}
-          y={12 + i * 14}
-          textAnchor="middle"
-          fill="#6b7280"
-          className="text-[11px] font-medium"
-        >
-          {line}
-        </text>
-      ))}
+      <text
+        x={0}
+        y={0}
+        dy={16}
+        textAnchor="end"
+        fill="#6b7280"
+        transform="rotate(-35)"
+        className="text-[10px] font-semibold"
+      >
+        {text}
+      </text>
     </g>
   );
 };
@@ -540,9 +526,9 @@ const MyProgress = () => {
                           dataKey="name"
                           axisLine={false}
                           tickLine={false}
-                          tick={<WrappedTick />}
+                          tick={<CustomTick />}
                           interval={0}
-                          height={80}
+                          height={85}
                         />
                         <YAxis
                           axisLine={false}

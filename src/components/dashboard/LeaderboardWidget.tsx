@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Trophy, ChevronDown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,8 @@ export interface LeaderboardEntry {
 
 interface LeaderboardWidgetProps {
   data?: LeaderboardEntry[];
+  weeklyData?: LeaderboardEntry[];
+  overallData?: LeaderboardEntry[];
 }
 
 const defaultLeaderboardData: LeaderboardEntry[] = [];
@@ -85,13 +88,58 @@ const RankMedal = ({ rank, isModal = false }: { rank: number; isModal?: boolean 
   );
 };
 
-export function LeaderboardWidget({ data = defaultLeaderboardData }: LeaderboardWidgetProps) {
-  if (data.length === 0) {
+export function LeaderboardWidget({
+  data,
+  weeklyData,
+  overallData
+}: LeaderboardWidgetProps) {
+  const [activeTab, setActiveTab] = useState<"weekly" | "overall">("weekly");
+
+  const [showAllModal, setShowAllModal] = useState(false);
+
+  // Decide which data to show in Widget (Top 3 + User)
+  const hasTabs = !!weeklyData && !!overallData;
+  const currentData = hasTabs
+    ? (activeTab === "weekly" ? weeklyData : overallData) || defaultLeaderboardData
+    : (data || weeklyData || overallData || defaultLeaderboardData);
+
+  // Process data for Modal (Top 10 + User logic if not showing all)
+  const getModalDisplayData = () => {
+    if (showAllModal) return currentData;
+    
+    const top10 = currentData.slice(0, 10);
+    const userInTop10 = top10.some(e => e.isYou);
+    const userEntry = currentData.find(e => e.isYou);
+    
+    if (!userInTop10 && userEntry) {
+      return [...top10, { ...userEntry, hasGap: true }];
+    }
+    return top10;
+  };
+
+  const modalDisplayData = getModalDisplayData();
+
+  if (currentData.length === 0) {
     return (
       <div className="bg-card rounded-xl p-5 border border-border shadow-sm animate-fade-in w-full flex flex-col items-center justify-center py-10 gap-4">
+        {hasTabs && (
+          <div className="absolute top-5 left-5 right-5 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground">Leaderboard</h3>
+            <div className="bg-muted/50 p-0.5 rounded-lg flex gap-0.5">
+              <button
+                onClick={() => setActiveTab("weekly")}
+                className={cn("px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all", activeTab === "weekly" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground")}
+              >Weekly</button>
+              <button
+                onClick={() => setActiveTab("overall")}
+                className={cn("px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all", activeTab === "overall" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground")}
+              >Overall</button>
+            </div>
+          </div>
+        )}
         <Trophy className="w-12 h-12 text-amber-500/20" />
         <div className="text-center">
-          <h3 className="text-base font-semibold text-foreground">Leaderboard</h3>
+          <h3 className="text-base font-semibold text-foreground">No Rankings Yet</h3>
           <p className="text-xs text-muted-foreground mt-1 text-balance">The competition is heating up! Join a test to see rankings.</p>
         </div>
       </div>
@@ -100,10 +148,33 @@ export function LeaderboardWidget({ data = defaultLeaderboardData }: Leaderboard
 
   return (
     <div className="bg-card rounded-xl p-5 border border-border shadow-sm animate-fade-in w-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-foreground">Leaderboard</h3>
-        <Trophy className="w-5 h-5 text-amber-500" />
+      {/* Header with Tabs Toggle if available */}
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="text-sm font-semibold text-foreground">Leaderboard</h3>
+        {hasTabs ? (
+          <div className="bg-muted p-0.5 rounded-lg flex gap-0.5">
+            <button
+              onClick={() => setActiveTab("weekly")}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[10px] font-bold transition-all",
+                activeTab === "weekly"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >Weekly</button>
+            <button
+              onClick={() => setActiveTab("overall")}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[10px] font-bold transition-all",
+                activeTab === "overall"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >Overall</button>
+          </div>
+        ) : (
+          <Trophy className="w-4 h-4 text-amber-500" />
+        )}
       </div>
 
       {/* Table grid layout - Optimized for space */}
@@ -116,11 +187,11 @@ export function LeaderboardWidget({ data = defaultLeaderboardData }: Leaderboard
           <div className="pb-3 text-right">Acc.</div>
         </div>
 
-        {/* Entries (Top 5) */}
+        {/* Entries (Top 3) */}
         <div className="col-span-4 space-y-2.5">
-          {data.slice(0, 3).map((entry) => (
+          {currentData.slice(0, 3).map((entry) => (
             <Link
-              key={entry.rank}
+              key={`${activeTab}-${entry.rank}-${entry.name}`}
               to="/profile"
               className={cn(
                 "grid grid-cols-[1.4rem_1fr_2.4rem_3.2rem] items-center rounded-xl p-2 transition-all gap-2 cursor-pointer ",
@@ -166,8 +237,8 @@ export function LeaderboardWidget({ data = defaultLeaderboardData }: Leaderboard
 
           {/* User's rank if not in top 3 */}
           {(() => {
-            const userInTop3 = data.slice(0, 3).some(e => e.isYou);
-            const userEntry = data.find(e => e.isYou);
+            const userInTop3 = currentData.slice(0, 3).some(e => e.isYou);
+            const userEntry = currentData.find(e => e.isYou);
 
             if (!userInTop3 && userEntry) {
               return (
@@ -213,7 +284,7 @@ export function LeaderboardWidget({ data = defaultLeaderboardData }: Leaderboard
       </div>
 
       {/* View Full Rankings Trigger */}
-      <Dialog>
+      <Dialog onOpenChange={(open) => { if (!open) setShowAllModal(false); }}>
         <DialogTrigger asChild>
           <Button
             variant="outline"
@@ -225,20 +296,44 @@ export function LeaderboardWidget({ data = defaultLeaderboardData }: Leaderboard
         <DialogContent className="max-w-2xl w-[80vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
           <div className="bg-white p-6  relative">
             <DialogHeader className="mb-0">
-              <DialogTitle className="text-2xl font-semibold text-[#1e293b] mb-4">Scores & Ranks</DialogTitle>
+              <div className="flex items-center justify-between mb-4">
+                <DialogTitle className="text-2xl font-semibold text-[#1e293b]">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Rankings</DialogTitle>
+                {hasTabs && (
+                  <div className="bg-muted p-1 rounded-xl flex gap-1 mr-8">
+                    <button
+                      onClick={() => { setActiveTab("weekly"); setShowAllModal(false); }}
+                      className={cn(
+                        "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                        activeTab === "weekly"
+                          ? "bg-white text-primary shadow-md"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >Weekly</button>
+                    <button
+                      onClick={() => { setActiveTab("overall"); setShowAllModal(false); }}
+                      className={cn(
+                        "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                        activeTab === "overall"
+                          ? "bg-white text-primary shadow-md"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >Overall</button>
+                  </div>
+                )}
+              </div>
             </DialogHeader>
 
-            {/* Illustration */}
+            {/* Illustration - Hidden when scrolled or on small modals if height is concern, but kept for visual style */}
             <div className="flex justify-center mb-6 pt-2">
               <img
                 src={boardImg}
                 alt="Scores and Ranks Illustration"
-                className="w-full max-w-[240px] h-auto object-contain"
+                className="w-full max-w-[200px] h-auto object-contain"
               />
             </div>
 
             {/* Full Leaderboard Table */}
-            <div className="space-y-4 px-4">
+            <div className="space-y-2 px-4">
               {/* Table Header */}
               <div className="grid grid-cols-[60px_1fr_80px_100px] gap-4 px-4 text-sm font-semibold text-[#1e293b]">
                 <div className="text-left">Rank</div>
@@ -248,48 +343,69 @@ export function LeaderboardWidget({ data = defaultLeaderboardData }: Leaderboard
               </div>
 
               {/* Rows - Scrollable Area */}
-              <div className="max-h-[300px] overflow-y-auto pr-2 space-y-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-                {data.map((entry) => (
-                  <div
-                    key={entry.rank}
-                    className={cn(
-                      "grid grid-cols-[60px_1fr_80px_100px] items-center gap-4 p-3 rounded-xl transition-all",
-                      entry.isYou
-                        ? "bg-[#eff6ff] border border-blue-200"
-                        : "bg-[#f8fafc]"
+              <div className="max-h-[350px] overflow-y-auto pr-2 space-y-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                {modalDisplayData.map((entry: any) => (
+                  <div key={`${activeTab}-modal-${entry.rank}-${entry.name}`} className="contents">
+                    {entry.hasGap && (
+                      <div className="flex justify-center py-2 opacity-30">
+                        <div className="h-1.5 w-1.5 rounded-full bg-slate-400 mx-1" />
+                        <div className="h-1.5 w-1.5 rounded-full bg-slate-400 mx-1" />
+                        <div className="h-1.5 w-1.5 rounded-full bg-slate-400 mx-1" />
+                      </div>
                     )}
-                  >
-                    <div className="flex justify-start">
-                      <RankMedal rank={entry.rank} isModal />
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-8 h-8 flex-shrink-0">
-                        <AvatarImage src={entry.avatar} />
-                        <AvatarFallback className={cn(
-                          "text-xs font-semibold text-white",
-                          entry.color || "bg-slate-500"
-                        )}>
-                          {entry.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-medium text-[#1e293b] truncate">
-                        {entry.name}
-                      </span>
-                    </div>
-                    <div className="text-right text-sm font-medium text-slate-400">
-                      {entry.marks}
-                    </div>
-                    <div className="text-right text-sm font-bold text-[#1e293b]">
-                      {entry.accuracy}
+                    <div
+                      className={cn(
+                        "grid grid-cols-[60px_1fr_80px_100px] items-center gap-4 p-3 rounded-xl transition-all",
+                        entry.isYou
+                          ? "bg-[#eff6ff] border border-blue-200"
+                          : "bg-[#f8fafc]"
+                      )}
+                    >
+                      <div className="flex justify-start">
+                        <RankMedal rank={entry.rank} isModal />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-8 h-8 flex-shrink-0">
+                          <AvatarImage src={entry.avatar} />
+                          <AvatarFallback className={cn(
+                            "text-xs font-semibold text-white",
+                            entry.color || "bg-slate-500"
+                          )}>
+                            {entry.initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium text-[#1e293b] truncate">
+                          {entry.name}
+                        </span>
+                      </div>
+                      <div className="text-right text-sm font-medium text-slate-400">
+                        {entry.marks}
+                      </div>
+                      <div className="text-right text-sm font-bold text-[#1e293b]">
+                        {entry.accuracy}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Bottom Chevron */}
-              <div className="flex justify-center pt-2">
-                <ChevronDown className="w-6 h-6 text-slate-300 animate-bounce" />
-              </div>
+              {/* Show All Logic */}
+              {!showAllModal && currentData.length > 10 ? (
+                <div className="flex flex-col items-center mt-4">
+                  <Button 
+                    variant="ghost" 
+                    className="text-primary font-bold hover:bg-primary/5 h-8"
+                    onClick={() => setShowAllModal(true)}
+                  >
+                    Show All Rankings
+                  </Button>
+                  <ChevronDown className="w-5 h-5 text-slate-300 animate-bounce mt-1" />
+                </div>
+              ) : (
+                <div className="flex justify-center p-2">
+                  <ChevronDown className="w-6 h-6 text-slate-300 opacity-20" />
+                </div>
+              )}
             </div>
           </div>
         </DialogContent>

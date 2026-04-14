@@ -786,11 +786,13 @@ const StudyContent = () => {
     if (!user?.id || !parsedSubtopicId || isNaN(parsedSubtopicId)) return;
 
     try {
+      const currentAttemptNo = (assessmentHistory?.attempts?.length || 0) + 1;
       const response = await studyService.startMCQAttempt({
         syllabus_id: parsedSubtopicId,
         difficulty: "easy",
         plan_id: currentSubscriptionPlanId,
-        plan_row_id: currentPlanRowId
+        plan_row_id: currentPlanRowId,
+        attempt_no: currentAttemptNo
       });
 
       if (response && response.questions) {

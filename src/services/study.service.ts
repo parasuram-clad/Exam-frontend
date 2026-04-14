@@ -21,10 +21,10 @@ export interface RoadmapDayItem {
     subject?: string;
     part?: string;
     image_url?: string;
-    topic?: { 
-        id: number; 
-        name: string; 
-        minutes: number; 
+    topic?: {
+        id: number;
+        name: string;
+        minutes: number;
         description: string;
         plan_status?: string;
         plan_row_id?: number;
@@ -85,7 +85,6 @@ export interface StudyPlanGenerateRequest {
     exam_type: string;
     sub_division: string;
     year: number;
-    learner_type: string;
     daily_study_hours: number;
     language?: 'English' | 'Tamil' | 'Hindi';
 }
@@ -285,7 +284,6 @@ const studyService = {
         subject: string;
         sub_division: string;
         topic: string;
-        learner_type: boolean;
         language?: string;
     }): Promise<any> => {
         const response = await apiClient.get('/study/topic', { params });
@@ -369,7 +367,7 @@ const studyService = {
     /**
      * Start an MCQ attempt (fetch questions)
      */
-    startMCQAttempt: async (payload: { syllabus_id: number; difficulty?: string; plan_id?: number; plan_row_id?: number }) => {
+    startMCQAttempt: async (payload: { syllabus_id: number; difficulty?: string; plan_id?: number; plan_row_id?: number; attempt_no?: number }) => {
         const response = await apiClient.post('/mcq/start', payload);
         return response.data;
     },
@@ -392,12 +390,7 @@ const studyService = {
         return response.data;
     },
 
-    getAssessmentHistory: async (userId: number, syllabusId: number, planId?: number, planRowId?: number) => {
-        const response = await apiClient.get('/mcq/history', {
-            params: { user_id: userId, syllabus_id: syllabusId, plan_id: planId, plan_row_id: planRowId }
-        });
-        return response.data;
-    },
+
 
     // ================================================================
     // WEEKLY TEST (OVERALL PLAN)

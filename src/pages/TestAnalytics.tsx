@@ -127,8 +127,8 @@ const TestAnalytics = () => {
     });
 
     const { data: dashboardData, refetch: refetchDashboard } = useQuery({
-        queryKey: ['dashboard-data', user?.id],
-        queryFn: () => studyService.getDashboardData(user!.id),
+        queryKey: ['dashboard-data', user?.id, planId],
+        queryFn: () => studyService.getDashboardData(user!.id, planId || undefined),
         enabled: !!user?.id,
     });
 
@@ -142,7 +142,19 @@ const TestAnalytics = () => {
         return () => window.removeEventListener('focus', handleFocus);
     }, [refetch, refetchDashboard]);
 
+    // Helper to map backend leaderboard entries
+    const mapLeaderboard = (lb: any) => lb?.leaderboard?.map((l: any) => ({
+        rank: l.rank,
+        name: l.name,
+        initials: l.initials || l.name.split(' ').map((n: any) => n[0]).join('').substring(0, 2).toUpperCase(),
+        marks: l.total_marks || l.score,
+        accuracy: `${l.accuracy}%`,
+        isYou: l.is_current_user || l.is_you,
+        color: (l.is_current_user || l.is_you) ? "bg-slate-500" : (l.rank === 1 ? "bg-amber-500" : "bg-blue-600")
+    })) || [];
+
     // Map backend data to frontend format
+    const leaderboards = dashboardData?.leaderboards;
     const data = resultData ? {
         correct: resultData.correct_answers || 0,
         incorrect: resultData.wrong_answers || 0,
@@ -185,26 +197,12 @@ const TestAnalytics = () => {
                 topics: allTopics
             };
         }) || [],
-        leaderboard: resultData.leaderboard?.map((l: any) => ({
-            rank: l.rank,
-            name: l.name,
-            initials: l.name.split(' ').map((n: any) => n[0]).join('').substring(0, 2),
-            color: l.is_you ? "bg-gray-400" : "bg-blue-500",
-            marks: l.score,
-            accuracy: `${l.accuracy}%`,
-            isYou: l.is_you
-        })) || [],
-        yourRank: dashboardData?.leaderboard?.your_rank || resultData.your_rank || 0,
+        leaderboard: mapLeaderboard(resultData), // Test specific leaderboard
+        yourRank: leaderboards?.weekly?.your_rank || leaderboards?.overall?.your_rank || dashboardData?.daily_performance?.current_rank || resultData.your_rank || 0,
         questions: resultData.questions || [],
-        headerLeaderboard: dashboardData?.leaderboard?.leaderboard?.map((l: any) => ({
-            rank: l.rank,
-            name: l.name,
-            initials: l.initials || l.name.split(' ').map((n: any) => n[0]).join('').substring(0, 2).toUpperCase(),
-            marks: l.total_marks,
-            accuracy: `${l.accuracy}%`,
-            isYou: l.is_current_user || l.is_you,
-            color: (l.is_current_user || l.is_you) ? "bg-slate-500" : (l.rank === 1 ? "bg-amber-500" : "bg-blue-600")
-        })) || []
+        weeklyData: mapLeaderboard(leaderboards?.weekly),
+        overallData: mapLeaderboard(leaderboards?.overall),
+        headerLeaderboard: mapLeaderboard(dashboardData?.leaderboard) // legacy fallback
     } : null;
 
     const [expandedUnit, setExpandedUnit] = useState<string | null>(null);
@@ -283,7 +281,11 @@ const TestAnalytics = () => {
                     </div>
 
                     {/* Leaderboard */}
-                    <LeaderboardWidget data={data.headerLeaderboard} />
+                    <LeaderboardWidget 
+                        weeklyData={data.weeklyData} 
+                        overallData={data.overallData}
+                        data={data.headerLeaderboard} 
+                    />
                 </div>
             }
         >

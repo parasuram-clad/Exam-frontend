@@ -98,7 +98,9 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
     const streakCount = dashboardData?.streak?.current_streak || 0;
 
     // Map backend leaderboard to LeaderboardEntry format
-    const leaderboardData = dashboardData?.leaderboard?.leaderboard?.map((l: any) => ({
+    const leaderboards = dashboardData?.leaderboards;
+    
+    const mapLeaderboard = (lb: any) => lb?.leaderboard?.map((l: any) => ({
         rank: l.rank,
         name: l.name,
         initials: l.initials,
@@ -107,6 +109,10 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
         isYou: l.is_current_user,
         color: l.is_current_user ? "bg-slate-500" : (l.rank === 1 ? "bg-amber-500" : "bg-blue-600")
     })) || [];
+
+    const weeklyData = mapLeaderboard(leaderboards?.weekly);
+    const overallData = mapLeaderboard(leaderboards?.overall);
+    const legacyData = mapLeaderboard(dashboardData?.leaderboard);
 
     return (
         <div className="space-y-8">
@@ -173,7 +179,11 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
             )}
 
             {features?.leaderboard && showLeaderboard && (
-                <LeaderboardWidget data={leaderboardData} />
+                <LeaderboardWidget 
+                    weeklyData={weeklyData} 
+                    overallData={overallData}
+                    data={legacyData}
+                />
             )}
         </div>
     );

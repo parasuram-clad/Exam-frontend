@@ -36,7 +36,6 @@ interface StudySetupModalProps {
     medium: string;
     examType: string;
     subDivision: string[];
-    learnerType: string;
     studyGoal: string;
     targetYear: string;
   };
@@ -230,29 +229,6 @@ export const StudySetupModal = ({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Learner Type</Label>
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
-                  <Zap className="w-4 h-4 text-muted-foreground/50 group-hover:text-accent transition-colors" />
-                </div>
-                <Select
-                  value={setupData.learnerType}
-                  onValueChange={(value) => setSetupData({ ...setupData, learnerType: value })}
-                >
-                  <SelectTrigger className="w-full bg-muted/30 border-none h-12 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-accent/20 font-medium transition-all hover:bg-muted/50 focus:bg-background text-foreground/80 shadow-none">
-                    <SelectValue placeholder="Select Learner Type" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-border/50 p-2">
-                    <SelectItem value="Student" className="rounded-lg focus:bg-accent/10">Student</SelectItem>
-                    <SelectItem value="Working Professional" className="rounded-lg focus:bg-accent/10">Working Professional</SelectItem>
-                    <SelectItem value="Fresher" className="rounded-lg focus:bg-accent/10">Fresher</SelectItem>
-                    <SelectItem value="Experienced" className="rounded-lg focus:bg-accent/10">Experienced</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2 md:col-span-1">
               <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Daily Study Goal</Label>
               <div className="relative group">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
@@ -273,6 +249,8 @@ export const StudySetupModal = ({
                 </Select>
               </div>
             </div>
+
+
           </div>
 
           <div className="relative z-10 flex justify-center pb-2">

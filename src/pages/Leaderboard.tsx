@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import studyService from "@/services/study.service";
+import { useState } from "react";
 
 interface LeaderboardEntry {
   rank: number;
@@ -27,14 +28,16 @@ const Leaderboard = () => {
     enabled: !!user?.id && !!currentContext?.plan_id,
   });
 
-  const lb = dashboardData?.leaderboard;
+  const [activeTab, setActiveTab] = useState<"weekly" | "overall">("weekly");
+  const leaderboards = dashboardData?.leaderboards;
+  const lb = leaderboards?.[activeTab] || leaderboards?.overall || dashboardData?.leaderboard;
   const fullLeaderboard: any[] = lb?.leaderboard || [];
   
   const leaderboardData: LeaderboardEntry[] = fullLeaderboard.map((entry: any) => ({
     rank: entry.rank,
-    name: entry.name,
+    name: entry.name || entry.full_name || "Student",
     avatar: entry.avatar_url,
-    initials: entry.initials || entry.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase(),
+    initials: entry.initials || (entry.name || "S").split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase(),
     marks: Math.round(entry.total_marks || entry.score || 0),
     accuracy: `${Math.round(entry.accuracy || 0)}%`,
     testsCompleted: entry.tests_completed || 0,
@@ -67,6 +70,34 @@ const Leaderboard = () => {
 
   return (
     <DashboardLayout>
+      {/* Header and Filter */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Top Students</h1>
+          <p className="text-sm text-muted-foreground">{lb?.exam_type || "Competitive"} Leaderboard</p>
+        </div>
+        <div className="flex bg-muted p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setActiveTab("weekly")}
+            className={cn(
+              "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+              activeTab === "weekly" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Weekly
+          </button>
+          <button
+            onClick={() => setActiveTab("overall")}
+            className={cn(
+              "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+              activeTab === "overall" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Overall
+          </button>
+        </div>
+      </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-card rounded-xl p-4 border border-border">
@@ -123,7 +154,7 @@ const Leaderboard = () => {
           <div className="absolute bottom-[-20%] right-[-10%] w-[30%] h-[30%] bg-accent/10 rounded-full blur-[80px] opacity-30" />
         </div>
 
-        {leaderboardData.length >= 3 ? (
+        {leaderboardData.length > 0 ? (
           <div className="relative z-10 w-full">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -132,70 +163,82 @@ const Leaderboard = () => {
               </div>
               <div className="bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-accent/30 flex items-center gap-1.5 shadow-sm">
                 <Star className="w-3.5 h-3.5 text-accent fill-accent" />
-                <span className="text-slate-800 font-medium text-[10px] md:text-xs">Current Week</span>
+                <span className="text-slate-800 font-medium text-[10px] md:text-xs">
+                  {activeTab === "weekly" ? (lb?.week_range || "Current Week") : "All Time"}
+                </span>
               </div>
             </div>
 
             <div className="flex justify-center items-end gap-1 md:gap-8 pt-6">
               {/* 2nd Place */}
-              <div className="flex flex-col items-center group">
-                <div className="relative mb-2 shrink-0">
-                  <Avatar className="w-12 h-12 md:w-20 md:h-20 border-2 md:border-4 border-white shadow-md relative">
-                    <AvatarFallback className="bg-slate-100 text-slate-600 text-sm md:text-xl font-medium">
-                      {leaderboardData[1].initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -top-2 -right-1 bg-slate-400 text-white w-5 h-5 md:w-7 md:h-7 rounded-full flex items-center justify-center font-medium text-[10px] md:text-xs border-2 border-white shadow-sm">
-                    2
+              {leaderboardData.length >= 2 ? (
+                <div className="flex flex-col items-center group">
+                  <div className="relative mb-2 shrink-0">
+                    <Avatar className="w-12 h-12 md:w-20 md:h-20 border-2 md:border-4 border-white shadow-md relative">
+                      <AvatarFallback className="bg-slate-100 text-slate-600 text-sm md:text-xl font-medium">
+                        {leaderboardData[1].initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute -top-2 -right-1 bg-slate-400 text-white w-5 h-5 md:w-7 md:h-7 rounded-full flex items-center justify-center font-medium text-[10px] md:text-xs border-2 border-white shadow-sm">
+                      2
+                    </div>
+                  </div>
+                  <div className="bg-white/70 backdrop-blur-sm rounded-t-xl w-20 md:w-28 h-14 md:h-20 flex flex-col items-center justify-end pb-2 border-x border-t border-white/80 shadow-sm">
+                    <p className="text-[10px] md:text-xs font-medium text-slate-800 text-center px-1 truncate w-full">{leaderboardData[1].name.split(' ')[0]}</p>
+                    <p className="text-[9px] md:text-[10px] text-slate-500 font-medium">{leaderboardData[1].marks} pts</p>
                   </div>
                 </div>
-                <div className="bg-white/70 backdrop-blur-sm rounded-t-xl w-20 md:w-28 h-14 md:h-20 flex flex-col items-center justify-end pb-2 border-x border-t border-white/80 shadow-sm">
-                  <p className="text-[10px] md:text-xs font-medium text-slate-800 text-center px-1 truncate w-full">{leaderboardData[1].name.split(' ')[0]}</p>
-                  <p className="text-[9px] md:text-[10px] text-slate-500 font-medium">{leaderboardData[1].marks} pts</p>
-                </div>
-              </div>
+              ) : (
+                <div className="w-20 md:w-28" /> /* Empty space for alignment */
+              )}
 
               {/* 1st Place - The Winner */}
-              <div className="flex flex-col items-center -mt-8 group z-20">
-                <div className="relative mb-3 shrink-0">
-                  <div className="absolute -inset-4 bg-accent/30 rounded-full blur-xl opacity-60 animate-pulse" />
-                  <div className="absolute -top-6 md:-top-8 left-1/2 -translate-x-1/2">
-                    <Crown className="w-6 h-6 md:w-8 md:h-8 text-accent fill-accent drop-shadow-md" />
+              {leaderboardData.length >= 1 && (
+                <div className="flex flex-col items-center -mt-8 group z-20">
+                  <div className="relative mb-3 shrink-0">
+                    <div className="absolute -inset-4 bg-accent/30 rounded-full blur-xl opacity-60 animate-pulse" />
+                    <div className="absolute -top-6 md:-top-8 left-1/2 -translate-x-1/2">
+                      <Crown className="w-6 h-6 md:w-8 md:h-8 text-accent fill-accent drop-shadow-md" />
+                    </div>
+                    <Avatar className="w-16 h-16 md:w-28 md:h-28 border-2 md:border-4 border-white shadow-xl relative scale-110">
+                      <AvatarFallback className="bg-accent text-accent-foreground text-lg md:text-2xl font-medium">
+                        {leaderboardData[0].initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute -top-2 -right-1 bg-accent text-accent-foreground w-6 h-6 md:w-10 md:h-10 rounded-full flex items-center justify-center font-medium text-xs md:text-base border-2 md:border-4 border-white shadow-lg">
+                      1
+                    </div>
                   </div>
-                  <Avatar className="w-16 h-16 md:w-28 md:h-28 border-2 md:border-4 border-white shadow-xl relative scale-110">
-                    <AvatarFallback className="bg-accent text-accent-foreground text-lg md:text-2xl font-medium">
-                      {leaderboardData[0].initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -top-2 -right-1 bg-accent text-accent-foreground w-6 h-6 md:w-10 md:h-10 rounded-full flex items-center justify-center font-medium text-xs md:text-base border-2 md:border-4 border-white shadow-lg">
-                    1
+                  <div className="bg-white rounded-t-2xl w-24 md:w-36 h-24 md:h-32 flex flex-col items-center justify-end pb-3 border-x border-t border-accent/20 shadow-[0_-10px_30px_-10px_rgba(199,221,102,0.4)]">
+                    <p className="text-xs md:text-base font-medium text-slate-900 text-center px-1 truncate w-full mb-1">{leaderboardData[0].name.split(' ')[0]}</p>
+                    <div className="bg-accent px-2 md:px-3 py-1 rounded-full">
+                      <p className="text-[9px] md:text-[11px] text-accent-foreground font-medium tracking-tight">{leaderboardData[0].marks} PTS</p>
+                    </div>
                   </div>
                 </div>
-                <div className="bg-white rounded-t-2xl w-24 md:w-36 h-24 md:h-32 flex flex-col items-center justify-end pb-3 border-x border-t border-accent/20 shadow-[0_-10px_30px_-10px_rgba(199,221,102,0.4)]">
-                  <p className="text-xs md:text-base font-medium text-slate-900 text-center px-1 truncate w-full mb-1">{leaderboardData[0].name.split(' ')[0]}</p>
-                  <div className="bg-accent px-2 md:px-3 py-1 rounded-full">
-                    <p className="text-[9px] md:text-[11px] text-accent-foreground font-medium tracking-tight">{leaderboardData[0].marks} PTS</p>
-                  </div>
-                </div>
-              </div>
+              )}
 
               {/* 3rd Place */}
-              <div className="flex flex-col items-center group">
-                <div className="relative mb-2 shrink-0">
-                  <Avatar className="w-10 h-10 md:w-16 md:h-16 border-2 md:border-4 border-white shadow-md relative">
-                    <AvatarFallback className="bg-amber-50 text-amber-700 text-xs md:text-lg font-medium">
-                      {leaderboardData[2].initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -top-2 -right-1 bg-amber-600 text-white w-4 h-4 md:w-6 md:h-6 rounded-full flex items-center justify-center font-medium text-[8px] md:text-[10px] border-2 border-white shadow-sm">
-                    3
+              {leaderboardData.length >= 3 ? (
+                <div className="flex flex-col items-center group">
+                  <div className="relative mb-2 shrink-0">
+                    <Avatar className="w-10 h-10 md:w-16 md:h-16 border-2 md:border-4 border-white shadow-md relative">
+                      <AvatarFallback className="bg-amber-50 text-amber-700 text-xs md:text-lg font-medium">
+                        {leaderboardData[2].initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute -top-2 -right-1 bg-amber-600 text-white w-4 h-4 md:w-6 md:h-6 rounded-full flex items-center justify-center font-medium text-[8px] md:text-[10px] border-2 border-white shadow-sm">
+                      3
+                    </div>
+                  </div>
+                  <div className="bg-white/70 backdrop-blur-sm rounded-t-xl w-18 md:w-24 h-10 md:h-16 flex flex-col items-center justify-end pb-2 border-x border-t border-white/80 shadow-sm">
+                    <p className="text-[10px] md:text-xs font-medium text-slate-800 text-center px-1 truncate w-full">{leaderboardData[2].name.split(' ')[0]}</p>
+                    <p className="text-[9px] md:text-[10px] text-slate-500 font-medium">{leaderboardData[2].marks} pts</p>
                   </div>
                 </div>
-                <div className="bg-white/70 backdrop-blur-sm rounded-t-xl w-18 md:w-24 h-10 md:h-16 flex flex-col items-center justify-end pb-2 border-x border-t border-white/80 shadow-sm">
-                  <p className="text-[10px] md:text-xs font-medium text-slate-800 text-center px-1 truncate w-full">{leaderboardData[2].name.split(' ')[0]}</p>
-                  <p className="text-[9px] md:text-[10px] text-slate-500 font-medium">{leaderboardData[2].marks} pts</p>
-                </div>
-              </div>
+              ) : (
+                <div className="w-18 md:w-24" /> /* Empty space for alignment */
+              )}
             </div>
           </div>
         ) : (

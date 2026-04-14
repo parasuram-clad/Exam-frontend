@@ -111,10 +111,7 @@ export function StreakWidget({
 
       {/* Combined Status Line */}
       <div className="flex items-center justify-center mb-5">
-        <p className={cn(
-          "text-[12px] font-normal transition-all",
-          dailyTaskStatus?.is_today_completed ? "text-green-600" : "text-orange-500"
-        )}>
+        <p className="text-[12px] font-normal text-muted-foreground whitespace-nowrap">
           {statusMessage}
         </p>
       </div>

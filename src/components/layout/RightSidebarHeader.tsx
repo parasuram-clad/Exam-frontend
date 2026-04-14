@@ -121,10 +121,10 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
                     }
                 }}>
                     <PopoverTrigger asChild>
-                        <button className="relative p-2 text-muted-foreground hover:text-foreground transition-all hover:bg-muted/50 rounded-full h-10 w-10 active:scale-95">
-                            <Bell className="w-5 h-5" />
+                        <button className="relative p-1.5 text-muted-foreground hover:text-foreground transition-all hover:bg-muted/50 rounded-full h-9 w-9 active:scale-95">
+                            <Bell className="w-4.5 h-4.5" />
                             {unreadCount > 0 && (
-                                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white ring-2 ring-white animate-pulse" />
+                                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border border-white ring-1 ring-white animate-pulse" />
                             )}
                         </button>
                     </PopoverTrigger>
@@ -239,14 +239,14 @@ export function RightSidebarHeader({ user, userName, avatarUrl, initials, classN
                 <Popover>
                     <PopoverTrigger asChild>
                         <div className="relative cursor-pointer hover:opacity-90 transition-opacity">
-                            <Avatar className="h-12 w-12 ring-2 ring-primary/10 shadow-sm">
+                            <Avatar className="h-10 w-10 ring-2 ring-primary/10 shadow-sm">
                                 <AvatarImage src={avatarUrl || pic} alt={userName} />
-                                <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                                <AvatarFallback className="bg-primary/10 text-primary font-medium text-sm">
                                     {initials}
                                 </AvatarFallback>
                             </Avatar>
-                            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-amber-400 rounded-full border-2 border-white flex items-center justify-center shadow-sm">
-                                <Medal className="w-3 h-3 text-white" />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-4.5 h-4.5 bg-amber-400 rounded-full border-2 border-white flex items-center justify-center shadow-sm">
+                                <Medal className="w-2.5 h-2.5 text-white" />
                             </div>
                         </div>
                     </PopoverTrigger>
