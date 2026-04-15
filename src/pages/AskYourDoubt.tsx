@@ -11,10 +11,24 @@ import authService, { UserMe } from "@/services/auth.service";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 
+interface StructuredResponse {
+  summary?: string;
+  key_points?: string[];
+  comparison_table?: { name: string; details: string }[];
+  events?: { event: string; year: string; who?: string; where?: string; how?: string; significance?: string }[];
+  question_pattern?: string;
+  related_pyq?: { question_text: string; exam: string; source_file?: string }[];
+  exam_tip?: string;
+  related_topics?: string[];
+  keywords?: string[];
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  structured_response?: StructuredResponse;
+
   timestamp: string;
   isNew?: boolean; // New prop to track if it should animate
 }
@@ -52,12 +66,12 @@ const formatChatDate = (dateStr: string | Date) => {
   const d = typeof dateStr === 'string' && !dateStr.includes('Z') && !dateStr.includes('+')
     ? new Date(dateStr + 'Z')
     : new Date(dateStr);
-  
+
   const today = new Date();
   if (d.toLocaleDateString() === today.toLocaleDateString()) {
     return "TODAY";
   }
-  
+
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
 };
 
@@ -127,25 +141,171 @@ const TypingIndicator = () => (
 );
 
 /* ── Typewriter Text Component ── */
+function parseMarkdownToTokens(text: string) {
+  const regex = /\*\*(.*?)(?:\*\*|$)/gs;
+  const tokens = [];
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      tokens.push({ text: text.substring(lastIndex, match.index), bold: false });
+    }
+    tokens.push({ text: match[1], bold: true });
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    tokens.push({ text: text.substring(lastIndex), bold: false });
+  }
+  return tokens;
+}
+
 const TypewriterText = ({ text }: { text: string }) => {
-  const words = text.split(" ");
+  const tokens = parseMarkdownToTokens(text);
+  let wordIndex = 0;
+
   return (
-    <div className="flex flex-wrap">
-      {words.map((word, i) => (
-        <motion.span
-          key={i}
-          initial={{ opacity: 0, filter: "blur(0px)", y: 2 }}
-          animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-          transition={{
-            duration: 0.3,
-            delay: i * 0.05,
-            ease: "easeOut"
-          }}
-          className="mr-1 mt-0.5"
-        >
-          {word}
-        </motion.span>
-      ))}
+    <div className="whitespace-pre-wrap inline">
+      {tokens.map((token, tIdx) => {
+        const words = token.text.split(/(\s+)/);
+        return (
+          <span key={tIdx} className={token.bold ? "font-bold" : ""}>
+            {words.map((word, wIdx) => {
+              if (!word) return null;
+              if (word.trim() === "") {
+                return <span key={wIdx}>{word}</span>;
+              }
+              const delay = (wordIndex++) * 0.035;
+              return (
+                <motion.span
+                  key={wIdx}
+                  initial={{ opacity: 0, filter: "blur(4px)", y: 2 }}
+                  animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                  transition={{
+                    duration: 0.3,
+                    delay: delay,
+                    ease: "easeOut"
+                  }}
+                  className="inline-block"
+                >
+                  {word}
+                </motion.span>
+              );
+            })}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
+const FormattedText = ({ text, className }: { text: string, className?: string }) => {
+  return (
+    <div
+      className={className}
+      dangerouslySetInnerHTML={{ __html: text ? text.replace(/\*\*(.*?)(?:\*\*|$)/gs, '<strong class="font-bold text-[#1e1b4b]">$1</strong>') : '' }}
+    />
+  );
+};
+
+const StructuredDataDisplay = ({ data }: { data: StructuredResponse }) => {
+  if (!data) return null;
+
+  return (
+    <div className="mt-4 space-y-6 text-sm bg-white/50 p-1 rounded-xl">
+      {data.summary && (
+        <div className="bg-[#bef264]/20 p-4 rounded-xl border border-[#bef264]/40">
+          <h4 className="font-bold text-[#1e1b4b] mb-2 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-[#73a31c]" /> Summary
+          </h4>
+          <FormattedText text={data.summary} className="text-gray-800 leading-relaxed" />
+        </div>
+      )}
+
+      {data.key_points && data.key_points.length > 0 && (
+        <div className="bg-[#1e1b4b]/5 p-4 rounded-xl">
+          <h4 className="font-bold text-[#1e1b4b] mb-2">Key Points</h4>
+          <ul className="space-y-2">
+            {data.key_points.map((pt, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-[#1e1b4b] font-bold mt-0.5">•</span>
+                <FormattedText text={pt} className="text-gray-800" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {data.events && data.events.length > 0 && (
+        <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+          <h4 className="font-bold text-[#1e1b4b] p-3 bg-gray-50 border-b">Important Events</h4>
+          <div className="divide-y">
+            {data.events.map((ev, i) => (
+              <div key={i} className="p-3 grid grid-cols-1 sm:grid-cols-4 gap-2 hover:bg-gray-50/50">
+                <div className="font-bold text-gray-800">{ev.year}</div>
+                <div className="sm:col-span-3">
+                  <p className="font-semibold text-gray-900">{ev.event}</p>
+                  {ev.significance && <p className="text-gray-600 text-xs mt-1">{ev.significance}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.comparison_table && data.comparison_table.length > 0 && (
+        <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+          <h4 className="font-bold text-[#1e1b4b] p-3 bg-gray-50 border-b">Details</h4>
+          <div className="divide-y">
+            {data.comparison_table.map((row, i) => (
+              <div key={i} className="p-3 grid grid-cols-1 sm:grid-cols-3 gap-2 hover:bg-gray-50/50">
+                <div className="font-semibold text-gray-800">{row.name}</div>
+                <div className="sm:col-span-2 text-gray-700"><FormattedText text={row.details} /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.question_pattern && (
+        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+          <h4 className="font-bold text-orange-800 mb-2">Exam Pattern</h4>
+          <FormattedText text={data.question_pattern} className="text-orange-900/90 leading-relaxed" />
+        </div>
+      )}
+
+      {data.exam_tip && (
+        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+          <h4 className="font-bold text-blue-800 mb-2">Exam Tip</h4>
+          <FormattedText text={data.exam_tip} className="text-blue-900/90 leading-relaxed" />
+        </div>
+      )}
+
+      {/* {data.related_pyq && data.related_pyq.length > 0 && (
+        <div className="mt-6 pt-4 border-t border-gray-100">
+          <h4 className="font-bold text-[#1e1b4b] mb-3">Previous Year Questions</h4>
+          <div className="space-y-3">
+            {data.related_pyq.map((pyq, i) => (
+              <div key={i} className="bg-gray-50 p-4 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+                <span className="inline-block px-2.5 py-1 bg-gray-200 text-gray-700 text-[10px] rounded mb-2 font-bold uppercase tracking-wider">{pyq.exam}</span>
+                <p className="text-gray-800 text-[13px] whitespace-pre-wrap leading-relaxed">{pyq.question_text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )} */}
+
+      {data.related_topics && data.related_topics.length > 0 && (
+        <div className="pt-2">
+          <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-2">Related Topics</h4>
+          <div className="flex flex-wrap gap-2">
+            {data.related_topics.map((topic, i) => (
+              <span key={i} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium hover:bg-gray-200 cursor-pointer transition-colors">
+                {topic}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -219,10 +379,10 @@ const AskYourDoubt = () => {
   useEffect(() => {
     const handleInitialQuery = async () => {
       const initialQuery = location.state?.initialQuery;
-      
+
       if (initialQuery && !initialQueryProcessed.current) {
         initialQueryProcessed.current = true;
-        
+
         // Slightly delay to ensure state and DOM are settled
         setTimeout(() => {
           sendMessage(initialQuery);
@@ -284,6 +444,7 @@ const AskYourDoubt = () => {
             id: `a-${item.id}`,
             role: "assistant" as const,
             content: item.answer,
+            structured_response: item.structured_response,
             timestamp: formatChatTime(item.created_at)
           });
         }
@@ -360,6 +521,7 @@ const AskYourDoubt = () => {
           id: response.id.toString(),
           role: "assistant",
           content: response.answer || "I'm sorry, I couldn't process that.",
+          structured_response: response.structured_response,
           timestamp: formatChatTime(response.created_at),
           isNew: true, // Mark only this specific message for animation
         };
@@ -588,7 +750,12 @@ const AskYourDoubt = () => {
                         {msg.role === "assistant" && msg.isNew ? (
                           <TypewriterText text={msg.content} />
                         ) : (
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                          msg.role === "assistant" ? <FormattedText text={msg.content} className="whitespace-pre-wrap" /> : <p className="whitespace-pre-wrap">{msg.content}</p>
+                        )}
+                        {msg.structured_response && (
+                          <div className={msg.isNew && isTyping ? "hidden" : "block animate-in fade-in slide-in-from-bottom-2 duration-500 mt-4 delay-500 fill-mode-both"}>
+                            <StructuredDataDisplay data={msg.structured_response} />
+                          </div>
                         )}
                       </div>
                       <p
