@@ -33,7 +33,7 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
     const { data: dashboardData, isLoading, error } = useQuery({
         queryKey: ['dashboard', user?.id, currentContext?.plan_id],
         queryFn: () => studyService.getDashboardData(user!.id, currentContext?.plan_id),
-        enabled: !!user?.id && !!currentContext?.plan_id,
+        enabled: !!user?.id,
         staleTime: 30 * 1000,
     });
 
@@ -168,6 +168,7 @@ export function RightSidebarWidgets({ initialView = 'all' }: RightSidebarWidgets
                 <>
                     <StreakWidget
                         streakDays={streakCount}
+                        longestStreak={dashboardData?.streak?.longest_streak}
                         calendar={dashboardData?.streak?.weekly_calendar}
                         streakPoints={dashboardData?.streak?.streak_points}
                         nextPointIn={dashboardData?.streak?.next_point_in}

@@ -146,8 +146,10 @@ export function StreakWidget({
 
           <div className="flex items-center gap-1.5 ">
             {/* Points Badge */}
-            <div className="flex items-center gap-1.5 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-100">
-            
+            <div className="flex items-center gap-1.5 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100">
+              <svg className="w-3.5 h-3.5 text-orange-500 fill-orange-500" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
               <span className="text-xs font-bold text-orange-700">{streakPoints} pts</span>
             </div>
 
@@ -234,8 +236,9 @@ export function StreakWidget({
                       >
                         +{rewardPoints}
                       </div>
-                    ) : day.isToday && isTodayCompleted ? (
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center ">
+                    ) : day.isToday ? (
+                      /* Always show fire animation on today's day */
+                      <div className="w-8 h-8 flex items-center justify-center ">
                         <Lottie
                           animationData={fireAnimation}
                           loop={true}
@@ -245,20 +248,13 @@ export function StreakWidget({
                     ) : (
                       <div
                         className={cn(
-                          "rounded-full flex items-center justify-center transition-all z-30 border-2 text-[11px] font-semibold",
-                          day.isToday ? "w-8 h-8" : "w-6 h-6",
+                          "w-6 h-6 rounded-full flex items-center justify-center transition-all z-30 border-2",
                           day.completed
                             ? "bg-primary text-primary-foreground border-primary"
-                            : day.isToday
-                              ? "bg-card border-orange-200 text-orange-500"
-                              : "bg-card border-muted-foreground/10 text-muted-foreground/50"
+                            : "bg-card border-muted-foreground/10 text-transparent"
                         )}
                       >
-                        {day.completed ? (
-                          <Check className="w-3.5 h-3.5 stroke-[3px]" />
-                        ) : (
-                          <span>{day.day}</span>
-                        )}
+                        {day.completed && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
                       </div>
                     )}
                   </div>
